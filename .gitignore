@@ -82,7 +82,6 @@ dmypy.json
 cython_debug/
 
 # Environments
-vianu/tools/tici/config.py
 .venv
 env/
 venv/
