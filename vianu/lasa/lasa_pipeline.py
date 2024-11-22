@@ -1,6 +1,7 @@
 import pandas as pd
-from .load_files import read_medicament_file_as_list
-from .matching_sequences import match_seq_against_list
+
+import load_files
+import matching_sequences
 from pandas import DataFrame
 
 def collapse_sources(df_drugs_identified):
@@ -48,8 +49,9 @@ def search(searched_word: str, sources, threshold: float = 50) -> pd.DataFrame:
     # INITIALIZE 'data_matched' VARIABLE. LIST WITH MATCHES THAT IS LATER READ AS DATAFRAME.
     data_matched = []
     for source_name in sources:
-        read_list = read_medicament_file_as_list(source_name)
-        data_matched = match_seq_against_list(data_matched, read_list, source_name, searched_word, float(threshold))
+        read_list = load_files.read_medicament_file_as_list(source_name)
+        print(sources)
+        data_matched = matching_sequences.match_seq_against_list(data_matched, read_list, source_name, searched_word, float(threshold))
 
     res = pd.DataFrame(data_matched, columns=['name', 'gram', 'phon-de', 'phon-fr', 'dataset'])
 
@@ -70,3 +72,6 @@ def search(searched_word: str, sources, threshold: float = 50) -> pd.DataFrame:
 
     # res.to_csv(OUTPUT_PATH / 'result_' + searched_word + '.csv', header=None)
     return res
+
+if __name__ == "__main__":
+    search('ibuprofen', ['dummy'], 50)
