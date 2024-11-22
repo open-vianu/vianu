@@ -37,7 +37,6 @@ poetry install
 #### Launch a Demo Pipeline
 
 ```bash
-poetry install
 poetry shell
 python -m vianu.tools.tici.launch_demo_pipeline
 ```
@@ -47,7 +46,6 @@ python -m vianu.tools.tici.launch_demo_pipeline
 #### Launch a Demo App
 
 ```bash
-poetry install
 poetry shell
 python vianu/tools/nightcrawler/launch_demo_app.py
 ```
