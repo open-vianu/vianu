@@ -7,7 +7,7 @@ Vianu is a Python package designed for developers working in the **life sciences
 
 ## Feature Overview
 
-- **Lasa**: A tool for phonetic comparison of novel drug names with authorized ones from different locations.
+- **TICI**: A tool for phonetic comparison of novel drug names with authorized ones from different locations.
 - **Nightcrawler**: A data ingestion and transformation pipeline for real-world healthcare data.
 
 ## Installation
@@ -40,7 +40,7 @@ Give
 cd vianu/lasa
 poetry install
 poetry shell
-python launch_demo_pipeline.py
+python -m vianu.tools.tici.launch_demo_pipeline
 ```
 
 ### Nightcrawler
