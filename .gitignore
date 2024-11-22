@@ -1,0 +1,138 @@
+.idea/
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Poetry specific
+poetry.lock
+.cache/
+
+# PyInstaller
+# Usually these files are written by a Python script from a template
+# before PyInstaller builds the exe, so as to inject date/other infos into it.
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+*.mocha/
+test-results/
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+
+# IPython
+profile_default/
+ipython_config.py
+
+# Pycharm
+.idea/
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# Spyder
+.spyderproject
+.spyproject
+
+# MyPy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre
+.pyre/
+
+# Cython debug symbols
+cython_debug/
+
+# Environments
+vianu/tools/tici/config.py
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Logs
+*.log
+*.out
+*.err
+
+# Docker
+*.dockerignore
+**/Dockerfile
+
+# Editor backups
+*~
+*.swp
+.swo
+*.orig
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Local environment files
+.envrc
+.env.local
+.env.development
+.env.test
+.env.production
+.env
+
+# Jupyter Notebook metadata
+.ipynb_checkpoints/
+
+# Coverage reports
+.coverage
+.cache
+
+# pytest
+.pytest_cache/
+.mypy_cache/
+
+# Ruff
+.ruff_cache/
+
+# Black
+.black/
+
+# Poetry lock file (if you prefer not to include it)
+poetry.lock
