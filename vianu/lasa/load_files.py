@@ -1,13 +1,13 @@
 import re
 import pandas as pd
 from typing import List
-from .config import (
+from config import (
+    DUMMY_FILEPATH,
     FDA_FILEPATH,
     USAN_FILEPATH,
     RXNORM_FILEPATH,
     SWISSMEDIC_FILEPATH,
 )
-
 
 def extract_drug_name(text):
     split_char = ","
