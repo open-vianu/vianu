@@ -57,6 +57,19 @@ poetry install
 poetry shell
 python -m vianu.tools.nightcrawler.launch_demo_pipeline
 ```
+### LiSA
+
+#### Launch a Demo App
+
+
+
+#### Launch a Demo Pipeline
+
+```bash
+poetry shell
+python -m vianu.tools.lisa.launch_demo_pipeline
+```
+
 
 ## Contributing
 
