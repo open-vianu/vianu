@@ -1,7 +1,15 @@
 from abc import ABC, abstractmethod
+import dacite
 from dataclasses import dataclass, asdict, field
+from datetime import datetime
+from enum import Enum
 from hashlib import sha256
-from typing import List
+import io
+import json
+import logging
+import numpy as np
+from pathlib import Path
+from typing import Dict, List, IO
 
 
 @dataclass
@@ -129,14 +137,35 @@ class TextEntity(DataUnit):
     def get_raw_text(self) -> str:
         return self.__raw_text
 
-# TODO continue from here
 
+class DocumentTypes(Enum):
+    HTML = "html"
+    PDF = "pdf"
+    # XLSX = "xlsx"
+    # XLS = "xls"
+    # TEXT = "txt"
+
+class DocumentSources(Enum):
+    PUBMED = "pubmed"
+    SWISSMEDIC = "swissmedic"
+    # EMA = "ema"
+    # FDA = "fda"
+    # MHRA = "mhra"
+    # TGA = "tga"
+    # HC = "hc"
+    # FDA_SEARCH = "fda_search"
+    # SAI_SEARCH = "sai_search"
+    # ROTELISTE = "roteliste"
+
+    
 @dataclass(eq=False)
 class Document(DataUnit):
     """Class containing any document related information."""
 
     url: str | None = None
     sourceUrl: str | None = None
+    source: DocumentSources | None = None
+    type: DocumentTypes | None = None
     language: str | None = None
 
     # optional document fields
@@ -150,6 +179,7 @@ class Document(DataUnit):
 
     # private document fields
     __raw_text: str = ""
+    __textEntityIDIndexMap: dict = field(default_factory=dict)
 
     @property
     def _id_prefix(self):
@@ -196,129 +226,12 @@ class Document(DataUnit):
     def get_raw_text(self) -> str:
         return self.__raw_text
 
-    def add_input(self, input: str) -> None:
-        self.__input = input
-
-    def get_input(self) -> str | None:
-        return self.__input
-
     def is_source_binary(self) -> bool:
         url = ("." + self.type.value) if self.type else (self.url or "")
         return any([url.endswith(x) for x in [".xls", ".xlsx", ".pdf", ".ppt"]])
 
     def is_source_html(self) -> bool:
         return self.type is not None and self.type == DocumentTypes.HTML or (self.url or "").endswith(".html")
-
-    def _apply_feedback(self, feedback: Feedback) -> None:
-        match feedback.category:
-            case FeedbackCategories.NER:
-                def _create_instance(class_name, id_, text, location, probability):
-                    cls = globals()[class_name]
-                    instance = cls(id_=id_, text=text, location=location, probability=probability)
-                    return instance
-                
-                old_value = json.loads(str(feedback.old_value))
-                new_value = json.loads(feedback.new_value)
-
-                for entity in self.textEntities:
-                    if entity.id_ != feedback.text_entity_id:
-                        continue
-                    filtered = [pair for pair in getattr(entity, old_value["key"]) if pair.id_ != old_value["entity_id"]]
-                    setattr(entity, old_value["key"], filtered)
-
-                    if new_value["key"] != "removed":
-                        new_pair = _create_instance(new_value["class_name"], id_=new_value["entity_id"], text=new_value["text"], location=new_value["location"], probability=float(new_value["probability"]))
-                        getattr(entity, new_value["key"]).append(new_pair)
-                        
-                    if old_value["key"] == "medicinalProducts":
-                        entity.medProdSigPairs = [pair for pair in entity.medProdSigPairs if pair.medProdID != old_value["entity_id"]]
-                    if old_value["key"] == "signals":
-                        entity.medProdSigPairs = [pair for pair in entity.medProdSigPairs if pair.sigID != old_value["entity_id"]]
-
-            case FeedbackCategories.CAUSALITY:
-                for entity in self.textEntities:
-                    if entity.id_ != feedback.text_entity_id:
-                        continue
-                    for pair in entity.medProdSigPairs:
-                        pair.causalityFeedback = float(feedback.new_value)
-            case FeedbackCategories.SEVERITY:
-                for entity in self.textEntities:
-                    if entity.id_ != feedback.text_entity_id:
-                        continue
-                    for pair in entity.medProdSigPairs:
-                        pair.severityFeedback = float(feedback.new_value)
-            case FeedbackCategories.RELEVANCE:
-                for entity in self.textEntities:
-                    if entity.id_ != feedback.text_entity_id:
-                        continue
-                    for pair in entity.medProdSigPairs:
-                        pair.relevanceFeedback = float(feedback.new_value)
-            case FeedbackCategories.REPORT:
-                new_value = json.loads(feedback.new_value)
-                if new_value["enabled"]:
-                    if new_value["query_id"] not in self.marked_for_report:
-                        self.marked_for_report.append(new_value["query_id"])
-                elif new_value["query_id"] in self.marked_for_report:
-                    self.marked_for_report.remove(new_value["query_id"])
-            case FeedbackCategories.COMMENT:
-                self.comment = feedback.new_value
-            case FeedbackCategories.CONTEXT:
-                new_value = json.loads(feedback.new_value)
-                for entity in self.textEntities:
-                    if entity.id_ != feedback.text_entity_id:
-                        continue
-                    if new_value["enabled"]:
-                            entity.reportContext = new_value["context"]
-                    else:
-                        entity.reportContext = []
-
-    def apply_feedbacks(self, feedbacks: list[Feedback] | None) -> None:
-        if not feedbacks:
-            return
-        logging.warning(f"Applying {len(feedbacks)} on doc {self.id_}")
-        for feedback in feedbacks:
-            self._apply_feedback(feedback)
-
-    def set_last_update(self, previous: Document | None):
-        """Set lastUpdate fields based on previous version of same document"""
-
-        if previous is not None and previous.lastUpdate is not None and self.lastUpdate is None:
-            self.lastUpdate = previous.lastUpdate
-
-        if self.lastUpdate is None:
-            self.lastUpdate = self.extractionDate
-
-        if previous is None:
-            logging.info(f"No previous version of {self.id_}")
-            return
-
-        changed = False
-        logging.info(f"Comparing with previous version {self.id_}")
-        for index, textEntity in enumerate(self.textEntities):
-            if textEntity.lastUpdate is None:
-                logging.info(f"{self.id_}: textEntity lastUpdate was None, setting to {self.lastUpdate}")
-                self._textEntities[index].lastUpdate = self.lastUpdate
-            # Find in previous
-            found = False
-            for prev_entity in previous.textEntities:
-                if prev_entity.id_ != textEntity.id_:
-                    continue
-                # Found an entity that existed before
-                found = True
-                # TODO this will always return False (dataclass eq=False)
-                # we might want to consider that some changes should be notified to users !
-                if textEntity != prev_entity:
-                    changed = True
-                    logging.warning(f"Doc {self.id_} entity {textEntity.id_} has a change")
-                    self._textEntities[index].lastUpdate = datetime.now()
-            if not found:
-                # New entity
-                logging.info(f"{self.id_}: found new entity")
-                self._textEntities[index].lastUpdate = datetime.now()
-                changed = True
-        if changed:
-            logging.info(f"{self.id_}: doc changed, setting new lastUpdate")
-            self.lastUpdate = datetime.now()
 
 
 class DocumentJSONEncoder(json.JSONEncoder):
