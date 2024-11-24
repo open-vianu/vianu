@@ -152,10 +152,10 @@ def display_results(site_token, serp_token, country, search_term, selected_examp
 
 
 # Define the Gradio app layout
-with gr.Blocks(title="Nightcrawler Sandbox (Vianus' Demo)") as app:
+with gr.Blocks(title="Fraudcrawler Sandbox (Vianus' Demo)") as app:
     gr.Markdown(
         """
-        <h1 style="text-align: center;">Nightcrawler Sandbox (Vianus' Demo)</h1>
+        <h1 style="text-align: center;">Fraudcrawler Sandbox (Vianus' Demo)</h1>
         """,
         elem_id="centered-title",
     )

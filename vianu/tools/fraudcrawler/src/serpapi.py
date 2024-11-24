@@ -1,7 +1,7 @@
 import requests
 import logging
 
-logger = logging.getLogger("nightcrawler_logger")
+logger = logging.getLogger("fraudcrawler_logger")
 
 class SerpApiClient:
     """

@@ -4,7 +4,7 @@ import time
 from tqdm.auto import tqdm
 from requests.auth import HTTPBasicAuth
 
-logger = logging.getLogger("nightcrawler_logger")
+logger = logging.getLogger("fraudcrawler_logger")
 
 
 class ZyteApiClient:
