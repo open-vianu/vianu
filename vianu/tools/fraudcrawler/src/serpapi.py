@@ -3,6 +3,7 @@ import logging
 
 logger = logging.getLogger("fraudcrawler_logger")
 
+
 class SerpApiClient:
     """
     A client to interact with the SERP API for performing search queries.

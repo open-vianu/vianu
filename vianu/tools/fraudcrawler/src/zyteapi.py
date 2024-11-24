@@ -101,4 +101,3 @@ class ZyteApiClient:
 
         logger.info(f"Fetched product details for {len(products)} URLs.")
         return products
-

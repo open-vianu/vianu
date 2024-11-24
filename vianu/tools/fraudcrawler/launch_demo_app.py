@@ -169,13 +169,15 @@ def handle_inputs(site_token, serp_token, search_term, selected_example):
 
             # Generate HTML content from JSON
             html_content = ""
-            if len(search_results)==0:
-                html_content= "<h3 style='color:green;'>Your search did not retrieve any results with the default configuration.</h3>"
+            if len(search_results) == 0:
+                html_content = "<h3 style='color:green;'>Your search did not retrieve any results with the default configuration.</h3>"
             else:
                 for item in search_results:
                     title = item.get("product.name", "No title")
                     price = item.get("product.price", "Price not available")
-                    description = item.get("product.description", "No description available")
+                    description = item.get(
+                        "product.description", "No description available"
+                    )
                     url = item.get("url", "#")
                     image_url = item.get("product.mainImage.url", "")
 
@@ -217,6 +219,7 @@ def handle_inputs(site_token, serp_token, search_term, selected_example):
             """
         return html_content
 
+
 # Define the Gradio app layout
 with gr.Blocks(title="FraudCrawler Sandbox") as app:
     gr.Markdown(
@@ -243,7 +246,7 @@ with gr.Blocks(title="FraudCrawler Sandbox") as app:
                 value="Devalife",
                 interactive=True,
             )
-            
+
             # Inputs for API tokens and search terms
             gr.Markdown("### Custom Configuration")
             with gr.Accordion("Search for your own keywords", open=False):
@@ -275,7 +278,9 @@ with gr.Blocks(title="FraudCrawler Sandbox") as app:
 
 
 def main():
-    app.launch(debug=True) # Add share=True if you want to create a 72h lasting demo deployment.
+    app.launch(
+        debug=True
+    )  # Add share=True if you want to create a 72h lasting demo deployment.
 
 
 # Launch the app

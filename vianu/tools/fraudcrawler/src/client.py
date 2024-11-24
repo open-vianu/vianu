@@ -71,4 +71,3 @@ class FraudcrawlerClient:
         # Log and return the DataFrame
         logger.info("Search completed. Returning flattened DataFrame.")
         return df
-
