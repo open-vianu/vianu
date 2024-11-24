@@ -1,14 +1,20 @@
-# Vianu
+<p align="center">
+    <img src="https://avatars.githubusercontent.com/u/189356226?s=400&u=4bc88c9f31bc573f84d4222461c520e19c1c97a4&v=4" alt="vianu Logo" width="150" height="150" />
+    <h3 align="center">vianu</h3>
+    <p align="center">Together we are building an Open Source Community for Life Sciences.</p>
+    <p align="center">
+        <a href="https://badge.fury.io/py/vianu"><img alt="PyPI version" src="https://badge.fury.io/py/vianu.svg?icon=si%3Apython"></a>
+    </p>
+</p>
 
-[![PyPI version](https://badge.fury.io/py/vianu.svg?icon=si%3Apython)](https://badge.fury.io/py/vianu)  
-<!-- [![Documentation Status](https://readthedocs.org/projects/vianu/badge/?version=latest)](https://vianu.readthedocs.io/en/latest/) -->
+---
 
 Vianu is a Python package designed for developers working in the **life sciences and healthcare** sectors. It provides access to a variety of tools and workflows, allowing users to quickly build, validate, and deploy data-driven applications.
 
-## Feature Overview
+## Available Tools
 
-- **TICI**: A tool for phonetic comparison of novel drug names with authorized ones from different locations.
-- **Fraudcrawler**: A data ingestion and transformation pipeline for real-world healthcare data.
+- **LASA**: A tool for phonetic comparison of novel drug names with authorized ones from different locations.
+- **FraudCrawler**: A data ingestion and transformation pipeline for real-world healthcare data.
 
 ## Installation
 
