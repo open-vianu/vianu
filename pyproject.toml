@@ -23,7 +23,7 @@ python-dotenv = "^1.0.1"
 openpyxl = "^3.1.5"
 
 [tool.poetry.scripts]
-nightcrawler_app = "vianu.tools.nightcrawler.launch_demo_app:main"
+fraudcrawler_app = "vianu.tools.fraudcrawler.launch_demo_app:main"
 
 
 [build-system]
