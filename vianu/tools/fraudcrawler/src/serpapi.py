@@ -41,7 +41,7 @@ class SerpApiClient:
             "location_used": self.location,
         }
 
-        response = requests.get("https://serpapi.com/search", params=params)
+        response = requests.get("https://serpapi.com/search", params=params, timeout=10)
 
         if response.status_code == 200:
             data = response.json()
