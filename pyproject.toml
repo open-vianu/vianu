@@ -21,6 +21,7 @@ cologne-phonetics = "^2.0.0"
 pandas = "^2.2.3"
 python-dotenv = "^1.0.1"
 openpyxl = "^3.1.5"
+bandit = "^1.7.10"
 
 [tool.poetry.scripts]
 fraudcrawler_app = "vianu.tools.fraudcrawler.launch_demo_app:main"
