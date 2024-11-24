@@ -4,7 +4,7 @@ from typing import Dict
 from llama_cpp import Llama
 
 import settings
-from helpers import llm_apis
+import llm_apis
 
 
 class BaseGenerator:
