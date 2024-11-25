@@ -64,7 +64,7 @@ python vianu/tools/fraudcrawler/launch_demo_app.py
 ```bash
 poetry install
 poetry shell
-python -m vianu.tools.fraudcrawler.launch_demo_pipeline
+python -m vianu.fraudcrawler.launch_demo_pipeline
 ```
 
 ## Contributing

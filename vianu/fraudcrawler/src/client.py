@@ -1,9 +1,9 @@
 import pandas as pd
 import logging
 
-from vianu.tools.fraudcrawler.src.processor import Processor
-from vianu.tools.fraudcrawler.src.serpapi import SerpApiClient
-from vianu.tools.fraudcrawler.src.zyteapi import ZyteApiClient
+from vianu.fraudcrawler.src.processor import Processor
+from vianu.fraudcrawler.src.serpapi import SerpApiClient
+from vianu.fraudcrawler.src.zyteapi import ZyteApiClient
 
 logger = logging.getLogger("fraudcrawler_logger")
 

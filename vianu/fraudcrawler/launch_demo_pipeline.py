@@ -1,7 +1,7 @@
 import os
 
 from dotenv import load_dotenv
-from vianu.tools.fraudcrawler.src.client import FraudCrawlerClient
+from vianu.fraudcrawler.src.client import FraudCrawlerClient
 
 load_dotenv()
 
