@@ -22,7 +22,7 @@ def parse_args(args_):
 def main():
     args_= parse_args(sys.argv[1:])
     mod = [mod for mod in MODULES if mod.MODULE_NAME == args_.module][0]
-    mod.apply()
+    mod.apply(args_)
 
 
 if __name__ == '__main__':

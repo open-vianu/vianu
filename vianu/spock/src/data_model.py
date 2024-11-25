@@ -154,7 +154,7 @@ class Document(DataUnit):
     """Class containing any document related information."""
 
     url: str | None = None
-    sourceUrl: str | None = None
+    source_url: str | None = None
     source: str | None = None
     type: str | None = None
     language: str | None = None
@@ -163,44 +163,46 @@ class Document(DataUnit):
     text: str | None = None
     title: str | None = None
     abstract: str | None = None
+    publication_date: datetime | None = None
+
 
     # protected document fields (considered by `DataUnit.asdict()`)
-    _textEntities: List[TextEntity] = field(default_factory=list)
+    _text_entities: List[TextEntity] = field(default_factory=list)
     _errors: List[str] = field(default_factory=list)
 
     # private document fields
     __raw_text: str = ""
-    __textEntityIDIndexMap: dict = field(default_factory=dict)
+    __text_entity_id_index_map: dict = field(default_factory=dict)
 
     @property
     def _id_prefix(self):
         return 'doc_'
 
     @property
-    def textEntities(self):
-        return self._textEntities
+    def text_entities(self):
+        return self._text_entities
 
     def add_text_entity(self, text_entity: TextEntity) -> None:
-        """Appends a text entity and updates the ID - Index map in self.textEntityIDIndexMap."""
-        if (id_ := text_entity.id_) in self.__textEntityIDIndexMap:
-            index = self.__textEntityIDIndexMap[id_]
-            logging.debug(f'A textEntity object with id={id_} already exists at loc={index} and is ignored')
+        """Appends a text entity and updates the ID - Index map in self.text_entity_id_index_map."""
+        if (id_ := text_entity.id_) in self.__text_entity_id_index_map:
+            index = self.__text_entity_id_index_map[id_]
+            logging.debug(f'A text entity object with id={id_} already exists at loc={index} and is ignored')
         else:
-            self.textEntities.append(text_entity)
-            self.__textEntityIDIndexMap[text_entity.id_] = len(self.textEntities) - 1
+            self._text_entities.append(text_entity)
+            self.__text_entity_id_index_map[text_entity.id_] = len(self.text_entities) - 1
 
     def del_text_entity(self, index_: int | None = None, id_: str | None = None) -> None:
         """Removes a given text entity by its index or its id."""
         if index_ is not None and id_ is not None:
-            raise ValueError(f'The definition of `index` OR `id_` must be exclusive.')
+            raise ValueError('The definition of `index` OR `id_` must be exclusive.')
         if index_ is None and id_ is None:
-            raise ValueError(f'Either `index` or `id_` has to be defined.')
+            raise ValueError('Either `index` or `id_` has to be defined.')
         if id_ is not None:
-            index = self.__textEntityIDIndexMap[id_]
+            index = self.__text_entity_id_index_map[id_]
         elif index_ is not None:
             index = index_
-        self._textEntities.pop(index)
-        self.__textEntityIDIndexMap = {ent.id_: i for i, ent in enumerate(self._textEntities)}
+        self._text_entities.pop(index)
+        self.__text_entity_id_index_map = {ent.id_: i for i, ent in enumerate(self._text_entities)}
 
     def add_error(self, err: str) -> None:
         self._errors.append(err)
@@ -216,13 +218,6 @@ class Document(DataUnit):
 
     def get_raw_text(self) -> str:
         return self.__raw_text
-
-    def is_source_binary(self) -> bool:
-        url = ("." + self.type.value) if self.type else (self.url or "")
-        return any([url.endswith(x) for x in [".xls", ".xlsx", ".pdf", ".ppt"]])
-
-    def is_source_html(self) -> bool:
-        return self.type is not None and self.type == DocumentTypes.HTML or (self.url or "").endswith(".html")
 
 
 class DocumentJSONEncoder(json.JSONEncoder):
