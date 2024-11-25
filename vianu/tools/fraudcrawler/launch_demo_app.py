@@ -1,4 +1,5 @@
 import gradio as gr
+from vianu.tools.fraudcrawler.src.client import FraudCrawlerClient
 
 # Sample JSON data for three example drugs with valid image URLs
 iron_magic_milk_data = [
@@ -11,7 +12,7 @@ iron_magic_milk_data = [
         "zyteProbability": 0.005122258793562651,
         "fullDescription": "Amazing product sold here",
         "images": [
-            "https://cdn.basler-beauty.de/out/pictures/generated/manufacturer/icon/100_100_100/milk-shake.b1107237.png",
+            "https://www.sport-enzinger.com/wp-content/uploads/2022/08/12914_95bb945f1ece-600x600.webp.jpg",
         ],
         "pageType": "other",
     },
@@ -151,44 +152,111 @@ def display_results(site_token, serp_token, country, search_term, selected_examp
     return html_content
 
 
+def handle_inputs(site_token, serp_token, search_term, selected_example):
+    # Validate input completeness
+    if len(site_token) > 10 and len(serp_token) > 10 and len(search_term) > 3:
+        # Instantiate the client
+        nc_client = FraudCrawlerClient()
+        nc_client.serpapi_token = serp_token
+        nc_client.zyte_api_key = site_token
+
+        try:
+            # Perform the search using FraudCrawler pipeline
+            df = nc_client.search(search_term, num_results=8, location="Switzerland")
+
+            # Convert DataFrame to JSON
+            search_results = df.to_dict(orient="records")
+
+            # Generate HTML content from JSON
+            html_content = ""
+            if len(search_results) == 0:
+                html_content = "<h3 style='color:green;'>Your search did not retrieve any results with the default configuration.</h3>"
+            else:
+                for item in search_results:
+                    title = item.get("product.name", "No title")
+                    price = item.get("product.price", "Price not available")
+                    description = item.get(
+                        "product.description", "No description available"
+                    )
+                    url = item.get("url", "#")
+                    image_url = item.get("product.mainImage.url", "")
+
+                    html_content += f"""
+                    <div style='border:1px solid #ccc; padding:10px; margin-bottom:10px;'>
+                        <h2>{title}</h2>
+                        <img src='{image_url}' alt='Image' style='max-width:200px;'/>
+                        <p><strong>Price:</strong> {price}</p>
+                        <p><strong>Description:</strong> {description}</p>
+                        <p><a href='{url}'>View Product</a></p>
+                    </div>
+                    """
+            return html_content
+        except Exception as e:
+            return f"<h3 style='color:red;'>Error: {str(e)}, please check your credentials or reach out to us at hello@vianu.com.</h3>"
+    elif len(site_token) > 0 or len(serp_token) > 0 or len(search_term) > 0:
+        return "<h3 style='color:red;'>Please fill out all the required credentials (Zyte API, Serp API, and Search Term).</h3>"
+    else:
+        # Provide example data if tokens are missing
+        if selected_example == "Devalife":
+            data = devalife_data
+        elif selected_example == "Iron Magic Milk":
+            data = iron_magic_milk_data
+        else:
+            return "Please select a valid example."
+
+        # Generate HTML content for example data
+        html_content = ""
+        for item in data:
+            image_url = item["images"][0] if item["images"] else ""
+            html_content += f"""
+            <div style='border:1px solid #ccc; padding:10px; margin-bottom:10px;'>
+                <h2>{item['title']}</h2>
+                <img src='{image_url}' alt='Image' style='max-width:200px;'/>
+                <p><strong>Price:</strong> {item['price']}</p>
+                <p><strong>Description:</strong> {item['fullDescription']}</p>
+                <p><a href='{item['url']}'>View Product</a></p>
+            </div>
+            """
+        return html_content
+
+
 # Define the Gradio app layout
-with gr.Blocks(title="Nightcrawler Sandbox (Vianus' Demo)") as app:
+with gr.Blocks(title="FraudCrawler Sandbox") as app:
     gr.Markdown(
         """
-        <h1 style="text-align: center;">Nightcrawler Sandbox (Vianus' Demo)</h1>
+        <h1 style="text-align: center;">FraudCrawler Sandbox</h1>
         """,
         elem_id="centered-title",
     )
+    gr.Markdown("""
+    Welcome to the FraudCrawler Sandbox! This tool allows you to explore how our search pipeline works using real-life examples or by performing your own custom searches. 
+
+    - **Examples**: Choose from preloaded data to see how the results are displayed.
+    - **Custom Search**: Input your search term along with a valid SERP API token and Site token. You can obtain these tokens for free by registering on their respective websites.
+
+    If you have any questions, feel free to reach out to us at hello@vianu.org. We're always happy to help! 
+    """)
     with gr.Row():
         with gr.Column(scale=1):
-            # First Box: Examples
+            # Dropdown for examples
             gr.Markdown("### Examples")
             example_dropdown = gr.Dropdown(
                 label="Select Example Drug",
-                choices=[
-                    "Devalife",
-                    "Iron Magic Milk",
-                ],
+                choices=["Devalife", "Iron Magic Milk"],
                 value="Devalife",
                 interactive=True,
             )
-            country_dropdown = gr.Dropdown(
-                label="Country",
-                choices=["CH", "CL", "AT", "ALL"],
-                value="AT",
-                interactive=True,
-            )
 
-            # Second Box: Custom Configuration (collapsible)
+            # Inputs for API tokens and search terms
             gr.Markdown("### Custom Configuration")
             with gr.Accordion("Search for your own keywords", open=False):
                 zyte_api = gr.Textbox(
-                    label="Zyte API (Name Token)",
+                    label="Zyte API Token",
                     type="password",
                     placeholder="Enter Zyte API Token",
                 )
                 serp_api = gr.Textbox(
-                    label="Serp API (Name Token)",
+                    label="Serp API Token",
                     type="password",
                     placeholder="Enter Serp API Token",
                 )
@@ -196,21 +264,23 @@ with gr.Blocks(title="Nightcrawler Sandbox (Vianus' Demo)") as app:
                     label="Search Term", placeholder="Enter your search term"
                 )
 
-        # Results section
+        # Results display section
         with gr.Column(scale=2):
             results = gr.HTML(label="Results")
 
-    # Set up the function to run when inputs are filled
+    # Button to trigger display logic
     display_button = gr.Button("Display Results")
     display_button.click(
-        fn=display_results,
-        inputs=[zyte_api, serp_api, country_dropdown, search_term, example_dropdown],
+        fn=handle_inputs,
+        inputs=[zyte_api, serp_api, search_term, example_dropdown],
         outputs=results,
     )
 
 
 def main():
-    app.launch(debug=True, share=True)
+    app.launch(
+        debug=True
+    )  # Add share=True if you want to create a 72h lasting demo deployment.
 
 
 # Launch the app

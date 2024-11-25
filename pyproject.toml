@@ -12,8 +12,8 @@ keywords = ["healthcare", "government", "opensource", "data science"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.9"
-gradio = "^4.0"
+python = "^3.11"
+gradio = "^5.0.0"
 build = "^1.2.2.post1"
 twine = "^5.1.1"
 abydos = "^0.5.0"
@@ -21,9 +21,10 @@ cologne-phonetics = "^2.0.0"
 pandas = "^2.2.3"
 python-dotenv = "^1.0.1"
 openpyxl = "^3.1.5"
+bandit = "^1.7.10"
 
 [tool.poetry.scripts]
-nightcrawler_app = "vianu.tools.nightcrawler.launch_demo_app:main"
+fraudcrawler_app = "vianu.tools.fraudcrawler.launch_demo_app:main"
 
 
 [build-system]
