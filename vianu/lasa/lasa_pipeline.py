@@ -1,6 +1,4 @@
 import pandas as pd
-#from lasa.load_files import read_medicament_file_as_list
-#from lasa.matching_sequences import match_seq_against_list
 
 import load_files
 import matching_sequences
