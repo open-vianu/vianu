@@ -9,6 +9,7 @@ Vianu is a Python package designed for developers working in the **life sciences
 
 - **TICI**: A tool for phonetic comparison of novel drug names with authorized ones from different locations.
 - **Nightcrawler**: A data ingestion and transformation pipeline for real-world healthcare data.
+- **SpoCK**: Spotting Clinical Knowledge
 
 ## Installation
 
@@ -57,7 +58,7 @@ poetry install
 poetry shell
 python -m vianu.tools.nightcrawler.launch_demo_pipeline
 ```
-### LiSA
+### SpoCK
 
 #### Launch a Demo App
 
@@ -67,7 +68,7 @@ python -m vianu.tools.nightcrawler.launch_demo_pipeline
 
 ```bash
 poetry shell
-python -m vianu.tools.lisa.launch_demo_pipeline
+python -m vianu.tools.spock.launch_demo_pipeline
 ```
 
 
