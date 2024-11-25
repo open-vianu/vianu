@@ -1,21 +1,21 @@
 import pandas as pd
 import logging
 
-from vianu.tools.nightcrawler.src.processor import Processor
-from vianu.tools.nightcrawler.src.serpapi import SerpApiClient
-from vianu.tools.nightcrawler.src.zyteapi import ZyteApiClient
+from vianu.tools.fraudcrawler.src.processor import Processor
+from vianu.tools.fraudcrawler.src.serpapi import SerpApiClient
+from vianu.tools.fraudcrawler.src.zyteapi import ZyteApiClient
 
-logger = logging.getLogger("nightcrawler_logger")
+logger = logging.getLogger("fraudcrawler_logger")
 
 
-class NightcrawlerClient:
+class FraudCrawlerClient:
     """
     The main client that orchestrates the search, data fetching, and processing.
     """
 
     def __init__(self, serpapi_token=None, zyte_api_key=None):
         """
-        Initializes the NightcrawlerClient with optional API tokens.
+        Initializes the FraudCrawlerClient with optional API tokens.
 
         Args:
             serpapi_token (str, optional): The API token for SERP API.
@@ -71,4 +71,3 @@ class NightcrawlerClient:
         # Log and return the DataFrame
         logger.info("Search completed. Returning flattened DataFrame.")
         return df
-

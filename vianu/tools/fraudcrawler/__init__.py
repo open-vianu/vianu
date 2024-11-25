@@ -1,7 +1,7 @@
 import logging
 
 # Create a named logger
-logger = logging.getLogger("nightcrawler_logger")
+logger = logging.getLogger("fraudcrawler_logger")
 
 # Set the log level
 logger.setLevel(logging.INFO)

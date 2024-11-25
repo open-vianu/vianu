@@ -1,6 +1,6 @@
 import logging
 
-logger = logging.getLogger("nightcrawler_logger")
+logger = logging.getLogger("fraudcrawler_logger")
 
 
 class Processor:
@@ -45,4 +45,3 @@ class Processor:
             f"Filtered down to {len(filtered_products)} products after applying country code filter."
         )
         return filtered_products
-
