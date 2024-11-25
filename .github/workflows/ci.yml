@@ -1,0 +1,33 @@
+# .github/workflows/ci.yml
+name: CI
+
+on: [push]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies
+      run: |
+        curl -sSL https://install.python-poetry.org | python3 -
+        poetry install
+
+    - name: Python Vulnerability Check
+      #bandit exits by defaul with status 1 if a vulerability was found. Status unequal to 0 lead to a github action failure
+      run: |
+        poetry run bandit -r vianu
+
+    - name: Lint with Ruff
+      run: |
+        poetry run ruff check --output-format=github
+
+    - name: Format with Ruff
+      run: |
+        poetry run ruff check --output-format=github
