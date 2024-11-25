@@ -7,6 +7,7 @@ from hashlib import sha256
 import io
 import json
 import logging
+
 import numpy as np
 from pathlib import Path
 from typing import Dict, List, IO
@@ -121,9 +122,9 @@ class TextEntity(DataUnit):
         if not 0 <= causality <= 1:
             raise ValueError(f'Causality value={causality} is not contained in [0, 1]')
         if index_ is not None and id_ is not None:
-            raise ValueError(f'The definition of `index` OR `id_` must be exclusive.')
+            raise ValueError('The definition of `index` OR `id_` must be exclusive.')
         if index_ is None and id_ is None:
-            raise ValueError(f'Either `index` or `id_` has to be defined.')
+            raise ValueError('Either `index` or `id_` has to be defined.')
         if id_ is not None:
             id2index = {p.id_: i for i, p in enumerate(self.medProdSigPairs)}
             index = id2index[id_]
@@ -137,35 +138,25 @@ class TextEntity(DataUnit):
     def get_raw_text(self) -> str:
         return self.__raw_text
 
+DOCUMENT_TYPES = [
+    'html',
+    'pdf',
+]
 
-class DocumentTypes(Enum):
-    HTML = "html"
-    PDF = "pdf"
-    # XLSX = "xlsx"
-    # XLS = "xls"
-    # TEXT = "txt"
+DOCUMENT_SOURCES = [
+    'pubmed',
+    'swissmedic',
+]
 
-class DocumentSources(Enum):
-    PUBMED = "pubmed"
-    SWISSMEDIC = "swissmedic"
-    # EMA = "ema"
-    # FDA = "fda"
-    # MHRA = "mhra"
-    # TGA = "tga"
-    # HC = "hc"
-    # FDA_SEARCH = "fda_search"
-    # SAI_SEARCH = "sai_search"
-    # ROTELISTE = "roteliste"
 
-    
 @dataclass(eq=False)
 class Document(DataUnit):
     """Class containing any document related information."""
 
     url: str | None = None
     sourceUrl: str | None = None
-    source: DocumentSources | None = None
-    type: DocumentTypes | None = None
+    source: str | None = None
+    type: str | None = None
     language: str | None = None
 
     # optional document fields
