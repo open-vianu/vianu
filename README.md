@@ -13,7 +13,7 @@ Vianu is a Python package designed for developers working in the **life sciences
 
 ## Available Tools
 
-- **LASA**: A tool for phonetic comparison of novel drug names with authorized ones from different locations.
+- **Lasa**: A tool for phonetic comparison of novel drug names with authorized ones from different locations.
 - **FraudCrawler**: A data ingestion and transformation pipeline for real-world healthcare data.
 
 ## Installation
@@ -54,6 +54,7 @@ python -m vianu.tools.tici.launch_demo_pipeline
 #### Launch a Demo App
 
 ```bash
+poetry install
 poetry shell
 python vianu/tools/fraudcrawler/launch_demo_app.py
 ```
