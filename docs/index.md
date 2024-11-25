@@ -7,7 +7,7 @@ layout: home
 
 # Vianu is a package meant to provide support to devs in the life sciences
 
-[Link button](#getting-started){: .btn .btn-purple }
+[Get Started](#getting-started){: .btn .btn-purple }
 
 [Vianu] is a *Python package* designed for developers working in the life sciences and healthcare sectors. 
 It provides access to a variety of tools and workflows, allowing users to quickly build, validate, and deploy 
@@ -26,7 +26,15 @@ Other than that, go ahead and `have fun` with this repository!
 
 ### Fraudcrawler
 
+This is a crawler
+
+### Ragulator
+
+This is a RAG system
+
 ### Lasa
+
+This is a tool that solves the look alike sound alike 
 
 
 ----
