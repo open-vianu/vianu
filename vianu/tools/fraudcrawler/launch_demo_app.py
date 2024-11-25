@@ -1,5 +1,5 @@
 import gradio as gr
-from vianu.tools.fraudcrawler.src.client import FraudcrawlerClient
+from vianu.tools.fraudcrawler.src.client import FraudCrawlerClient
 
 # Sample JSON data for three example drugs with valid image URLs
 iron_magic_milk_data = [
@@ -156,12 +156,12 @@ def handle_inputs(site_token, serp_token, search_term, selected_example):
     # Validate input completeness
     if len(site_token) > 10 and len(serp_token) > 10 and len(search_term) > 3:
         # Instantiate the client
-        nc_client = FraudcrawlerClient()
+        nc_client = FraudCrawlerClient()
         nc_client.serpapi_token = serp_token
         nc_client.zyte_api_key = site_token
 
         try:
-            # Perform the search using Fraudcrawler pipeline
+            # Perform the search using FraudCrawler pipeline
             df = nc_client.search(search_term, num_results=8, location="Switzerland")
 
             # Convert DataFrame to JSON

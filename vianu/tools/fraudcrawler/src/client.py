@@ -8,14 +8,14 @@ from vianu.tools.fraudcrawler.src.zyteapi import ZyteApiClient
 logger = logging.getLogger("fraudcrawler_logger")
 
 
-class FraudcrawlerClient:
+class FraudCrawlerClient:
     """
     The main client that orchestrates the search, data fetching, and processing.
     """
 
     def __init__(self, serpapi_token=None, zyte_api_key=None):
         """
-        Initializes the FraudcrawlerClient with optional API tokens.
+        Initializes the FraudCrawlerClient with optional API tokens.
 
         Args:
             serpapi_token (str, optional): The API token for SERP API.

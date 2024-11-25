@@ -1,12 +1,12 @@
 import os
 
 from dotenv import load_dotenv
-from vianu.tools.fraudcrawler.src.client import FraudcrawlerClient
+from vianu.tools.fraudcrawler.src.client import FraudCrawlerClient
 
 load_dotenv()
 
 # Instantiate the client
-nc_client = FraudcrawlerClient()
+nc_client = FraudCrawlerClient()
 
 # Set API tokens
 nc_client.serpapi_token = os.getenv("SERP_API_TOKEN", "YOUR_SERPAPI_TOKEN")
