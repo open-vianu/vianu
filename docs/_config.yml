@@ -5,7 +5,7 @@ theme: just-the-docs
 url: https://open-vianu.github.io/vianu
 
 # These are individual configurations to vianu
-logo: "/assets/images/pingu.jpeg"
+logo: "/assets/images/pingu-logo.png"
 favicon_ico: "/assets/images/favicon-pingu.ico"
 search_enabled: true
 nav_enabled: true
