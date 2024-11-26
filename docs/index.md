@@ -41,6 +41,8 @@ title: Installation
 layout: Installation
 ---
 
+# Check out what happens here
+
 ----
 
 [Vianu]: https://github.com/open-vianu/vianu
