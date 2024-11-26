@@ -1,0 +1,14 @@
+title: vianu
+description: an open-source platform for the life sciences
+theme: just-the-docs
+
+url: https://open-vianu.github.io/vianu
+
+# These are individual configurations to vianu
+logo: "/assets/images/pingu-logo.png"
+favicon_ico: "/assets/images/favicon-pingu.ico"
+search_enabled: true
+nav_enabled: true
+
+#aux_links:
+#  Template Repository: https://github.com/just-the-docs/just-the-docs-template
