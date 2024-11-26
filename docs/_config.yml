@@ -10,5 +10,28 @@ favicon_ico: "/assets/images/favicon-pingu.ico"
 search_enabled: true
 nav_enabled: true
 
+# Navigation configuration
+navigation:
+  - title: "Home"
+    url: /
+  - title: "Getting Started"
+    url: /getting-started/
+    children:
+      - title: "Installation"
+        url: /getting-started/installation/
+      - title: "Quick Start"
+        url: /getting-started/quick-start/
+  - title: "Features"
+    url: /features/
+    children:
+      - title: "Search"
+        url: /features/search/
+      - title: "Customization"
+        url: /features/customization/
+  - title: "API Reference"
+    url: /api-reference/
+  - title: "About"
+    url: /about/
+
 #aux_links:
 #  Template Repository: https://github.com/just-the-docs/just-the-docs-template

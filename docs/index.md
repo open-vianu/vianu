@@ -26,12 +26,12 @@ This is how you install all of our cool ninja moves
 - 
 
 ## Prerequisites
-- Python 3.8 or higher
+- Python 3.11 or higher
 - Internet connection for API calls
 
 ## Quick Installation
 ```bash
-pip install vianu==0.1.0
+pip install vianu==0.1.2
 ```
 
 ### Example usage
