@@ -1,5 +1,5 @@
 import gradio as gr
-from vianu.tools.fraudcrawler.src.client import FraudCrawlerClient
+from vianu.fraudcrawler.src.client import FraudCrawlerClient
 
 # Sample JSON data for three example drugs with valid image URLs
 iron_magic_milk_data = [

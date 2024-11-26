@@ -24,7 +24,7 @@ openpyxl = "^3.1.5"
 bandit = "^1.7.10"
 
 [tool.poetry.scripts]
-fraudcrawler_app = "vianu.tools.fraudcrawler.launch_demo_app:main"
+vianu_fraudcrawler_app = "vianu.fraudcrawler.launch_demo_app:main"
 
 
 [build-system]
