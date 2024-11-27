@@ -4,10 +4,10 @@ import sys
 
 from ..settings import DEFAULT_LOGGING_LEVEL, LOGGING_FMT
 from . import scraping as scp
-from . import pipeline as ppl
+from . import chunking as cnk
 
 
-MODULES = [scp]
+MODULES = [scp, cnk]
 
 
 def parse_args(args_):    # Create global parser for logs
