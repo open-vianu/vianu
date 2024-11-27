@@ -146,10 +146,12 @@ class PubmedClient:
         return documents
 
 
-def add_parser(subparser: ArgumentParser, parents: List[ArgumentParser]):
-    parser = subparser.add_parser(MODULE_NAME, parents=parents)
-    parser.add_argument('--source', dest='source', choices=DOCUMENT_SOURCES)
-    parser.add_argument('--term', dest='term')
+def cli_args():
+    parser = ArgumentParser(add_help=False)
+    group = parser.add_argument_group(MODULE_NAME)
+    group.add_argument('--source', dest='source', choices=DOCUMENT_SOURCES)
+    group.add_argument('--term', dest='term')
+    return parser
 
 
 def apply(args_):

@@ -5,9 +5,9 @@ from typing import List
 import numpy as np
 
 
-MODULE_NAME = 'chunker'
+MODULE_NAME = 'chunking'
 
-class TextChunker:
+class TextChunking:
 
     _separator = ' '
 
@@ -34,14 +34,16 @@ class TextChunker:
 
         return chunks
 
-def add_parser(subparser: ArgumentParser, parents: List[ArgumentParser]):
-    parser = subparser.add_parser(MODULE_NAME, parents=parents)
-    group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument('--text', dest='text', type=str)
-    group.add_argument('--text-file', dest='text_file')
+def cli_args():
+    parser = ArgumentParser(add_help=False)
+    group = parser.add_argument_group(MODULE_NAME)
+    txt_grp = group.add_mutually_exclusive_group(required=True)
+    txt_grp.add_argument('--text', dest='text', type=str)
+    txt_grp.add_argument('--text-file', dest='text_file')
 
-    parser.add_argument('--min-chunk-size', dest='min_chunk_size', type=int, required=True)
-    parser.add_argument('--min-chunk-overlap', dest='min_chunk_overlap', type=int, required=True)
+    group.add_argument('--min-chunk-size', dest='min_chunk_size', type=int, required=True)
+    group.add_argument('--min-chunk-overlap', dest='min_chunk_overlap', type=int, required=True)
+    return parser
 
 
 def apply(args_):
@@ -54,8 +56,6 @@ def apply(args_):
     min_chunk_overlap = args_.min_chunk_overlap
 
     logging.info(f'chunking text of length {len(text)}')
-    chunker = TextChunker(min_chunk_size=min_chunk_size, min_chunk_overlap=min_chunk_overlap)
+    chunker = TextChunking(min_chunk_size=min_chunk_size, min_chunk_overlap=min_chunk_overlap)
     chunks = chunker.get_chunks(text=text)
     logging.info(f'split into {len(chunks)} chunks')
-    for c in chunks:
-        logging.debug(c)
