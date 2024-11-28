@@ -1,6 +1,9 @@
 from argparse import ArgumentParser, ArgumentTypeError
-from typing import List
+import logging
+from pathlib import Path
 
+from ..settings import DEFAULT_DATA_DUMP
+from .data_model import FileHandler
 from . import scraping as scp
 from . import chunking as cnk
 
@@ -27,10 +30,19 @@ def cli_args():
     return parser
 
 def apply(args_):
+    logging.info(f'run pipeline seps {args_.steps}')
     if 'all' in args_.steps:
         steps = PIPELINE_STEPS['all']
     else:
         steps = [PIPELINE_STEPS[s] for s in args_.steps]
-    print(steps)
+    
+    if (data_load := args_.get('data_load')) is not None:
+        data_file = Path(data_load)
+        data = FileHandler(data_file=data_file).read()
+    else:
+        data = []
+    
+    for stp in steps:
+        stp.apply(args_, data)
     
 

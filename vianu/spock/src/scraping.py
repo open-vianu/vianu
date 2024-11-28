@@ -7,7 +7,7 @@ import requests
 from typing import List
 import xml.etree.ElementTree as ET
 
-from .data_model import DOCUMENT_SOURCES, Document
+from .data_model import DOCUMENT_SOURCES, Document, FileHandler
 from ..settings import PUBMED_ESEARCH_URL, PUBMED_DB, PUBMED_EFETCH_URL, PUBMED_BATCH_SIZE
 
 MODULE_NAME = 'scraping'
@@ -112,8 +112,9 @@ class PubmedClient:
                     language = self._extract_language(article=article)
                     publication_date = self._extract_date(article=article)
                     publication_types = self._extract_publication_types(article=article)
+                    
                     if publication_type_filter is None or set(publication_type_filter).issubset(set(publication_types)):
-                        documents.append(Document(
+                        document = Document(
                             id_=f'{title} {abstract} {language} {publication_date}',
                             source_url=self.source_url,
                             source=self.source,
@@ -121,7 +122,9 @@ class PubmedClient:
                             title=title,
                             abstract=abstract,
                             publication_date=publication_date,
-                        ))
+                        )
+                        document.add_raw_text(abstract)
+                        documents.append(document)
         return documents
 
     
@@ -154,14 +157,21 @@ def cli_args():
     return parser
 
 
-def apply(args_):
+def apply(args_, data: List[Document] | None = None):
     source = args_.source
     term = args_.term
+
+    if data is None:
+        data = FileHandler(args_.data_load).read()
+
     logging.info(f'crawling source "{source}" for term "{term}"')
-    
+
     if source == 'pubmed':
         client = PubmedClient()
-        documents = client.get_pubmed_articles(term=args_.term)
-        logging.info(f'found {len(documents)} pubmed articles')
+        articles = client.get_pubmed_articles(term=args_.term)
+        logging.info(f'found {len(articles)} pubmed articles')
+        data.extend(articles)
     else:
         logging.error(f'Unknown source {source}')
+    
+

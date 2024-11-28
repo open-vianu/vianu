@@ -1,12 +1,15 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, asdict, field
 from datetime import datetime
+import dacite
 from hashlib import sha256
 import json
 import logging
+import os
+from pathlib import Path
 
 import numpy as np
-from typing import List
+from typing import List, Self
 
 
 @dataclass
@@ -213,6 +216,14 @@ class Document(DataUnit):
 
     def get_raw_text(self) -> str:
         return self.__raw_text
+    
+    @classmethod
+    def from_dict(cls, data: dict) -> Self:
+        dacite.from_dict(
+            data_class=Self,
+            data=data,
+            config=dacite.Config(type_hooks={datetime: datetime.fromisoformat})
+        )
 
 
 class DocumentJSONEncoder(json.JSONEncoder):
@@ -227,3 +238,32 @@ class DocumentJSONEncoder(json.JSONEncoder):
             return int(o)
         # Let the base class default method raise the TypeError
         return json.JSONEncoder.default(self, o)
+
+
+
+class FileHandler:
+    """Reads from and write data to a file.
+
+    Args:
+        data_file (Path): File name
+    """
+    _suffix = '.json'
+
+    def __init__(self, data_file: Path):
+        self._data_file = data_file.with_suffix(self._suffix)
+        if not Path.is_file(self._data_file):
+            os.makedirs(self._data_file.parent)
+        logging.debug(f"FileHandler path: '{self._file}'")
+
+
+    def read(self) -> List[Document]:
+        with open(self._data_file, 'r', encoding="utf-8") as dfile:
+            entries = json.load(dfile)
+        data = [Document.from_dict(x) for x in entries]
+        return data
+
+    def write(self, data: List[Document]):
+        with open(self._data_file, 'w', encoding="utf-8") as dfile:
+            json.dump(self, dfile, cls=DocumentJSONEncoder)
+        data.dump(self._file)
+

@@ -4,6 +4,8 @@ from typing import List
 
 import numpy as np
 
+from .data_model import Document, FileHandler, TextEntity
+
 
 MODULE_NAME = 'chunking'
 
@@ -37,22 +39,27 @@ class TextChunking:
 def cli_args():
     parser = ArgumentParser(add_help=False)
     group = parser.add_argument_group(MODULE_NAME)
-    group.add_argument('--text-file', dest='text_file')
     group.add_argument('--min-chunk-size', dest='min_chunk_size', type=int, required=True)
     group.add_argument('--min-chunk-overlap', dest='min_chunk_overlap', type=int, required=True)
     return parser
 
 
-def apply(args_):
-    if args_.text:
-        text = args_.text
-    else:
-        with open(args_.text_file, 'r') as file:
-            text = file.read()
+def apply(args_: dict, data: List[Document] | None = None):
     min_chunk_size = args_.min_chunk_size
     min_chunk_overlap = args_.min_chunk_overlap
 
-    logging.info(f'chunking text of length {len(text)}')
+    if data is None:
+        data = FileHandler(args_.data_load).read()
+
+    logging.info(f'chunking the raw text of {len(data)} documents')
+
     chunker = TextChunking(min_chunk_size=min_chunk_size, min_chunk_overlap=min_chunk_overlap)
-    chunks = chunker.get_chunks(text=text)
-    logging.info(f'split into {len(chunks)} chunks')
+    for doc in data:
+        chunks = chunker.get_chunks(text=doc.get_raw_text())
+        logging.debug(f'split into {len(chunks)} chunks')
+        for text in chunks:
+            te = TextEntity(
+                id_=text,
+                text=text,
+            )
+            doc.add_text_entity(text_entity=te)
