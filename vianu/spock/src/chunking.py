@@ -37,10 +37,7 @@ class TextChunking:
 def cli_args():
     parser = ArgumentParser(add_help=False)
     group = parser.add_argument_group(MODULE_NAME)
-    txt_grp = group.add_mutually_exclusive_group(required=True)
-    txt_grp.add_argument('--text', dest='text', type=str)
-    txt_grp.add_argument('--text-file', dest='text_file')
-
+    group.add_argument('--text-file', dest='text_file')
     group.add_argument('--min-chunk-size', dest='min_chunk_size', type=int, required=True)
     group.add_argument('--min-chunk-overlap', dest='min_chunk_overlap', type=int, required=True)
     return parser
