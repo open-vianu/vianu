@@ -142,11 +142,11 @@ def display_results(site_token, serp_token, country, search_term, selected_examp
         image_url = item["images"][0] if item["images"] else ""
         html_content += f"""
         <div style='border:1px solid #ccc; padding:10px; margin-bottom:10px;'>
-            <h2>{item['title']}</h2>
+            <h2>{item["title"]}</h2>
             <img src='{image_url}' alt='Image' style='max-width:200px;'/>
-            <p><strong>Price:</strong> {item['price']}</p>
-            <p><strong>Description:</strong> {item['fullDescription']}</p>
-            <p><a href='{item['url']}'>View Product</a></p>
+            <p><strong>Price:</strong> {item["price"]}</p>
+            <p><strong>Description:</strong> {item["fullDescription"]}</p>
+            <p><a href='{item["url"]}'>View Product</a></p>
         </div>
         """
     return html_content
@@ -210,11 +210,11 @@ def handle_inputs(site_token, serp_token, search_term, selected_example):
             image_url = item["images"][0] if item["images"] else ""
             html_content += f"""
             <div style='border:1px solid #ccc; padding:10px; margin-bottom:10px;'>
-                <h2>{item['title']}</h2>
+                <h2>{item["title"]}</h2>
                 <img src='{image_url}' alt='Image' style='max-width:200px;'/>
-                <p><strong>Price:</strong> {item['price']}</p>
-                <p><strong>Description:</strong> {item['fullDescription']}</p>
-                <p><a href='{item['url']}'>View Product</a></p>
+                <p><strong>Price:</strong> {item["price"]}</p>
+                <p><strong>Description:</strong> {item["fullDescription"]}</p>
+                <p><a href='{item["url"]}'>View Product</a></p>
             </div>
             """
         return html_content

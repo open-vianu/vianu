@@ -274,7 +274,7 @@ class FileHandler:
         If `add_dt=True`, the filename is `{file_name}_%Y%m%d%H%M%S.json`.
         """
         if add_dt:
-            file_name = f'{file_name}_{datetime.now().strftime("%Y%m%d%H%M%S")}'
+            file_name = f"{file_name}_{datetime.now().strftime('%Y%m%d%H%M%S')}"
         file_name = (self._file_path / file_name).with_suffix(self._suffix)
 
         logger.info(f"writing data to file {file_name}")

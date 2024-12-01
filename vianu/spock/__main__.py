@@ -89,7 +89,11 @@ async def _orchestrator(
 
 
 def setup_asyncio_framework(
+<<<<<<< HEAD
     args_: Namespace, model_config: Dict[str, Any]
+=======
+    args_: Namespace,
+>>>>>>> b196f55 (added drugsafety app and pipeline)
 ) -> Tuple[asyncio.Queue, List[asyncio.Task], List[asyncio.Task], asyncio.Task]:
     """Set up the asyncio framework for the SpoCK application."""
     # Set up arguments
@@ -145,6 +149,7 @@ async def main(args_: Namespace | None = None, save: bool = True) -> None:
 
     logging.basicConfig(level=args_.log_level.upper(), format=LOG_FMT)
     logger.info(f"starting SpoCK (args_={args_})")
+<<<<<<< HEAD
 
     # Test availability of NER model
     model = args_.model
@@ -159,6 +164,8 @@ async def main(args_: Namespace | None = None, save: bool = True) -> None:
     except Exception as e:
         logger.error(f"could not reach model endpoint: {e}")
         raise e
+=======
+>>>>>>> b196f55 (added drugsafety app and pipeline)
 
     # Set up async structure (scraping queue/tasks, NER queue/tasks, orchestrator task)
     ner_queue, _, _, _ = setup_asyncio_framework(args_=args_, model_config=model_config)

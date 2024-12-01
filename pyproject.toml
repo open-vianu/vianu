@@ -29,10 +29,19 @@ pymupdf = "^1.25.1"
 beautifulsoup4 = "^4.12.3"
 openai = "^1.59.5"
 defusedxml = "^0.7.1"
+selenium = "^4.27.1"
+torch = "^2.5.1"
+transformers = "^4.46.3"
+plotly = "^5.24.1"
+llvmlite = "^0.43.0"
+numba = "^0.60.0"
+shap = "^0.46.0"
+pytest-cov = "^6.0.0"
+matplotlib = "^3.9.3"
 
 [tool.poetry.scripts]
 vianu_fraudcrawler_app = "vianu.fraudcrawler.launch_demo_app:main"
-
+vianu_drugsafetycompare_app = "vianu.drugsafetycompare.launch_demo_app:main"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
