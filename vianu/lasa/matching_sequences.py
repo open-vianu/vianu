@@ -2,7 +2,6 @@ from typing import List
 import comparison_utils
 
 
-
 def match_seq_against_list(
     data_matched: List,
     database: List,
@@ -15,11 +14,17 @@ def match_seq_against_list(
     those that stay above a given threshold.
     """
     for each in database:
-        ratio = comparison_utils.orthographic_comparison(searched_word, each, 'SequenceMatcher')
+        ratio = comparison_utils.orthographic_comparison(
+            searched_word, each, "SequenceMatcher"
+        )
 
-        ratio_phonetic = comparison_utils.phonetic_comparison(searched_word, each, 'Kolner')
+        ratio_phonetic = comparison_utils.phonetic_comparison(
+            searched_word, each, "Kolner"
+        )
 
-        ratio_fr_phonetic_fonem = comparison_utils.phonetic_comparison(searched_word, each, 'fr-fonem')
+        ratio_fr_phonetic_fonem = comparison_utils.phonetic_comparison(
+            searched_word, each, "fr-fonem"
+        )
 
         # THIS FUNCTION ADDED AN ALTERNATIVE FRENCH PHONETIC COMPARISON - DISCONTINUED IN MARCH 2022.
         # ratio_fr_phonetic_henry = phonetic_comparison(searched_word, each, 'fr-henry')

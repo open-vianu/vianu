@@ -31,3 +31,7 @@ jobs:
     - name: Format with Ruff
       run: |
         poetry run ruff check --output-format=github
+
+    - name: Run Unit Tests
+      run: |
+        pytest tests/tests-*/* -s

@@ -1,6 +1,7 @@
 ---
 title: Home
 layout: home
+nav_order: 1
 ---
 
 # Welcome to VIANU!
@@ -21,6 +22,7 @@ This is how you install all of our cool ninja moves
 
 Lasa: A tool for phonetic comparison of novel drug names with authorized ones from different locations.
 FraudCrawler: A data ingestion and transformation pipeline for real-world healthcare data.
+DrugSafetyCompare: [Go to the documentation](drugsafetycompare.md)
 
 Other than that, go ahead and `have fun` with this repository!
 
