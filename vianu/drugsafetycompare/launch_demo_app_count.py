@@ -1,10 +1,10 @@
 """
-Optimized Gradio App for Drug Information Scraping and Comparison with Adverse Event Extraction.
+Gradio App for Drug Information Scraping and Comparison with Adverse Event Extraction.
 
 This application allows users to:
 1. Search for a drug and retrieve its products from Germany and Switzerland.
 2. Select specific products to view their side effects.
-3. Extract adverse events from the side effects using OpenAI's GPT-4.
+3. Extract adverse events from the side effects using OpenAI's GPT-4o.
 4. Compare the side effects using SOC classification and visualize them with radar charts and sunburst plots.
 """
 
@@ -157,7 +157,7 @@ Now, analyze the following text and return a Python list of all adverse events a
         content_list = ast.literal_eval(content)  # Safely parse the list
         return content_list, ""
     except Exception as e:
-        error_msg = f"Error in get_ae_from_openai: {e}"
+        error_msg = f"Failed to extract adverse events: {e}"
         logger.error(error_msg)
         return [], error_msg
 
@@ -417,6 +417,36 @@ def draw_sunburst_with_highlights(
         )
 
     fig.update_layout(margin=dict(t=40, l=0, r=0, b=0))
+    return fig
+
+def update_charts_highlighted(selected_soc, show_highlighted_only, scores_germany, scores_switzerland, unique_in_germany, unique_in_switzerland, color_map):
+    """
+    Updates the sunburst charts based on selected SOC and highlight toggle.
+
+    Args:
+        selected_soc (str): Selected SOC or "All".
+        show_highlighted_only (bool): Toggle to show only highlighted events.
+        scores_germany (dict): SOC classification scores for Germany.
+        scores_switzerland (dict): SOC classification scores for Switzerland.
+        unique_in_germany (dict): Unique adverse events in Germany.
+        unique_in_switzerland (dict): Unique adverse events in Switzerland.
+        color_map (dict): Mapping of SOCs and events to colors.
+
+    Returns:
+        plotly.graph_objects.Figure: Updated sunburst chart.
+    """
+    if selected_soc == "All":
+        selected_soc = None
+
+    fig = draw_sunburst_with_highlights(
+        scores_germany,
+        scores_switzerland,
+        unique_in_germany,
+        unique_in_switzerland,
+        selected_soc,
+        show_highlighted_only,
+        color_map
+    )
     return fig
 
 async def plot_radar_chart_with_selection_async(text_germany, text_switzerland, api_key):
@@ -691,7 +721,6 @@ with gr.Blocks(theme=gr.themes.Soft()) as demo:
             type="password",
             placeholder="Enter your OpenAI API key here",
             value=os.getenv("OPENAI_TOKEN") or "",
-            interactive=True,
         )
         drug_input = gr.Textbox(label="Enter Drug Name", placeholder="e.g., aspirin")
         search_button = gr.Button("Search")
@@ -741,7 +770,7 @@ with gr.Blocks(theme=gr.themes.Soft()) as demo:
             selected_soc = gr.Dropdown(
                 label="Select SOC", choices=["All"] + socs, value="All"
             )
-            highlight_toggle = gr.Checkbox(label="Show Only Highlighted", value=False)
+            highlight_toggle = gr.Checkbox(label="Show Only Differences", value=False)
         plot_output_radar = gr.Plot()
         plot_output_sunburst = gr.Plot()
 
