@@ -1,5 +1,5 @@
 """
-Merged Gradio App for Drug Information Scraping and Comparison with Adverse Event Extraction.
+Optimized Gradio App for Drug Information Scraping and Comparison with Adverse Event Extraction.
 
 This application allows users to:
 1. Search for a drug and retrieve its products from Germany and Switzerland.
@@ -18,11 +18,14 @@ import re
 import sys
 import os
 import plotly.subplots as sp
+import asyncio
 from openai import OpenAI
 import ast
 import atexit
 from dotenv import load_dotenv
+from functools import lru_cache
 
+# Load environment variables
 load_dotenv()
 
 # --------------------- Configure Logging ---------------------
@@ -98,9 +101,19 @@ socs = [
     "Vascular disorders",
 ]
 
+# --------------------- Caching Decorators ---------------------
+@lru_cache(maxsize=128)
+def cache_search_drug_extractor(extractor_class, drug_name):
+    extractor = extractor_class()
+    products = extractor.search_drug(drug_name)
+    return products
+
 # --------------------- Define Functions ---------------------
 
-def get_ae_from_openai(text, api_key):
+async def get_ae_from_openai_async(text, api_key):
+    """
+    Asynchronously fetch adverse events from OpenAI.
+    """
     prompt = """
 You are an expert assistant trained to extract specific information from text. Given the following text, return a Python list of all adverse events and side effects mentioned in the text. Provide only the Python list as your output, without any additional explanations or text.
 
@@ -129,24 +142,19 @@ Now, analyze the following text and return a Python list of all adverse events a
 """
 
     try:
-        client = OpenAI(
-            api_key=api_key
-        )
-        response = client.chat.completions.create(
-            model="gpt-4",
+        client = OpenAI(api_key=api_key)
+        response = await asyncio.to_thread(
+            client.chat.completions.create,
+            model="gpt-4o",
             messages=[
                 {"role": "system", "content": prompt},
-                {
-                    "role": "user",
-                    "content": text,
-                },
+                {"role": "user", "content": text},
             ],
             temperature=0,
         )
-        # Accessing the message content correctly
         content = response.choices[0].message.content
         logger.info(content)
-        content_list = ast.literal_eval(content)  # Safely convert the string representation of a Python list to an actual list
+        content_list = ast.literal_eval(content)  # Safely parse the list
         return content_list, ""
     except Exception as e:
         error_msg = f"Error in get_ae_from_openai: {e}"
@@ -271,7 +279,7 @@ def plot_radar_chart_plotly(socs, scores_a, scores_b):
 
 def generate_color_map(scores):
     color_map = {}
-    soc_list = scores.keys()
+    soc_list = list(scores.keys())
     colors = [
         "#AEC6CF", "#FFB347", "#B39EB5", "#617bff", "#77DD77",
         "#FDFD96", "#CFCFC4", "#FFCCCB", "#F49AC2", "#BC8F8F",
@@ -302,21 +310,6 @@ def identify_unique_adverse_events(scores_germany, scores_switzerland):
         unique_in_switzerland[soc] = events_switzerland - events_germany
 
     return unique_in_germany, unique_in_switzerland
-
-def update_charts_highlighted(selected_soc, show_highlighted_only, scores_germany, scores_switzerland, unique_in_germany, unique_in_switzerland, color_map):
-    if selected_soc == "All":
-        selected_soc = None
-
-    fig = draw_sunburst_with_highlights(
-        scores_germany,
-        scores_switzerland,
-        unique_in_germany,
-        unique_in_switzerland,
-        selected_soc,
-        show_highlighted_only,
-        color_map
-    )
-    return fig
 
 def draw_sunburst_with_highlights(
     scores_germany,
@@ -426,9 +419,9 @@ def draw_sunburst_with_highlights(
     fig.update_layout(margin=dict(t=40, l=0, r=0, b=0))
     return fig
 
-def plot_radar_chart_with_selection(text_germany, text_switzerland, api_key):
+async def plot_radar_chart_with_selection_async(text_germany, text_switzerland, api_key):
     """
-    Generates the radar chart and sunburst chart based on input texts.
+    Asynchronously generates the radar chart and sunburst chart based on input texts.
     Returns the Plotly figures and any error messages.
     """
     global scores_germany_global, scores_switzerland_global
@@ -443,8 +436,8 @@ def plot_radar_chart_with_selection(text_germany, text_switzerland, api_key):
         return go.Figure(), go.Figure(), gr.update(value="\n".join(error_messages), visible=True)
 
     # Extract adverse events
-    adverse_events_germany, error_germany = get_ae_from_openai(text_germany, api_key)
-    adverse_events_switzerland, error_switzerland = get_ae_from_openai(text_switzerland, api_key)
+    adverse_events_germany, error_germany = await get_ae_from_openai_async(text_germany, api_key)
+    adverse_events_switzerland, error_switzerland = await get_ae_from_openai_async(text_switzerland, api_key)
 
     if error_germany:
         error_messages.append(f"Germany Side Effects Extraction Error: {error_germany}")
@@ -499,8 +492,15 @@ def plot_radar_chart_with_selection(text_germany, text_switzerland, api_key):
     return fig_radar, initial_fig_sunburst, gr.update(value="", visible=False)
 
 def search_and_display(drug_name):
+    """
+    Searches for the drug in both German and Swiss databases.
+    Returns updates for the Gradio interface components.
+    """
     global german_products_dict
     global swiss_products_dict
+
+    # Initialize error messages
+    error_messages = []
 
     # Search in Germany
     try:
@@ -516,6 +516,7 @@ def search_and_display(drug_name):
         logger.error(f"Error fetching German products: {e}")
         german_product_names = []
         german_products_dict = {}
+        error_messages.append(f"Error fetching German products: {e}")
 
     # Search in Switzerland
     try:
@@ -531,6 +532,7 @@ def search_and_display(drug_name):
         logger.error(f"Error fetching Swiss products: {e}")
         swiss_product_names = []
         swiss_products_dict = {}
+        error_messages.append(f"Error fetching Swiss products: {e}")
 
     # Prepare German section updates
     if german_product_names:
@@ -583,17 +585,34 @@ def search_and_display(drug_name):
 
     comparison_section_update = gr.update(visible=comparison_section_visible)
 
-    return (
-        german_dropdown_update,
-        german_side_effects_output_update,
-        german_link_update,
-        swiss_dropdown_update,
-        swiss_side_effects_output_update,
-        swiss_link_update,
-        comparison_section_update,
-    )
+    # Update error messages if any
+    if error_messages:
+        return (
+            german_dropdown_update,
+            german_side_effects_output_update,
+            german_link_update,
+            swiss_dropdown_update,
+            swiss_side_effects_output_update,
+            swiss_link_update,
+            comparison_section_update,
+            gr.update(value="\n".join(error_messages), visible=True)
+        )
+    else:
+        return (
+            german_dropdown_update,
+            german_side_effects_output_update,
+            german_link_update,
+            swiss_dropdown_update,
+            swiss_side_effects_output_update,
+            swiss_link_update,
+            comparison_section_update,
+            gr.update(value="", visible=False)
+        )
 
 def get_german_side_effects(selected_product_name):
+    """
+    Retrieves side effects for the selected German product.
+    """
     if selected_product_name in german_products_dict:
         product_url = german_products_dict[selected_product_name]
         try:
@@ -610,6 +629,9 @@ def get_german_side_effects(selected_product_name):
         return "Product not found."
 
 def get_swiss_side_effects(selected_product_name):
+    """
+    Retrieves side effects for the selected Swiss product.
+    """
     if selected_product_name in swiss_products_dict:
         product_url = swiss_products_dict[selected_product_name]
         try:
@@ -624,18 +646,27 @@ def get_swiss_side_effects(selected_product_name):
         return "Product not found."
 
 def update_german_link(selected_product_name):
+    """
+    Updates the German product link.
+    """
     if selected_product_name in german_products_dict:
         product_url = german_products_dict[selected_product_name]
         return f"<a href='{product_url}' target='_blank'>{product_url}</a>"
     return ""
 
 def update_swiss_link(selected_product_name):
+    """
+    Updates the Swiss product link.
+    """
     if selected_product_name in swiss_products_dict:
         product_url = swiss_products_dict[selected_product_name]
         return f"<a href='{product_url}' target='_blank'>{product_url}</a>"
     return ""
 
 def on_close():
+    """
+    Shuts down extractors gracefully upon app termination.
+    """
     logger.info("Shutting down extractors.")
     try:
         german_extractor.quit()
@@ -670,7 +701,8 @@ with gr.Blocks(theme=gr.themes.Soft()) as demo:
         value="", 
         visible=False, 
         label="Error Messages",
-        elem_id="error-output"
+        elem_id="error-output",
+        show_label=False
     )
 
     # Results Sections
@@ -685,7 +717,7 @@ with gr.Blocks(theme=gr.themes.Soft()) as demo:
                     label="Select a Product (Germany)", choices=[]
                 )
                 german_side_effects_output = gr.Textbox(
-                    label="Undesired Effects (Germany)", lines=10
+                    label="Undesired Effects (Germany)", lines=10, interactive=False
                 )
                 german_link_output = gr.HTML()
 
@@ -697,7 +729,7 @@ with gr.Blocks(theme=gr.themes.Soft()) as demo:
                     label="Select a Product (Switzerland)", choices=[]
                 )
                 swiss_side_effects_output = gr.Textbox(
-                    label="Undesired Effects (Switzerland)", lines=10
+                    label="Undesired Effects (Switzerland)", lines=10, interactive=False
                 )
                 swiss_link_output = gr.HTML()
 
@@ -725,9 +757,10 @@ with gr.Blocks(theme=gr.themes.Soft()) as demo:
             swiss_side_effects_output,
             swiss_link_output,
             comparison_section,
+            error_output,
         ],
     ).then(
-        fn=plot_radar_chart_with_selection,
+        fn=plot_radar_chart_with_selection_async,
         inputs=[german_side_effects_output, swiss_side_effects_output, api_key_input],
         outputs=[plot_output_radar, plot_output_sunburst, error_output],
     )
