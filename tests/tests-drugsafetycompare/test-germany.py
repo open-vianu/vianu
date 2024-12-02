@@ -4,8 +4,9 @@ import unittest
 from unittest.mock import patch, MagicMock, PropertyMock
 from vianu.drugsafetycompare.src.germany import GermanDrugInfoExtractor
 
+
 class TestGermanDrugInfoExtractor(unittest.TestCase):
-    @patch('vianu.drugsafetycompare.src.germany.webdriver.Chrome')
+    @patch("vianu.drugsafetycompare.src.germany.webdriver.Chrome")
     def test_search_drug_success(self, mock_webdriver):
         # Mock the WebDriver instance and its methods
         mock_driver_instance = MagicMock()
@@ -37,7 +38,7 @@ class TestGermanDrugInfoExtractor(unittest.TestCase):
         # Assert the results
         self.assertEqual(products, expected_products)
 
-    @patch('vianu.drugsafetycompare.src.germany.webdriver.Chrome')
+    @patch("vianu.drugsafetycompare.src.germany.webdriver.Chrome")
     def test_search_drug_no_products(self, mock_webdriver):
         # Mock the WebDriver instance and its methods
         mock_driver_instance = MagicMock()
@@ -61,7 +62,7 @@ class TestGermanDrugInfoExtractor(unittest.TestCase):
         # Assert the results
         self.assertEqual(products, expected_products)
 
-    @patch('vianu.drugsafetycompare.src.germany.webdriver.Chrome')
+    @patch("vianu.drugsafetycompare.src.germany.webdriver.Chrome")
     def test_get_undesired_effects_success(self, mock_webdriver):
         # Mock the WebDriver instance and its methods
         mock_driver_instance = MagicMock()
@@ -80,7 +81,9 @@ class TestGermanDrugInfoExtractor(unittest.TestCase):
         extractor = GermanDrugInfoExtractor()
 
         # Call the method
-        side_effects = extractor.get_undesired_effects("https://www.rote-liste.de/produkt/1")
+        side_effects = extractor.get_undesired_effects(
+            "https://www.rote-liste.de/produkt/1"
+        )
 
         # Define expected output
         expected_side_effects = "Kopfschmerzen, Übelkeit"
@@ -88,7 +91,7 @@ class TestGermanDrugInfoExtractor(unittest.TestCase):
         # Assert the results
         self.assertEqual(side_effects, expected_side_effects)
 
-    @patch('vianu.drugsafetycompare.src.germany.webdriver.Chrome')
+    @patch("vianu.drugsafetycompare.src.germany.webdriver.Chrome")
     def test_get_undesired_effects_no_section(self, mock_webdriver):
         # Mock the WebDriver instance and its methods
         mock_driver_instance = MagicMock()
@@ -108,7 +111,9 @@ class TestGermanDrugInfoExtractor(unittest.TestCase):
         extractor = GermanDrugInfoExtractor()
 
         # Call the method
-        side_effects = extractor.get_undesired_effects("https://www.rote-liste.de/produkt/1")
+        side_effects = extractor.get_undesired_effects(
+            "https://www.rote-liste.de/produkt/1"
+        )
 
         # Define expected output
         expected_output = "No 'Nebenwirkungen' section found."
@@ -116,11 +121,13 @@ class TestGermanDrugInfoExtractor(unittest.TestCase):
         # Assert the results
         self.assertEqual(side_effects, expected_output)
 
-    @patch('vianu.drugsafetycompare.src.germany.webdriver.Chrome')
+    @patch("vianu.drugsafetycompare.src.germany.webdriver.Chrome")
     def test_get_undesired_effects_exception_handling(self, mock_webdriver):
         # Mock the WebDriver instance and its methods to raise an exception when accessing page_source
         mock_driver_instance = MagicMock()
-        type(mock_driver_instance).page_source = PropertyMock(side_effect=Exception("Element not found"))
+        type(mock_driver_instance).page_source = PropertyMock(
+            side_effect=Exception("Element not found")
+        )
         mock_webdriver.return_value = mock_driver_instance
 
         # Initialize the extractor
@@ -132,5 +139,6 @@ class TestGermanDrugInfoExtractor(unittest.TestCase):
 
         self.assertIn("Element not found", str(context.exception))
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     unittest.main()

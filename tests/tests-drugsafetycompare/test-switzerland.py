@@ -4,8 +4,9 @@ import unittest
 from unittest.mock import patch, MagicMock
 from vianu.drugsafetycompare.src.switzerland import SwissDrugInfoExtractor
 
+
 class TestSwissDrugInfoExtractor(unittest.TestCase):
-    @patch('vianu.drugsafetycompare.src.switzerland.webdriver.Chrome')
+    @patch("vianu.drugsafetycompare.src.switzerland.webdriver.Chrome")
     def test_search_drug_success(self, mock_webdriver):
         # Mock the WebDriver instance and its methods
         mock_driver_instance = MagicMock()
@@ -32,10 +33,18 @@ class TestSwissDrugInfoExtractor(unittest.TestCase):
 
         # Mock find_elements to return rows
         mock_row_1 = MagicMock()
-        mock_row_1.find_elements.return_value = [MagicMock(text="Aspirin 100mg"), MagicMock(text="Info"), MagicMock(text="Info")]
+        mock_row_1.find_elements.return_value = [
+            MagicMock(text="Aspirin 100mg"),
+            MagicMock(text="Info"),
+            MagicMock(text="Info"),
+        ]
         mock_row_1.get_attribute.return_value = "/product/1"
         mock_row_2 = MagicMock()
-        mock_row_2.find_elements.return_value = [MagicMock(text="Aspirin 500mg"), MagicMock(text="Info"), MagicMock(text="Info")]
+        mock_row_2.find_elements.return_value = [
+            MagicMock(text="Aspirin 500mg"),
+            MagicMock(text="Info"),
+            MagicMock(text="Info"),
+        ]
         mock_row_2.get_attribute.return_value = "/product/2"
         mock_driver_instance.find_elements.return_value = [mock_row_1, mock_row_2]
 
@@ -54,7 +63,7 @@ class TestSwissDrugInfoExtractor(unittest.TestCase):
         # Assert the results
         self.assertEqual(products, expected_products)
 
-    @patch('vianu.drugsafetycompare.src.switzerland.webdriver.Chrome')
+    @patch("vianu.drugsafetycompare.src.switzerland.webdriver.Chrome")
     def test_search_drug_no_products(self, mock_webdriver):
         # Mock the WebDriver instance and its methods
         mock_driver_instance = MagicMock()
@@ -84,7 +93,7 @@ class TestSwissDrugInfoExtractor(unittest.TestCase):
         # Assert the results
         self.assertEqual(products, expected_products)
 
-    @patch('vianu.drugsafetycompare.src.switzerland.webdriver.Chrome')
+    @patch("vianu.drugsafetycompare.src.switzerland.webdriver.Chrome")
     def test_get_side_effects_success(self, mock_webdriver):
         # Mock the WebDriver instance and its methods
         mock_driver_instance = MagicMock()
@@ -127,7 +136,7 @@ class TestSwissDrugInfoExtractor(unittest.TestCase):
         # Assert the results
         self.assertEqual(side_effects, expected_side_effects)
 
-    @patch('vianu.drugsafetycompare.src.switzerland.webdriver.Chrome')
+    @patch("vianu.drugsafetycompare.src.switzerland.webdriver.Chrome")
     def test_get_side_effects_no_fachinformation(self, mock_webdriver):
         # Mock the WebDriver instance and its methods
         mock_driver_instance = MagicMock()
@@ -149,7 +158,7 @@ class TestSwissDrugInfoExtractor(unittest.TestCase):
         # Assert the results
         self.assertEqual(side_effects, expected_output)
 
-    @patch('vianu.drugsafetycompare.src.switzerland.webdriver.Chrome')
+    @patch("vianu.drugsafetycompare.src.switzerland.webdriver.Chrome")
     def test_get_side_effects_exception_handling(self, mock_webdriver):
         # Mock the WebDriver instance and its methods to raise an exception during find_element
         mock_driver_instance = MagicMock()
@@ -163,10 +172,13 @@ class TestSwissDrugInfoExtractor(unittest.TestCase):
         side_effects = extractor.get_side_effects("https://sai.refdata.ch/product/1")
 
         # Define expected output
-        expected_output = "Could not find or click the 'Fachinformation' button: Element not found"
+        expected_output = (
+            "Could not find or click the 'Fachinformation' button: Element not found"
+        )
 
         # Assert the results
         self.assertEqual(side_effects, expected_output)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     unittest.main()

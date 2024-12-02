@@ -101,6 +101,7 @@ socs = [
     "Vascular disorders",
 ]
 
+
 # --------------------- Caching Decorators ---------------------
 @lru_cache(maxsize=128)
 def cache_search_drug_extractor(extractor_class, drug_name):
@@ -108,7 +109,9 @@ def cache_search_drug_extractor(extractor_class, drug_name):
     products = extractor.search_drug(drug_name)
     return products
 
+
 # --------------------- Define Functions ---------------------
+
 
 async def get_ae_from_openai_async(text, api_key):
     """
@@ -160,6 +163,7 @@ Now, analyze the following text and return a Python list of all adverse events a
         error_msg = f"Failed to extract adverse events: {e}"
         logger.error(error_msg)
         return [], error_msg
+
 
 def classify_adverse_events(adverse_events, candidate_labels):
     """
@@ -229,6 +233,7 @@ def classify_adverse_events(adverse_events, candidate_labels):
             for soc in candidate_labels
         }
 
+
 def plot_radar_chart_plotly(socs, scores_a, scores_b):
     """
     Plots a radar chart using Plotly comparing two sets of scores across multiple categories.
@@ -277,16 +282,41 @@ def plot_radar_chart_plotly(socs, scores_a, scores_b):
 
     return fig
 
+
 def generate_color_map(scores):
     color_map = {}
     soc_list = list(scores.keys())
     colors = [
-        "#AEC6CF", "#FFB347", "#B39EB5", "#617bff", "#77DD77",
-        "#FDFD96", "#CFCFC4", "#FFCCCB", "#F49AC2", "#BC8F8F",
-        "#F5DEB3", "#D8BFD8", "#E6E6FA", "#FFDAB9", "#F0E68C",
-        "#DAE8FC", "#ACE1AF", "#FFE4E1", "#ADD8E6", "#D4AF37",
-        "#FFC0CB", "#D9F3FF", "#FFEBCD", "#E3A857", "#BAED91",
-        "#D6D6D6", "#FFEFD5", "#DEB887", "#FFD1DC", "#C8A2C8",
+        "#AEC6CF",
+        "#FFB347",
+        "#B39EB5",
+        "#617bff",
+        "#77DD77",
+        "#FDFD96",
+        "#CFCFC4",
+        "#FFCCCB",
+        "#F49AC2",
+        "#BC8F8F",
+        "#F5DEB3",
+        "#D8BFD8",
+        "#E6E6FA",
+        "#FFDAB9",
+        "#F0E68C",
+        "#DAE8FC",
+        "#ACE1AF",
+        "#FFE4E1",
+        "#ADD8E6",
+        "#D4AF37",
+        "#FFC0CB",
+        "#D9F3FF",
+        "#FFEBCD",
+        "#E3A857",
+        "#BAED91",
+        "#D6D6D6",
+        "#FFEFD5",
+        "#DEB887",
+        "#FFD1DC",
+        "#C8A2C8",
     ]
     for idx, soc in enumerate(soc_list):
         base_color = colors[idx % len(colors)]
@@ -294,6 +324,7 @@ def generate_color_map(scores):
         for event in scores[soc]["adverse_events"]:
             color_map[event] = base_color
     return color_map
+
 
 def identify_unique_adverse_events(scores_germany, scores_switzerland):
     unique_in_germany = {}
@@ -311,6 +342,7 @@ def identify_unique_adverse_events(scores_germany, scores_switzerland):
 
     return unique_in_germany, unique_in_switzerland
 
+
 def draw_sunburst_with_highlights(
     scores_germany,
     scores_switzerland,
@@ -318,7 +350,7 @@ def draw_sunburst_with_highlights(
     unique_in_switzerland,
     selected_soc=None,
     highlighted_only=False,
-    color_map={}
+    color_map={},
 ):
     # Prepare data for Germany
     labels_germany = []
@@ -419,7 +451,16 @@ def draw_sunburst_with_highlights(
     fig.update_layout(margin=dict(t=40, l=0, r=0, b=0))
     return fig
 
-def update_charts_highlighted(selected_soc, show_highlighted_only, scores_germany, scores_switzerland, unique_in_germany, unique_in_switzerland, color_map):
+
+def update_charts_highlighted(
+    selected_soc,
+    show_highlighted_only,
+    scores_germany,
+    scores_switzerland,
+    unique_in_germany,
+    unique_in_switzerland,
+    color_map,
+):
     """
     Updates the sunburst charts based on selected SOC and highlight toggle.
 
@@ -445,11 +486,14 @@ def update_charts_highlighted(selected_soc, show_highlighted_only, scores_german
         unique_in_switzerland,
         selected_soc,
         show_highlighted_only,
-        color_map
+        color_map,
     )
     return fig
 
-async def plot_radar_chart_with_selection_async(text_germany, text_switzerland, api_key):
+
+async def plot_radar_chart_with_selection_async(
+    text_germany, text_switzerland, api_key
+):
     """
     Asynchronously generates the radar chart and sunburst chart based on input texts.
     Returns the Plotly figures and any error messages.
@@ -463,20 +507,34 @@ async def plot_radar_chart_with_selection_async(text_germany, text_switzerland, 
     if not text_germany.strip() or not text_switzerland.strip():
         logger.warning("One or both side effect texts are empty.")
         error_messages.append("One or both side effect texts are empty.")
-        return go.Figure(), go.Figure(), gr.update(value="\n".join(error_messages), visible=True)
+        return (
+            go.Figure(),
+            go.Figure(),
+            gr.update(value="\n".join(error_messages), visible=True),
+        )
 
     # Extract adverse events
-    adverse_events_germany, error_germany = await get_ae_from_openai_async(text_germany, api_key)
-    adverse_events_switzerland, error_switzerland = await get_ae_from_openai_async(text_switzerland, api_key)
+    adverse_events_germany, error_germany = await get_ae_from_openai_async(
+        text_germany, api_key
+    )
+    adverse_events_switzerland, error_switzerland = await get_ae_from_openai_async(
+        text_switzerland, api_key
+    )
 
     if error_germany:
         error_messages.append(f"Germany Side Effects Extraction Error: {error_germany}")
     if error_switzerland:
-        error_messages.append(f"Switzerland Side Effects Extraction Error: {error_switzerland}")
+        error_messages.append(
+            f"Switzerland Side Effects Extraction Error: {error_switzerland}"
+        )
 
     # If there are errors, return them without proceeding further
     if error_messages:
-        return go.Figure(), go.Figure(), gr.update(value="\n".join(error_messages), visible=True)
+        return (
+            go.Figure(),
+            go.Figure(),
+            gr.update(value="\n".join(error_messages), visible=True),
+        )
 
     # Classify SOCs based on adverse events
     scores_germany = classify_adverse_events(adverse_events_germany, socs)
@@ -516,10 +574,11 @@ async def plot_radar_chart_with_selection_async(text_germany, text_switzerland, 
         unique_in_switzerland,
         selected_soc=None,
         highlighted_only=False,
-        color_map=color_map
+        color_map=color_map,
     )
 
     return fig_radar, initial_fig_sunburst, gr.update(value="", visible=False)
+
 
 def search_and_display(drug_name):
     """
@@ -625,7 +684,7 @@ def search_and_display(drug_name):
             swiss_side_effects_output_update,
             swiss_link_update,
             comparison_section_update,
-            gr.update(value="\n".join(error_messages), visible=True)
+            gr.update(value="\n".join(error_messages), visible=True),
         )
     else:
         return (
@@ -636,8 +695,9 @@ def search_and_display(drug_name):
             swiss_side_effects_output_update,
             swiss_link_update,
             comparison_section_update,
-            gr.update(value="", visible=False)
+            gr.update(value="", visible=False),
         )
+
 
 def get_german_side_effects(selected_product_name):
     """
@@ -648,15 +708,14 @@ def get_german_side_effects(selected_product_name):
         try:
             side_effects = german_extractor.get_undesired_effects(product_url)
             side_effects = re.sub(r"\s+", " ", side_effects).strip()
-            logger.info(
-                f"Retrieved German side effects for '{selected_product_name}'."
-            )
+            logger.info(f"Retrieved German side effects for '{selected_product_name}'.")
             return side_effects
         except Exception as e:
             logger.error(f"Error retrieving German side effects: {e}")
             return "Unable to retrieve side effects."
     else:
         return "Product not found."
+
 
 def get_swiss_side_effects(selected_product_name):
     """
@@ -675,6 +734,7 @@ def get_swiss_side_effects(selected_product_name):
     else:
         return "Product not found."
 
+
 def update_german_link(selected_product_name):
     """
     Updates the German product link.
@@ -684,6 +744,7 @@ def update_german_link(selected_product_name):
         return f"<a href='{product_url}' target='_blank'>{product_url}</a>"
     return ""
 
+
 def update_swiss_link(selected_product_name):
     """
     Updates the Swiss product link.
@@ -692,6 +753,7 @@ def update_swiss_link(selected_product_name):
         product_url = swiss_products_dict[selected_product_name]
         return f"<a href='{product_url}' target='_blank'>{product_url}</a>"
     return ""
+
 
 def on_close():
     """
@@ -706,6 +768,7 @@ def on_close():
         swiss_extractor.quit()
     except Exception as e:
         logger.error(f"Error shutting down Swiss extractor: {e}")
+
 
 atexit.register(on_close)
 
@@ -727,11 +790,11 @@ with gr.Blocks(theme=gr.themes.Soft()) as demo:
 
     # Error Message Display
     error_output = gr.Markdown(
-        value="", 
-        visible=False, 
+        value="",
+        visible=False,
         label="Error Messages",
         elem_id="error-output",
-        show_label=False
+        show_label=False,
     )
 
     # Results Sections
@@ -822,7 +885,7 @@ with gr.Blocks(theme=gr.themes.Soft()) as demo:
             scores_switzerland_global,
             unique_in_germany_global,
             unique_in_switzerland_global,
-            color_map
+            color_map,
         )
         return fig
 
@@ -850,9 +913,11 @@ with gr.Blocks(theme=gr.themes.Soft()) as demo:
     </div>
     """)
 
+
 # --------------------- Main Function ---------------------
 def main():
     demo.launch(inbrowser=True)
+
 
 if __name__ == "__main__":
     main()

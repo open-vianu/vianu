@@ -4,8 +4,9 @@ import unittest
 from unittest.mock import patch, MagicMock
 from vianu.drugsafetycompare.src.compare import compare_drugs_with_gpt
 
+
 class TestCompareDrugsWithGPT(unittest.TestCase):
-    @patch('vianu.drugsafetycompare.src.compare.OpenAI')
+    @patch("vianu.drugsafetycompare.src.compare.OpenAI")
     def test_compare_drugs_with_gpt_success(self, mock_openai):
         # Mock OpenAI response
         mock_client_instance = MagicMock()
@@ -27,7 +28,9 @@ class TestCompareDrugsWithGPT(unittest.TestCase):
         swiss_description = "Tachycardia is observed."
 
         # Call the function
-        result = compare_drugs_with_gpt(token, drug_name, german_description, swiss_description)
+        result = compare_drugs_with_gpt(
+            token, drug_name, german_description, swiss_description
+        )
 
         # Define expected output
         expected_output = """| Affected SOC                | Germany                 | Switzerland            |
@@ -41,13 +44,15 @@ class TestCompareDrugsWithGPT(unittest.TestCase):
         # Ensure OpenAI was called with correct parameters
         mock_openai.assert_called_with(api_key=token)
         mock_client_instance.chat.completions.create.assert_called_once()
-    
-    @patch('vianu.drugsafetycompare.src.compare.OpenAI')
+
+    @patch("vianu.drugsafetycompare.src.compare.OpenAI")
     def test_compare_drugs_with_gpt_api_exception(self, mock_openai):
         # Mock OpenAI to raise an exception
         mock_client_instance = MagicMock()
         mock_openai.return_value = mock_client_instance
-        mock_client_instance.chat.completions.create.side_effect = Exception("API Error")
+        mock_client_instance.chat.completions.create.side_effect = Exception(
+            "API Error"
+        )
 
         # Define test inputs
         token = "test_token"
@@ -56,7 +61,9 @@ class TestCompareDrugsWithGPT(unittest.TestCase):
         swiss_description = "Tachycardia is observed."
 
         # Call the function
-        result = compare_drugs_with_gpt(token, drug_name, german_description, swiss_description)
+        result = compare_drugs_with_gpt(
+            token, drug_name, german_description, swiss_description
+        )
 
         # Define expected output
         expected_output = "Error calling OpenAI API: API Error"
@@ -68,5 +75,6 @@ class TestCompareDrugsWithGPT(unittest.TestCase):
         mock_openai.assert_called_with(api_key=token)
         mock_client_instance.chat.completions.create.assert_called_once()
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     unittest.main()

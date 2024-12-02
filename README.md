@@ -68,6 +68,7 @@ python -m vianu.fraudcrawler.launch_demo_pipeline
 
 
 ### DrugSafetyCompare
+**DrugSafetyCompare** is a tool designed to help users search for drugs, retrieve product information from Germany and Switzerland, extract adverse events, and compare side effects using SOC (System Organ Class) classification. Leveraging OpenAI's GPT-4 and interactive visualization tools, DrugSafetyCompare provides a comprehensive overview of drug safety profiles.
 
 #### Launch a Demo App
 To lauch the demo app do the following:
