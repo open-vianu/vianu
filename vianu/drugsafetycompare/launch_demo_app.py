@@ -20,13 +20,14 @@ Modules used:
 - `vianu.drugsafetycompare.src.extract_switzerland` → Swiss drug information retrieval.
 """
 
-import os
+# --------------------- Import Statements ---------------------
 import logging
 import atexit
 import re
 import asyncio
 import gradio as gr
 import torch
+import os
 
 # If you have local imports
 from dotenv import load_dotenv
@@ -251,6 +252,7 @@ def search_and_display(drug_name):
 with gr.Blocks(theme=gr.themes.Soft()) as demo:
     gr.HTML("<h1 style='text-align: center;'>DrugSafetyCompare</h1>")
 
+    # Initial Search Bar
     with gr.Row():
         drug_input = gr.Textbox(label="Enter Drug Name", placeholder="e.g., aspirin")
         search_button = gr.Button("Search")
@@ -581,6 +583,7 @@ def on_close():
 atexit.register(on_close)
 
 
+# --------------------- Launch Gradio App ---------------------
 def main():
     demo.launch()
 

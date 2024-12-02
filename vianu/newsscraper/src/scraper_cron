@@ -1,0 +1,5 @@
+# scraper_cron
+
+# Run scraper daily at 2 a.m. as seluser
+0 2 * * * seluser /app/venv/bin/python /app/run_scraper.py >> /app/data/scraper.log 2>&1
+
