@@ -1,4 +1,4 @@
-from argparse import ArgumentParser
+from argparse import ArgumentParser, Namespace
 import logging
 from typing import List
 
@@ -44,7 +44,7 @@ def cli_args():
     return parser
 
 
-def apply(args_: dict, data: List[Document] | None = None):
+def apply(args_: Namespace, data: List[Document] | None = None):
     min_chunk_size = args_.min_chunk_size
     min_chunk_overlap = args_.min_chunk_overlap
 
@@ -55,7 +55,13 @@ def apply(args_: dict, data: List[Document] | None = None):
 
     chunker = TextChunking(min_chunk_size=min_chunk_size, min_chunk_overlap=min_chunk_overlap)
     for doc in data:
-        chunks = chunker.get_chunks(text=doc.get_raw_text())
+        text = doc.get_raw_text()
+        if text is None:
+            err_msg = f"no raw text found for document with id {doc.id_}"
+            logging.warning(err_msg)
+            doc.add_error(err_msg)
+            continue
+        chunks = chunker.get_chunks(text=text)
         logging.debug(f'split into {len(chunks)} chunks')
         for text in chunks:
             te = TextEntity(
@@ -63,3 +69,5 @@ def apply(args_: dict, data: List[Document] | None = None):
                 text=text,
             )
             doc.add_text_entity(text_entity=te)
+            
+    FileHandler(args_.data_dump).write(data)

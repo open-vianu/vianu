@@ -1,4 +1,4 @@
-from argparse import ArgumentParser
+from argparse import ArgumentParser, Namespace
 from datetime import datetime
 import logging
 from pydantic import BaseModel
@@ -149,7 +149,7 @@ class PubmedClient:
         return documents
 
 
-def cli_args():
+def cli_args() -> None:
     parser = ArgumentParser(add_help=False)
     group = parser.add_argument_group(MODULE_NAME)
     group.add_argument('--source', dest='source', choices=DOCUMENT_SOURCES)
@@ -157,7 +157,7 @@ def cli_args():
     return parser
 
 
-def apply(args_, data: List[Document] | None = None):
+def apply(args_: Namespace, data: List[Document] | None = None) -> None:
     source = args_.source
     term = args_.term
 
@@ -175,3 +175,4 @@ def apply(args_, data: List[Document] | None = None):
         logging.error(f'Unknown source {source}')
     
 
+    FileHandler(args_.data_dump).write(data)

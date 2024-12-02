@@ -9,7 +9,7 @@ import os
 from pathlib import Path
 
 import numpy as np
-from typing import List, Self
+from typing import Tuple, List, Self
 
 
 @dataclass
@@ -47,10 +47,11 @@ class DataUnit(ABC):
 
 
 @dataclass(eq=False)
-class NamedEntityUnit(DataUnit):
-    """Parent class for all named entities."""
+class NamedEntity(DataUnit):
+    """Class for all named entities."""
     text: str = field(default_factory=str)
-    location: List[int] | None = None
+    class_: str = field(default_factory=str)
+    location: Tuple[int] | None = None
     probability: float | None = None
 
     @property
@@ -169,7 +170,7 @@ class Document(DataUnit):
     _errors: List[str] = field(default_factory=list)
 
     # private document fields
-    __raw_text: str = ""
+    __raw_text: str | None = None
     __text_entity_id_index_map: dict = field(default_factory=dict)
 
     @property
@@ -219,8 +220,8 @@ class Document(DataUnit):
     
     @classmethod
     def from_dict(cls, data: dict) -> Self:
-        dacite.from_dict(
-            data_class=Self,
+        return dacite.from_dict(
+            data_class=cls,
             data=data,
             config=dacite.Config(type_hooks={datetime: datetime.fromisoformat})
         )
@@ -243,17 +244,15 @@ class DocumentJSONEncoder(json.JSONEncoder):
 
 class FileHandler:
     """Reads from and write data to a file.
-
-    Args:
-        data_file (Path): File name
     """
     _suffix = '.json'
 
-    def __init__(self, data_file: Path):
+    def __init__(self, data_file: Path | str):
+        data_file = Path(data_file) if isinstance(data_file, str) else data_file
         self._data_file = data_file.with_suffix(self._suffix)
-        if not Path.is_file(self._data_file):
+        if not self._data_file.parent.exists():
             os.makedirs(self._data_file.parent)
-        logging.debug(f"FileHandler path: '{self._file}'")
+        logging.debug(f"FileHandler path: '{self._data_file}'")
 
 
     def read(self) -> List[Document]:
@@ -264,6 +263,4 @@ class FileHandler:
 
     def write(self, data: List[Document]):
         with open(self._data_file, 'w', encoding="utf-8") as dfile:
-            json.dump(self, dfile, cls=DocumentJSONEncoder)
-        data.dump(self._file)
-
+            json.dump(data, dfile, cls=DocumentJSONEncoder)
