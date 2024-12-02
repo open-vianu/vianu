@@ -36,10 +36,8 @@ poetry install
 
 ## Usage
 ### Lasa
-Give
+TBD
 #### Launch a Demo App
-
-
 
 #### Launch a Demo Pipeline
 
@@ -66,6 +64,29 @@ python vianu/tools/fraudcrawler/launch_demo_app.py
 poetry install
 poetry shell
 python -m vianu.fraudcrawler.launch_demo_pipeline
+```
+
+
+### DrugSafetyCompare
+
+#### Launch a Demo App
+To lauch the demo app do the following:
+```bash
+poetry install
+poetry shell
+python vianu/tools/drugsafetycompare/launch_demo_app_count.py
+```
+Or simply launch the starter-script:
+```bash
+vianu_drugsafetycompare_app
+```
+
+#### Launch a Demo Pipeline
+
+```bash
+poetry install
+poetry shell
+python -m vianu.drugsafetycompare.launch_demo_pipeline
 ```
 
 ## Contributing
