@@ -23,7 +23,7 @@ custom_css = """
     background: #E0E7FF;
     border-radius: 10px;
     font: Montserrat;
-    font-size: 50px;
+    font-size: 40px;
     font-weight: bold;
     text-align: center;
 }
@@ -33,9 +33,9 @@ custom_css = """
 with gr.Blocks(css=custom_css, theme=gr.themes.Soft()) as demo:
     with gr.Row():
         with gr.Column(scale=1):
-            gr.Image(value="vianu/spock/assets/spock_logo.png", show_label=False, elem_id="logo-image")
+            gr.Image(value="vianu/spock/assets/spock_logo_circular.png", show_label=False, elem_id="logo-image")
         with gr.Column(scale=5):
-            gr.Markdown("<div id='title-text'>SpoCK: Spott Clinical Knowledge</div>")
+            gr.Markdown("<div id='title-text'>SpoCK: Spotting Clinical Knowledge</div>")
                 
     with gr.Row():
         search_input = gr.Textbox(label="Search", placeholder="Enter your search here...")
