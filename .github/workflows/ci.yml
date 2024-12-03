@@ -34,4 +34,5 @@ jobs:
 
     - name: Run Unit Tests
       run: |
+        poetry add pytest
         pytest tests/tests-*/* -s
