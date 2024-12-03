@@ -6,34 +6,80 @@ nav_order: 2
 
 # Welcome to DrugSafetyCompare!
 
-**DrugSafetyCompare** is a *Gradio-based* application designed to help users search for drugs, retrieve product information from Germany and Switzerland, extract adverse events, and compare side effects using SOC (System Organ Class) classification. Leveraging OpenAI's GPT-4 and interactive visualization tools, DrugSafetyCompare provides a comprehensive overview of drug safety profiles.
+**DrugSafetyCompare** is a *Gradio-based* application designed to help  users to compare the safety profiles of drugs between Germany and Switzerland. By entering a drug name, the application retrieves drug labels from both countries, extracts safety-related information, and performs an analysis to compare the potential adverse effects across different system organ classes (SOCs) defined by MedDRA.
 
 [Skip to Installation](#installation-guide){: .btn .btn-purple }
 
+## Features
+
+1. **Drug Search and Retrieval**: Start by entering a keyword to search for a drug. The application retrieves drug labels and safety information from both Germany and Switzerland.
+
+2. **Safety Information Extraction**:
+   - **Transformer Pipeline**: Uses a zero-shot classification model (`facebook/bart-large-mnli`) to predict the relevance and potential impact of the safety information on each of MedDRA's 27 SOCs.
+   - **GPT-4 Pipeline**: Utilizes OpenAI's GPT-4 model to infer all mentioned adverse events (AEs) from the safety information, then uses the zero-shot classification model to predict which SOCs are most impacted by each AE.
+
+3. **Toxicity Profile Comparison**:
+   - **Radar Chart Visualization**: The toxicity profiles of the drugs are compared visually using radar (spider) charts, where each axis represents a specific SOC. The overlaid profiles highlight differences between the drugs from the two countries.
+   - **SHAP Explanations** (Transformer Pipeline): For each SOC, a SHAP plot can be generated to identify the textual features contributing most to the predictions, providing detailed insights into the factors driving the classification.
+   - **Sunburst Chart Visualization** (GPT-4 Pipeline): An interactive sunburst chart allows users to explore all SOCs and their corresponding AEs, highlighting differences between the countries.
+
+## How It Works
+
+1. **Search for a Drug**: Enter the name of the drug you are interested in. The application searches for products in both Germany and Switzerland and displays the results.
+
+2. **Select Products**: Choose specific products from each country to compare their safety information.
+
+3. **Select Analysis Pipeline**:
+   - **Transformer Pipeline**:
+     - Extracts safety information from the drug labels.
+     - Uses the zero-shot classification model to predict the impact on each SOC.
+     - Visualizes the results using a radar chart.
+     - Provides SHAP explanations for in-depth analysis.
+   - **GPT-4 Pipeline**:
+     - Extracts safety information and uses GPT-4 to infer all mentioned AEs.
+     - Uses the zero-shot classification model to predict the impact on each SOC for each AE.
+     - Visualizes the results using a radar chart.
+     - Provides an interactive sunburst chart to explore SOCs and their corresponding AEs.
+
+4. **Compare Toxicity Profiles**: Generate visualizations to compare the toxicity profiles of the selected products from Germany and Switzerland.
+
+### Transformer Pipeline
+
+![Transformer Pipeline](assets/images/drugsafetycompare_1.png)
+
+### GPT-4 Pipeline
+
+![GPT-4 Pipeline](assets/images/drugsafetycompare_2.jpg)
+
+## Getting Started
+
+### Prerequisites
+
+- Python 3.11 or higher
+- Required Python packages (see `requirements.txt`)
+- OpenAI API key (for GPT-4 Pipeline)
 
 
-## Available Features
+## Usage
 
-- **Drug Search**: Search for a drug and retrieve its products from Germany and Switzerland.
-- **Side Effects Retrieval**: Select specific products to view their side effects.
-- **Adverse Event Extraction**: Extract adverse events from side effects using OpenAI's GPT-4.
-- **SOC Classification & Visualization**: Compare side effects using SOC classification and visualize them with radar charts and sunburst plots.
+1. **Enter Drug Name**: Input the name of the drug you want to compare.
+
+2. **Search**: Click on the **Search** button to retrieve products from Germany and Switzerland.
+
+3. **Select Products**: From the dropdown menus, select the specific products you want to analyze.
+
+4. **Select Analysis Pipeline**: Choose between the **Transformer Pipeline** and the **GPT-4 Pipeline**.
+
+5. **Provide OpenAI API Key** (if using GPT-4 Pipeline): Enter your OpenAI API key when prompted.
+
+6. **Compare Toxicity Profiles**: Click on the **Compare Toxicity Profiles** button to generate the visualizations.
+
+7. **Explore Results**:
+   - **Radar Charts**: Use the radar charts to compare the overall toxicity profiles across SOCs.
+   - **SHAP Explanations** (Transformer Pipeline): Select an SOC from the dropdown to view SHAP explanations highlighting the textual features influencing the predictions.
+   - **Sunburst Charts** (GPT-4 Pipeline): Interact with the sunburst chart to explore SOCs and their corresponding AEs, and identify unique adverse events in each country.
 
 
-## How it works
-There are currently two applications implemented:
-![Application Overview](assets/images/drugsafetycompare_pipeline.jpg)
-
-**Application 1** starts with a keyword search, retrieving drug labels from Switzerland and Germany and extracting safety-related information. This information is encoded and processed using a zero-shot classification model (transformers `zero-shot-classification` pipeline with `facebook/bart-large-mnli` model) to predict its relevance and potential impact on each of MedDRAs 27 system organ classes (SOCs), determining harmful effects. The toxicity profiles of the drugs are then compared visually using a spider chart, where each spike represents a specific SOC, and the overlaid profiles highlight differences across the two drugs. Finally, for each SOC, a SHAP plot can be generated to identify the textual features contributing most to the prediction, providing detailed insights into the factors driving the classification.
-![Application 1](assets/images/drugsafetycompare_1.png)
-
-**Application 2** is similar as pipeline 1, however, it uses OpenAI's GPT-4o model to infer all mentioned adverse events (AE) from the safety information. Then, we are using a zero-shot classification model (transformers `zero-shot-classification` pipeline with `facebook/bart-large-mnli` model) to predict for each AE which SOCs they would be impacting most. The results are again ploted on a spider chart. Lastely we are using an interactive sunburst chart that allows to see all SOCs and the corresponding AEs.
-![Application 1](assets/images/drugsafetycompare_2.jpg)
-
-
-# Installation Guide
-
-This section provides instructions to install and set up **DrugSafetyCompare** on your local machine.
 
 ## Prerequisites
 
@@ -42,7 +88,7 @@ Before you begin, ensure you have the following installed:
 - **Python 3.10 or higher**: [Download Python](https://www.python.org/downloads/)
 - **OpenAI API Key**: Obtain your API key from [OpenAI](https://platform.openai.com/account/api-keys)
 
-## Installation Steps
+## Installation Guide
 
 1. **Download pacakage**
 
@@ -53,6 +99,7 @@ Before you begin, ensure you have the following installed:
     ```bash
     vianu_drugsafetycompare_app
     ```
+    The application will launch and can be accessed via your web browser at `http://127.0.0.1:7860/?__theme=light`.
 3. **Use Pipeline to Extract Drug Labels**: In Python you can use the following:
     ```python
         from vianu.drugsafetycompare.src.germany import GermanDrugInfoExtractor
@@ -78,3 +125,4 @@ Before you begin, ensure you have the following installed:
             extractor.quit()
 
     ```
+

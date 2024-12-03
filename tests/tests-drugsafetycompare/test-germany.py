@@ -2,10 +2,12 @@ import pytest
 from unittest.mock import patch, MagicMock, PropertyMock
 from vianu.drugsafetycompare.src.germany import GermanDrugInfoExtractor
 
+
 @pytest.fixture
 def mock_webdriver():
     with patch("vianu.drugsafetycompare.src.germany.webdriver.Chrome") as mock:
         yield mock
+
 
 def test_search_drug_success(mock_webdriver):
     # Mock the WebDriver instance and its methods
@@ -38,6 +40,7 @@ def test_search_drug_success(mock_webdriver):
     # Assert the results
     assert products == expected_products
 
+
 def test_search_drug_no_products(mock_webdriver):
     # Mock the WebDriver instance and its methods
     mock_driver_instance = MagicMock()
@@ -60,6 +63,7 @@ def test_search_drug_no_products(mock_webdriver):
 
     # Assert the results
     assert products == expected_products
+
 
 def test_get_undesired_effects_success(mock_webdriver):
     # Mock the WebDriver instance and its methods
@@ -89,6 +93,7 @@ def test_get_undesired_effects_success(mock_webdriver):
     # Assert the results
     assert side_effects == expected_side_effects
 
+
 def test_get_undesired_effects_no_section(mock_webdriver):
     # Mock the WebDriver instance and its methods
     mock_driver_instance = MagicMock()
@@ -117,6 +122,7 @@ def test_get_undesired_effects_no_section(mock_webdriver):
 
     # Assert the results
     assert side_effects == expected_output
+
 
 def test_get_undesired_effects_exception_handling(mock_webdriver):
     # Mock the WebDriver instance and its methods to raise an exception when accessing page_source

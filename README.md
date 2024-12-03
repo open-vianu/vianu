@@ -4,8 +4,6 @@
     <p align="center">Together we are building an Open Source Community for Life Sciences.</p>
     <p align="center">
         <a href="https://badge.fury.io/py/vianu"><img alt="PyPI version" src="https://badge.fury.io/py/vianu.svg?icon=si%3Apython"></a>
-        <a href="https://github.com/open-vianu/vianu"><img alt="Coverage Status" src="./docs/assets/images/coverage-badge.svg" /></a>
-
     </p>
 </p>
 

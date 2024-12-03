@@ -1,8 +1,8 @@
 # tests/tests-drugsafetycompare/test-compare.py
 
-import pytest
 from unittest.mock import patch, MagicMock
 from vianu.drugsafetycompare.src.compare import compare_drugs_with_gpt
+
 
 @patch("vianu.drugsafetycompare.src.compare.OpenAI")
 def test_compare_drugs_with_gpt_success(mock_openai):
@@ -43,14 +43,13 @@ def test_compare_drugs_with_gpt_success(mock_openai):
     mock_openai.assert_called_with(api_key=token)
     mock_client_instance.chat.completions.create.assert_called_once()
 
+
 @patch("vianu.drugsafetycompare.src.compare.OpenAI")
 def test_compare_drugs_with_gpt_api_exception(mock_openai):
     # Mock OpenAI to raise an exception
     mock_client_instance = MagicMock()
     mock_openai.return_value = mock_client_instance
-    mock_client_instance.chat.completions.create.side_effect = Exception(
-        "API Error"
-    )
+    mock_client_instance.chat.completions.create.side_effect = Exception("API Error")
 
     # Define test inputs
     token = "test_token"
