@@ -60,21 +60,6 @@ class NamedEntity(DataUnit):
 
 
 @dataclass(eq=False)
-class MedProdSigPair(DataUnit):
-    """Class describing a medicinal product - signal pair named entity."""
-
-    medProdID: str = field(default_factory=str)
-    sigID: str = field(default_factory=str)
-    causality: float | None = None
-    seriousness: float | None = None
-    severity: float | None = None
-
-    @property
-    def _id_prefix(self):
-        return 'msp_'
-
-
-@dataclass(eq=False)
 class TextEntity(DataUnit):
     """Class containing any text-entity related information."""
 
@@ -83,9 +68,8 @@ class TextEntity(DataUnit):
     location: List[int] = field(default_factory=list)
 
     # NER information (optional)
-    medicinalProducts: List[NamedEntityUnit] = field(default_factory=list)
-    signals: List[NamedEntityUnit] = field(default_factory=list)
-    medProdSigPairs: List[MedProdSigPair] = field(default_factory=list)
+    medicinal_products: List[NamedEntity] = field(default_factory=list)
+    adverse_reactions: List[NamedEntity] = field(default_factory=list)
 
 
     # private document fields
@@ -95,57 +79,16 @@ class TextEntity(DataUnit):
     def _id_prefix(self):
         return 'txt_'
 
-    @staticmethod
-    def _get_filtered_entities(entities) -> list[str]:
-        ref = [x.text.strip().lower().strip("-").strip() for x in entities]
-        return list(set([x for x in ref if len(x) > 1]))
-
-    def get_products(self) -> list[str]:
-        return self._get_filtered_entities(self.medicinalProducts)
-
-    def get_signals(self) -> list[str]:
-        return self._get_filtered_entities(self.signals)
-
-    def set_med_prod_sig_pair_causality(
-            self,
-            causality: float,
-            index_: int | None = None,
-            id_: str | None = None
-    ) -> None:
-        """Set the causality value for a given medicinal product - signal pair.
-
-        Args:
-            causality (float): Causality value in [0, 1]
-            index (int): List index of the medicinal product - signal pair.
-            id_ (str): ID of the medicinal product - signal pair.
-        """
-        if not 0 <= causality <= 1:
-            raise ValueError(f'Causality value={causality} is not contained in [0, 1]')
-        if index_ is not None and id_ is not None:
-            raise ValueError('The definition of `index` OR `id_` must be exclusive.')
-        if index_ is None and id_ is None:
-            raise ValueError('Either `index` or `id_` has to be defined.')
-        if id_ is not None:
-            id2index = {p.id_: i for i, p in enumerate(self.medProdSigPairs)}
-            index = id2index[id_]
-        elif index_ is not None:
-            index = index_
-        self.medProdSigPairs[index].causality = causality
-
     def add_raw_text(self, text: str) -> None:
         self.__raw_text = text
 
     def get_raw_text(self) -> str:
         return self.__raw_text
 
-DOCUMENT_TYPES = [
-    'html',
-    'pdf',
-]
 
 DOCUMENT_SOURCES = [
     'pubmed',
-    'swissmedic',
+    'faers',
 ]
 
 

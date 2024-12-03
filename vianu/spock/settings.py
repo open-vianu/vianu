@@ -7,3 +7,5 @@ PUBMED_DB = 'pubmed'
 PUBMED_BATCH_SIZE = 500
 
 DEFAULT_DATA_DUMP = "/tmp/spock/data.json"
+
+DEFAULT_OLLAMA_ENDPOINT = "http://localhost:11434/api/chat"
