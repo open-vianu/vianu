@@ -4,10 +4,11 @@ Gradio App for Drug Information Scraping and Comparison with Adverse Event Extra
 This application allows users to:
 1. Search for a drug and retrieve its products from Germany and Switzerland.
 2. Select specific products to view their side effects.
-3. Extract adverse events from the side effects using OpenAI's GPT-4o.
+3. Extract adverse events from the side effects using OpenAI's GPT-4.
 4. Compare the side effects using SOC classification and visualize them with radar charts and sunburst plots.
 """
 
+# --------------------- Import Statements ---------------------
 import logging
 import gradio as gr
 import torch
@@ -25,7 +26,10 @@ import atexit
 from dotenv import load_dotenv
 from functools import lru_cache
 
-# Load environment variables
+from vianu.drugsafetycompare.src.germany import GermanDrugInfoExtractor
+from vianu.drugsafetycompare.src.switzerland import SwissDrugInfoExtractor
+
+# --------------------- Load Environment Variables ---------------------
 load_dotenv()
 
 # --------------------- Configure Logging ---------------------
@@ -36,10 +40,6 @@ console_handler.setLevel(logging.INFO)
 formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
 console_handler.setFormatter(formatter)
 logger.addHandler(console_handler)
-
-# --------------------- Import Extractors ---------------------
-from vianu.drugsafetycompare.src.germany import GermanDrugInfoExtractor
-from vianu.drugsafetycompare.src.switzerland import SwissDrugInfoExtractor
 
 # --------------------- Initialize Extractors ---------------------
 german_extractor = GermanDrugInfoExtractor()

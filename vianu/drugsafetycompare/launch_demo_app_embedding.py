@@ -20,7 +20,6 @@ import sys
 import os
 import atexit
 
-
 # --------------------- Add 'src' to Python Path ---------------------
 # Adjust the path according to your project structure
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -28,8 +27,8 @@ parent_dir = os.path.abspath(os.path.join(current_dir, os.pardir))
 sys.path.append(parent_dir)
 
 # Import the necessary extractors from App 1
-from vianu.drugsafetycompare.src.germany import GermanDrugInfoExtractor
-from vianu.drugsafetycompare.src.switzerland import SwissDrugInfoExtractor
+from vianu.drugsafetycompare.src.germany import GermanDrugInfoExtractor  # noqa: E402
+from vianu.drugsafetycompare.src.switzerland import SwissDrugInfoExtractor  # noqa: E402
 
 # Initialize Logger
 logger = logging.getLogger("drug_compare_logger")
@@ -101,7 +100,6 @@ socs = [
     "Vascular disorders",
 ]
 
-
 # --------------------- Classification Function ---------------------
 def classify_adverse_events(text, candidate_labels):
     """
@@ -127,7 +125,6 @@ def classify_adverse_events(text, candidate_labels):
     except Exception as e:
         logger.error(f"Error during classification: {e}")
         return {soc: 0.0 for soc in candidate_labels}
-
 
 # --------------------- Radar Chart Plotting Function ---------------------
 def plot_radar_chart_plotly(socs, scores_a, scores_b, selected_soc=None):
@@ -208,16 +205,15 @@ def plot_radar_chart_plotly(socs, scores_a, scores_b, selected_soc=None):
 
     return fig
 
-
 # --------------------- SHAP Explainer Initialization ---------------------
-def soc_model(texts, soc, *args, **kwargs):
+def soc_model(texts, soc):
     """
     Model function for SHAP that returns scores for a specific SOC.
     Accepts arbitrary additional arguments to prevent errors.
     """
     logger.debug(
-        f"soc_model called with texts: {texts}, soc: {soc}, args: {args}, kwargs: {kwargs}"
-    )
+        f"soc_model called with texts: {texts}, soc: {soc}"
+    )  # Removed args and kwargs from the log message
     if isinstance(texts, str):
         texts = [texts]
     scores = []
@@ -238,10 +234,8 @@ def soc_model(texts, soc, *args, **kwargs):
             scores.append(0.0)
     return np.array(scores)  # Ensure a NumPy array is returned
 
-
 # Initialize SHAP Explainer per SOC and cache them
 shap_explainers = {}
-
 
 def create_shap_explainer(soc):
     """
@@ -249,8 +243,10 @@ def create_shap_explainer(soc):
     """
     if soc not in shap_explainers:
         try:
-            # Use lambda to fix 'soc' parameter
-            model_fn = lambda texts: soc_model(texts, soc)
+            # Define a function instead of using a lambda to fix 'soc' parameter
+            def model_fn(texts):
+                return soc_model(texts, soc)
+
             shap_explainer = shap.Explainer(model_fn, masker=shap.maskers.Text())
             shap_explainers[soc] = shap_explainer
             logger.debug(f"SHAP explainer created for SOC: {soc}")
@@ -258,7 +254,6 @@ def create_shap_explainer(soc):
             logger.error(f"Error creating SHAP explainer for SOC '{soc}': {e}")
             return None
     return shap_explainers[soc]
-
 
 # --------------------- SHAP Explanation Function ---------------------
 def explain_soc(shap_explainer, text):
@@ -349,7 +344,6 @@ def explain_soc(shap_explainer, text):
 
     return highlighted_text.strip()
 
-
 # --------------------- SHAP Explanation for Both Countries ---------------------
 def handle_selection(selected_soc, text_germany, text_switzerland):
     """
@@ -377,7 +371,6 @@ def handle_selection(selected_soc, text_germany, text_switzerland):
 
     return combined_explanation
 
-
 # --------------------- Radar Chart Generation ---------------------
 def plot_radar_chart_with_selection(text_germany, text_switzerland):
     """
@@ -392,7 +385,6 @@ def plot_radar_chart_with_selection(text_germany, text_switzerland):
     scores_switzerland = classify_adverse_events(text_switzerland, socs)
     fig = plot_radar_chart_plotly(socs, scores_germany, scores_switzerland)
     return fig
-
 
 # --------------------- Search and Display Functions ---------------------
 def search_and_display(drug_name):
@@ -499,7 +491,6 @@ def search_and_display(drug_name):
         comparison_section_update,
     )
 
-
 def get_german_side_effects(selected_product_name):
     """
     Retrieves the undesired effects of the selected German product.
@@ -526,7 +517,6 @@ def get_german_side_effects(selected_product_name):
     else:
         return "Product not found."
 
-
 def get_swiss_side_effects(selected_product_name):
     """
     Retrieves the undesired effects of the selected Swiss product.
@@ -551,7 +541,6 @@ def get_swiss_side_effects(selected_product_name):
     else:
         return "Product not found."
 
-
 def update_german_link(selected_product_name):
     """
     Updates the German product link dynamically.
@@ -567,7 +556,6 @@ def update_german_link(selected_product_name):
         return f"<a href='{product_url}' target='_blank' style='color:white;'>{product_url}</a>"
     return ""
 
-
 def update_swiss_link(selected_product_name):
     """
     Updates the Swiss product link dynamically.
@@ -582,7 +570,6 @@ def update_swiss_link(selected_product_name):
         product_url = swiss_products_dict[selected_product_name]
         return f"<a href='{product_url}' target='_blank' style='color:white;'>{product_url}</a>"
     return ""
-
 
 # --------------------- Gradio Interface ---------------------
 with gr.Blocks(theme=gr.themes.Soft()) as demo:
@@ -718,7 +705,6 @@ with gr.Blocks(theme=gr.themes.Soft()) as demo:
     </style>
     """)
 
-
 # --------------------- Close Extractors on App Termination ---------------------
 def on_close():
     logger.debug("Shutting down extractors.")
@@ -731,16 +717,13 @@ def on_close():
     except Exception as e:
         logger.error(f"Error shutting down Swiss extractor: {e}")
 
-
 atexit.register(on_close)
-
 
 # --------------------- Launch Gradio App ---------------------
 def main():
     demo.launch()  # Add share=True if you want to create a public shareable link.
 
     # http://127.0.0.1:7860/?__theme=light
-
 
 # Launch the app
 if __name__ == "__main__":

@@ -32,10 +32,11 @@ pytest = "^8.3.4"
 llvmlite = "^0.43.0"
 numba = "^0.60.0"
 shap = "^0.46.0"
+pytest-cov = "^6.0.0"
 
 [tool.poetry.scripts]
 vianu_fraudcrawler_app = "vianu.fraudcrawler.launch_demo_app:main"
-vianu_drugsafetycompare_app = "vianu.drugsafetycompare.launch_demo_app_count:main"
+vianu_drugsafetycompare_app = "vianu.drugsafetycompare.launch_demo_app_embedding:main"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
