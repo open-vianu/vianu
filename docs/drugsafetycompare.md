@@ -90,7 +90,7 @@ Before you begin, ensure you have the following installed:
 
 ## Installation Guide
 
-1. **Download pacakage**
+1. **Download package**
 
    ```bash
    pip install vianu
