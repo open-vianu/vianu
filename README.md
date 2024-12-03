@@ -15,6 +15,7 @@ Vianu is a Python package designed for developers working in the **life sciences
 
 - **Lasa**: A tool for phonetic comparison of novel drug names with authorized ones from different locations.
 - **FraudCrawler**: A data ingestion and transformation pipeline for real-world healthcare data.
+- **DrugSafetyCompare**: A tool to search for published drug labels and compare their safety profiles. [See in action](https://huggingface.co/spaces/vianu/drugsafetycompare)
 
 ## Installation
 
@@ -35,10 +36,8 @@ poetry install
 
 ## Usage
 ### Lasa
-Give
+TBD
 #### Launch a Demo App
-
-
 
 #### Launch a Demo Pipeline
 
@@ -65,6 +64,37 @@ python vianu/tools/fraudcrawler/launch_demo_app.py
 poetry install
 poetry shell
 python -m vianu.fraudcrawler.launch_demo_pipeline
+```
+
+
+### DrugSafetyCompare
+**DrugSafetyCompare** is a tool designed to help users search for drugs, retrieve product information from Germany and Switzerland, extract adverse events, and compare side effects using SOC (System Organ Class) classification. Leveraging OpenAI's GPT-4 and interactive visualization tools, DrugSafetyCompare provides a comprehensive overview of drug safety profiles.
+
+#### Launch a Demo App
+To lauch the demo app do the following:
+```bash
+poetry install
+poetry shell
+python vianu/tools/drugsafetycompare/launch_demo_app_count.py
+```
+Or simply launch the starter-script:
+```bash
+vianu_drugsafetycompare_app
+```
+
+#### Launch a Demo Pipeline
+
+```bash
+poetry install
+poetry shell
+python -m vianu.drugsafetycompare.launch_demo_pipeline
+```
+
+
+## Run tests
+To run all tests with a covarage report run:
+```bash
+pytest --cov-report=html tests/tests-*/* -s
 ```
 
 ## Contributing

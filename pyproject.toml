@@ -22,10 +22,22 @@ pandas = "^2.2.3"
 python-dotenv = "^1.0.1"
 openpyxl = "^3.1.5"
 bandit = "^1.7.10"
+selenium = "^4.27.1"
+openai = "^1.55.3"
+beautifulsoup4 = "^4.12.3"
+torch = "^2.5.1"
+transformers = "^4.46.3"
+plotly = "^5.24.1"
+pytest = "^8.3.4"
+llvmlite = "^0.43.0"
+numba = "^0.60.0"
+shap = "^0.46.0"
+pytest-cov = "^6.0.0"
+matplotlib = "^3.9.3"
 
 [tool.poetry.scripts]
 vianu_fraudcrawler_app = "vianu.fraudcrawler.launch_demo_app:main"
-
+vianu_drugsafetycompare_app = "vianu.drugsafetycompare.launch_demo_app:main"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
