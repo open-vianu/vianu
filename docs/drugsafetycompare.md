@@ -9,6 +9,7 @@ nav_order: 2
 **DrugSafetyCompare** is a *Gradio-based* application designed to help  users to compare the safety profiles of drugs between Germany and Switzerland. By entering a drug name, the application retrieves drug labels from both countries, extracts safety-related information, and performs an analysis to compare the potential adverse effects across different system organ classes (SOCs) defined by MedDRA.
 
 [Skip to Installation](#installation-guide){: .btn .btn-purple }
+[See in action](https://huggingface.co/spaces/vianu/drugsafetycompare){: .btn .btn-purple }
 
 ## Features
 

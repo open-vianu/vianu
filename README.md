@@ -15,7 +15,7 @@ Vianu is a Python package designed for developers working in the **life sciences
 
 - **Lasa**: A tool for phonetic comparison of novel drug names with authorized ones from different locations.
 - **FraudCrawler**: A data ingestion and transformation pipeline for real-world healthcare data.
-- **DrugSafetyCompare**: A tool to search for published drug labels and compare their safety profiles.
+- **DrugSafetyCompare**: A tool to search for published drug labels and compare their safety profiles. [See in action](https://huggingface.co/spaces/vianu/drugsafetycompare)
 
 ## Installation
 
