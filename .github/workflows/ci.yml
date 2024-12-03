@@ -34,4 +34,4 @@ jobs:
 
     - name: Run Unit Tests
       run: |
-        poetry runn pytest --cov=vianu --cov-report=html --cov-report=xml tests/tests-*/* -s
+        poetry run pytest --cov=vianu --cov-report=html --cov-report=xml tests/tests-*/* -s
