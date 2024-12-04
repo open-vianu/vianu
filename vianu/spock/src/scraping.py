@@ -157,7 +157,7 @@ def cli_args() -> None:
     return parser
 
 
-def apply(args_: Namespace, data: List[Document] | None = None) -> None:
+def apply(args_: Namespace, data: List[Document] | None = None, save_data: bool = True) -> None:
     source = args_.source
     term = args_.term
 
@@ -174,5 +174,5 @@ def apply(args_: Namespace, data: List[Document] | None = None) -> None:
     else:
         logging.error(f'Unknown source {source}')
     
-
-    FileHandler(args_.data_dump).write(data)
+    if save_data:
+        FileHandler(args_.data_dump).write(data)

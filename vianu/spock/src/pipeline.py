@@ -47,4 +47,3 @@ def apply(args_: Namespace):
     for stp in steps:
         stp.apply(args_, data)
     
-    FileHandler(args_.data_dump).write(data)

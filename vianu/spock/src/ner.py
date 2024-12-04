@@ -1,13 +1,14 @@
 from abc import ABC, abstractmethod
 from argparse import ArgumentParser, Namespace
 import ast
-import json
+from copy import deepcopy
 import logging
 import requests
-from typing import List, Tuple
+from typing import List
 
-from .data_model import Document, FileHandler, NamedEntity
 from ..settings import DEFAULT_OLLAMA_ENDPOINT
+from .data_model import Document, TextEntity, FileHandler, NamedEntity
+from . import utils as utl
 
 MODULE_NAME = 'ner'
 NAMED_ENTITY_PROMPT = """
@@ -67,7 +68,7 @@ class OllamaNER(NER):
 
 
     def _get_model_answer(self, text: str) -> str:
-        data = self._data.copy()
+        data = deepcopy(self._data)
         data['messages'].append({
             "role": "user",
             "content": text,
@@ -76,24 +77,33 @@ class OllamaNER(NER):
         response.raise_for_status()
         content = response.json()['message']['content']
 
-        # content = ''
-        # for line in response.iter_lines():
-            # if line:
-                # data = json.loads(line.decode('utf-8'))
-                # content += data['message']['content']
-                # if data['done']:
-                    # break
         return content
         
 
     def get_named_entities(self, text: str) -> List[NamedEntity]:
-        try:
+        # Request the text answer from the model endpoint
+        try: 
             content = self._get_model_answer(text=text)
-            named_entities = ast.literal_eval(content)
-            return [NamedEntity(id_=f'{text} {txt} {cls_}', text=txt, class_=cls_) for txt, cls_ in named_entities]
         except Exception as e:
-            logging.error(f'error while extracting named entities: {e}')
+            logging.error(f'error during inference of model endpoint: {e}')
+            logging.debug(f'text: {text}')
             return []
+        
+        # Parse the model answer
+        ne_list = ast.literal_eval(content)
+        if not isinstance(ne_list, list):
+            logging.error(f'error while parsing model answer: content={content}')
+            return []
+        
+        named_entities = []
+        for ne in ne_list:
+            try:
+                txt, cls_ = ne
+                named_entities.append(NamedEntity(id_=f'{text} {txt} {cls_}', text=txt, class_=cls_))
+            except Exception as e:
+                logging.error(f'error during creation of NamedEntity object: {e}')
+                logging.debug(f'ne={ne}')
+        return named_entities
 
 
 
@@ -104,9 +114,34 @@ def cli_args() -> None:
     return parser
 
 
+def _add_loc_for_medicinal_products(text_entity: TextEntity) -> None:
+    te_txt_low = text_entity.text.lower()
+    for ne in text_entity.medicinal_products:
+        ne_txt_low = ne.text.lower()
+        loc = utl.get_loc_of_subtext(text=te_txt_low, sutext=ne_txt_low)
+        if loc is not None:
+            ne.location = loc
+            ne.text = text_entity.text[loc[0]:loc[1]]
 
-def apply(args_: Namespace, data: List[Document] | None = None) -> None:
 
+def _add_loc_for_adverse_reactions(text_entity: TextEntity) -> None:
+    te_txt_low = text_entity.text.lower()
+    for ne in text_entity.adverse_reactions:
+        ne_txt_low = ne.text.lower()
+        loc = utl.get_loc_of_subtext(text=te_txt_low, sutext=ne_txt_low)
+        if loc is not None:
+            ne.location = loc
+            ne.text = text_entity.text[loc[0]:loc[1]]
+
+
+def _postprocess_named_entities(data: List[Document]) -> None:
+    for doc in data:
+        for te in doc.text_entities:
+            _add_loc_for_medicinal_products(te)
+            _add_loc_for_adverse_reactions(te)
+    
+
+def apply(args_: Namespace, data: List[Document] | None = None, save_data: bool = True) -> None:
     if data is None:
         data = FileHandler(args_.data_load).read()
     
@@ -120,14 +155,18 @@ def apply(args_: Namespace, data: List[Document] | None = None) -> None:
         return None
     
 
-    for doc in data_no_err:
-        logging.debug(f'performing ner for {len(doc.text_entities)} text entities in document {doc.id_}')
-        for i, te in enumerate(doc.text_entities):
-            logging.debug(f'text entity {i} with id_={te.id_}')
+    for id, doc in enumerate(data_no_err):
+        logging.debug(f'NER for {len(doc.text_entities)} text entities in document {id} with id {doc.id_}')
+        for jt, te in enumerate(doc.text_entities):
+            logging.debug(f'text entity {jt} with id_={te.id_}')
             named_entities = client.get_named_entities(text=te.text)
             te.medicinal_products.extend([ne for ne in named_entities if ne.class_ == 'MP'])
             te.adverse_reactions.extend([ne for ne in named_entities if ne.class_ == 'ADR'])
             logging.debug(f'found {len(te.medicinal_products)} medicinal products')
             logging.debug(f'found {len(te.adverse_reactions)} adverse reactions')
-    
-    FileHandler(args_.data_dump).write(data)
+
+    logging.info('cleaning up named entities')
+    _postprocess_named_entities(data)
+
+    if save_data:
+        FileHandler(args_.data_dump).write(data)

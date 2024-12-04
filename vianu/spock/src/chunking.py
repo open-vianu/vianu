@@ -5,6 +5,7 @@ from typing import List
 import numpy as np
 
 from .data_model import Document, FileHandler, TextEntity
+from . import utils as utl
 
 
 MODULE_NAME = 'chunking'
@@ -24,15 +25,17 @@ class TextChunking:
         N = len(entities)
         s = min(self._min_chunk_size, N)
         n = N // s
-        d = max(self._min_chunk_overlap, (N - s*n) // n) // 2 + 1
+        d = (self._min_chunk_overlap+1) // 2
         
-        bnd = [round(i) for i in np.linspace(0, 1, n+2) * N]
+        bnd = [round(i) for i in np.linspace(0, 1, n+1) * N]
 
         chunks = []
         for dwn, up in zip(bnd[:-1], bnd[1:]):
             start = max(0, dwn-d)
             stop = min(N, up+d)
             chunks.append(self._separator.join(entities[start:stop]))
+            if stop >= N:
+                break
 
         return chunks
 
@@ -44,7 +47,14 @@ def cli_args():
     return parser
 
 
-def apply(args_: Namespace, data: List[Document] | None = None):
+def _postprocess_text_entities(data: List[Document]) -> None:
+    for doc in data:
+        for te in doc.text_entities:
+            loc = utl.get_loc_of_subtext(text=doc.get_raw_text(), sutext=te.text)
+            te.location = loc
+
+
+def apply(args_: Namespace, data: List[Document] | None = None, save_data: bool = True) -> None:
     min_chunk_size = args_.min_chunk_size
     min_chunk_overlap = args_.min_chunk_overlap
 
@@ -69,5 +79,9 @@ def apply(args_: Namespace, data: List[Document] | None = None):
                 text=text,
             )
             doc.add_text_entity(text_entity=te)
-            
-    FileHandler(args_.data_dump).write(data)
+    
+    logging.info('add locations of text entities')
+    _postprocess_text_entities(data=data)
+    
+    if save_data:
+        FileHandler(args_.data_dump).write(data)

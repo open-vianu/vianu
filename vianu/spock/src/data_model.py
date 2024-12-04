@@ -51,8 +51,7 @@ class NamedEntity(DataUnit):
     """Class for all named entities."""
     text: str = field(default_factory=str)
     class_: str = field(default_factory=str)
-    location: Tuple[int] | None = None
-    probability: float | None = None
+    location: List[int] | None = None
 
     @property
     def _id_prefix(self):
@@ -65,25 +64,20 @@ class TextEntity(DataUnit):
 
     # Text information
     text: str = field(default_factory=str)
-    location: List[int] = field(default_factory=list)
+    location: List[int] | None = None
 
     # NER information (optional)
     medicinal_products: List[NamedEntity] = field(default_factory=list)
     adverse_reactions: List[NamedEntity] = field(default_factory=list)
 
-
-    # private document fields
-    __raw_text: str = ""
-
     @property
     def _id_prefix(self):
         return 'txt_'
 
-    def add_raw_text(self, text: str) -> None:
-        self.__raw_text = text
-
-    def get_raw_text(self) -> str:
-        return self.__raw_text
+    def remove_named_entity(self, id_: str) -> None:
+        """Removes a named entity from the text entity."""
+        self.medicinal_products = [ne for ne in self.medicinal_products if ne.id_ != id_]
+        self.adverse_reactions = [ne for ne in self.adverse_reactions if ne.id_ != id_]
 
 
 DOCUMENT_SOURCES = [
