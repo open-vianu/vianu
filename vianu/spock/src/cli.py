@@ -4,15 +4,13 @@ import sys
 
 from ..settings import DEFAULT_LOGGING_LEVEL, LOGGING_FMT, DEFAULT_DATA_DUMP
 from . import scraping as scp
-from . import chunking as cnk
 from . import ner
 from . import pipeline as ppl
 
 
 
-MODULES = [scp, cnk, ner, ppl]
-_MODULES_NO_PPL = [mod for mod in MODULES if mod != ppl]
-
+MODULES = [scp, ner, ppl]
+_MOD_NON_PPL = [mod for mod in MODULES if mod.MODULE_NAME != ppl.MODULE_NAME]
 
 def parse_args(args_: argparse.Namespace) -> argparse.Namespace:
     # Create global parser for logs
@@ -26,11 +24,11 @@ def parse_args(args_: argparse.Namespace) -> argparse.Namespace:
     mod_parser = parser.add_subparsers(help='Module', dest="module", required=True)
 
     # Add single module parser
-    for mod in _MODULES_NO_PPL:
+    for mod in _MOD_NON_PPL:
         mod_parser.add_parser(mod.MODULE_NAME, parents=[global_parser, mod.cli_args()])
     
     # Add pipeline module parser
-    parents = [global_parser, ppl.cli_args()] + [mod.cli_args() for mod in _MODULES_NO_PPL]
+    parents = [global_parser, ppl.cli_args()] + [mod.cli_args() for mod in _MOD_NON_PPL]
     mod_parser.add_parser(ppl.MODULE_NAME, parents=parents)
 
     return parser.parse_args(args_)

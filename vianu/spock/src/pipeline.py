@@ -1,20 +1,15 @@
 from argparse import ArgumentParser, ArgumentTypeError, Namespace
 import logging
-from pathlib import Path
 from typing import Iterable, List
 
 from .data_model import FileHandler
 from . import scraping as scp
-from . import chunking as cnk
 from . import ner
 
+logger = logging.getLogger(__name__)
+
 MODULE_NAME = 'pipeline'
-PIPELINE_STEPS = {
-    'all': [scp, cnk, ner],
-    'scp': scp,
-    'cnk': cnk,
-    'ner': ner,
-}
+PIPELINE_STEPS = [scp, ner] 
 
 def _pipeline_steps(steps: Iterable[str]):
     def _parse(arg: str) -> List[str]:
@@ -27,23 +22,13 @@ def _pipeline_steps(steps: Iterable[str]):
 
 def cli_args():
     parser = ArgumentParser(add_help=False)
-    group = parser.add_argument_group(MODULE_NAME)
-    group.add_argument('--steps', dest='steps', type=_pipeline_steps(PIPELINE_STEPS.keys()), required=True)
     return parser
 
-def apply(args_: Namespace):
-    logging.info(f'run pipeline seps {args_.steps}')
-    if 'all' in args_.steps:
-        steps = PIPELINE_STEPS['all']
-    else:
-        steps = [PIPELINE_STEPS[s] for s in args_.steps]
-    
-    if (data_load := args_.data_load) is not None:
-        data_file = Path(data_load)
-        data = FileHandler(data_file=data_file).read()
-    else:
-        data = []
-    
-    for stp in steps:
-        stp.apply(args_, data)
-    
+def apply(args_: Namespace, save_data: bool = True) -> None:
+    logger.info('run pipeline')
+
+    data = scp.apply(args_=args_, save_data=False)
+    ner.apply(args_=args_, data=data, save_data=False)
+
+    if save_data:
+        FileHandler(args_.data_dump).write(data)

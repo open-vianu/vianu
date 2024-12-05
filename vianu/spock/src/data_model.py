@@ -9,7 +9,7 @@ import os
 from pathlib import Path
 
 import numpy as np
-from typing import Tuple, List, Self
+from typing import List, Self
 
 
 @dataclass
@@ -59,86 +59,35 @@ class NamedEntity(DataUnit):
 
 
 @dataclass(eq=False)
-class TextEntity(DataUnit):
-    """Class containing any text-entity related information."""
+class Document(DataUnit):
+    """Class containing any document related information."""
 
-    # Text information
-    text: str = field(default_factory=str)
-    location: List[int] | None = None
+    # mandatory document fields
+    text: str
+    source: str
+
+    # optional document fields
+    title: str | None = None
+    url: str | None = None
+    source_url: str | None = None
+    language: str | None = None
+    publication_date: datetime | None = None
 
     # NER information (optional)
     medicinal_products: List[NamedEntity] = field(default_factory=list)
     adverse_reactions: List[NamedEntity] = field(default_factory=list)
 
-    @property
-    def _id_prefix(self):
-        return 'txt_'
-
-    def remove_named_entity(self, id_: str) -> None:
-        """Removes a named entity from the text entity."""
-        self.medicinal_products = [ne for ne in self.medicinal_products if ne.id_ != id_]
-        self.adverse_reactions = [ne for ne in self.adverse_reactions if ne.id_ != id_]
-
-
-DOCUMENT_SOURCES = [
-    'pubmed',
-    'faers',
-]
-
-
-@dataclass(eq=False)
-class Document(DataUnit):
-    """Class containing any document related information."""
-
-    url: str | None = None
-    source_url: str | None = None
-    source: str | None = None
-    type: str | None = None
-    language: str | None = None
-
-    # optional document fields
-    text: str | None = None
-    title: str | None = None
-    abstract: str | None = None
-    publication_date: datetime | None = None
-
-    # protected document fields (considered by `DataUnit.asdict()`)
-    _text_entities: List[TextEntity] = field(default_factory=list)
+    # Protected fields
     _errors: List[str] = field(default_factory=list)
-
-    # private document fields
-    __raw_text: str | None = None
-    __text_entity_id_index_map: dict = field(default_factory=dict)
 
     @property
     def _id_prefix(self):
         return 'doc_'
-
-    @property
-    def text_entities(self):
-        return self._text_entities
-
-    def add_text_entity(self, text_entity: TextEntity) -> None:
-        """Appends a text entity and updates the ID - Index map in self.text_entity_id_index_map."""
-        if (id_ := text_entity.id_) in self.__text_entity_id_index_map:
-            index = self.__text_entity_id_index_map[id_]
-            logging.debug(f'A text entity object with id={id_} already exists at loc={index} and is ignored')
-        else:
-            self._text_entities.append(text_entity)
-            self.__text_entity_id_index_map[text_entity.id_] = len(self.text_entities) - 1
-
-    def del_text_entity(self, index_: int | None = None, id_: str | None = None) -> None:
-        """Removes a given text entity by its index or its id."""
-        if index_ is not None and id_ is not None:
-            raise ValueError('The definition of `index` OR `id_` must be exclusive.')
-        if index_ is None and id_ is None:
-            raise ValueError('Either `index` or `id_` has to be defined.')
-        if id_ is not None:
-            index = self.__text_entity_id_index_map[id_]
-        elif index_ is not None:
-            index = index_
-        self._text_entities.pop(index)
-        self.__text_entity_id_index_map = {ent.id_: i for i, ent in enumerate(self._text_entities)}
+    
+    def remove_named_entity_from_id(self, id_: str) -> None:
+        """Removes a named entity from the text entity."""
+        self.medicinal_products = [ne for ne in self.medicinal_products if ne.id_ != id_]
+        self.adverse_reactions = [ne for ne in self.adverse_reactions if ne.id_ != id_]
 
     def add_error(self, err: str) -> None:
         self._errors.append(err)
@@ -149,12 +98,6 @@ class Document(DataUnit):
     def has_error(self) -> bool:
         return len(self._errors) > 0
 
-    def add_raw_text(self, text: str) -> None:
-        self.__raw_text = text
-
-    def get_raw_text(self) -> str:
-        return self.__raw_text
-    
     @classmethod
     def from_dict(cls, data: dict) -> Self:
         return dacite.from_dict(
@@ -178,10 +121,9 @@ class DocumentJSONEncoder(json.JSONEncoder):
         return json.JSONEncoder.default(self, o)
 
 
-
 class FileHandler:
-    """Reads from and write data to a file.
-    """
+    """Reads from and write data to a file."""
+
     _suffix = '.json'
 
     def __init__(self, data_file: Path | str):

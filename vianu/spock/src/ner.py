@@ -6,9 +6,10 @@ import logging
 import requests
 from typing import List
 
-from ..settings import DEFAULT_OLLAMA_ENDPOINT
-from .data_model import Document, TextEntity, FileHandler, NamedEntity
-from . import utils as utl
+from ..settings import DEFAULT_OLLAMA_ENDPOINT, DEFAULT_LLAMA_MODEL
+from .data_model import Document, FileHandler, NamedEntity
+
+logger = logging.getLogger(__name__)
 
 MODULE_NAME = 'ner'
 NAMED_ENTITY_PROMPT = """
@@ -44,26 +45,35 @@ Now, analyze the following text and return a Python list of all adverse events a
 
 class NER(ABC):
 
+    @staticmethod
+    def get_loc_of_subtext(text: str, sutext: str) -> List[int] | None:
+        """Get the location of a subtext in a text."""
+        pos = text.find(sutext)
+        if pos == -1:
+            return None
+        return pos, pos + len(sutext)
+
 
     @abstractmethod
-    def get_named_entities(text: str) -> List[NamedEntity]:
+    def apply(text: str) -> List[NamedEntity]:
         pass
 
 
-class OllamaNER(NER):
-    _data = {
-        "model": "llama3.2",
-        "messages": [
-            {
-                "role": "system",
-                "content": NAMED_ENTITY_PROMPT,
-            },
-        ],
-        "stream": False,
-    }
 
-    def __init__(self, endpoint: str):
-        super(OllamaNER, self).__init__()
+
+class OllamaNER(NER):
+
+    def __init__(self, endpoint: str, model: str):
+        self._data = {
+            "model": model,
+            "messages": [
+                {
+                    "role": "system",
+                    "content": NAMED_ENTITY_PROMPT,
+                },
+            ],
+            "stream": False,
+        }
         self._endpoint = endpoint
 
 
@@ -80,20 +90,23 @@ class OllamaNER(NER):
         return content
         
 
-    def get_named_entities(self, text: str) -> List[NamedEntity]:
+    def apply(self, text: str) -> List[NamedEntity]:
         # Request the text answer from the model endpoint
         try: 
             content = self._get_model_answer(text=text)
         except Exception as e:
-            logging.error(f'error during inference of model endpoint: {e}')
-            logging.debug(f'text: {text}')
+            logger.error(f'error during inference of model endpoint: {e}')
+            logger.debug(f'text: {text}')
             return []
         
         # Parse the model answer
-        ne_list = ast.literal_eval(content)
-        if not isinstance(ne_list, list):
-            logging.error(f'error while parsing model answer: content={content}')
-            return []
+        try:
+            ne_list = ast.literal_eval(content)
+            if not isinstance(ne_list, list):
+                raise TypeError('parsed model answer is not a list')
+        except Exception as e:
+            logger.error(f'error while parsing model answer: {e}')
+            logger.debug(f'content: {content}')
         
         named_entities = []
         for ne in ne_list:
@@ -101,8 +114,8 @@ class OllamaNER(NER):
                 txt, cls_ = ne
                 named_entities.append(NamedEntity(id_=f'{text} {txt} {cls_}', text=txt, class_=cls_))
             except Exception as e:
-                logging.error(f'error during creation of NamedEntity object: {e}')
-                logging.debug(f'ne={ne}')
+                logger.error(f'error during creation of NamedEntity object: {e}')
+                logger.debug(f'ne={ne}')
         return named_entities
 
 
@@ -114,31 +127,33 @@ def cli_args() -> None:
     return parser
 
 
-def _add_loc_for_medicinal_products(text_entity: TextEntity) -> None:
-    te_txt_low = text_entity.text.lower()
-    for ne in text_entity.medicinal_products:
+def _add_loc_for_medicinal_products(doc: Document) -> None:
+    txt_low = doc.text.lower()
+    for ne in doc.medicinal_products:
         ne_txt_low = ne.text.lower()
-        loc = utl.get_loc_of_subtext(text=te_txt_low, sutext=ne_txt_low)
+        loc = NER.get_loc_of_subtext(text=txt_low, sutext=ne_txt_low)
         if loc is not None:
             ne.location = loc
-            ne.text = text_entity.text[loc[0]:loc[1]]
+            ne.text = doc.text[loc[0]:loc[1]]
+        else:
+            logger.warning(f'could not find location for medicinal product "{ne.text}"')
 
 
-def _add_loc_for_adverse_reactions(text_entity: TextEntity) -> None:
-    te_txt_low = text_entity.text.lower()
-    for ne in text_entity.adverse_reactions:
+def _add_loc_for_adverse_reactions(doc: Document) -> None:
+    txt_low = doc.text.lower()
+    for ne in doc.adverse_reactions:
         ne_txt_low = ne.text.lower()
-        loc = utl.get_loc_of_subtext(text=te_txt_low, sutext=ne_txt_low)
+        loc = NER.get_loc_of_subtext(text=txt_low, sutext=ne_txt_low)
         if loc is not None:
             ne.location = loc
-            ne.text = text_entity.text[loc[0]:loc[1]]
-
+            ne.text = doc.text[loc[0]:loc[1]]
+        else:
+            logger.warning(f'could not find location for adverse reaction "{ne.text}"')
 
 def _postprocess_named_entities(data: List[Document]) -> None:
     for doc in data:
-        for te in doc.text_entities:
-            _add_loc_for_medicinal_products(te)
-            _add_loc_for_adverse_reactions(te)
+        _add_loc_for_medicinal_products(doc)
+        _add_loc_for_adverse_reactions(doc)
     
 
 def apply(args_: Namespace, data: List[Document] | None = None, save_data: bool = True) -> None:
@@ -146,26 +161,29 @@ def apply(args_: Namespace, data: List[Document] | None = None, save_data: bool 
         data = FileHandler(args_.data_load).read()
     
     data_no_err = [d for d in data if not d.has_error()]
-    logging.info(f'extracting named entities for {len(data_no_err)} documents')
+    logger.info(f'NER for {len(data_no_err)} documents')
     
     if args_.model == 'ollama':
-        client = OllamaNER(endpoint=DEFAULT_OLLAMA_ENDPOINT)
+        ner = OllamaNER(endpoint=DEFAULT_OLLAMA_ENDPOINT, model=DEFAULT_LLAMA_MODEL)
     else:
-        logging.error(f'unknown ner model "{args_.model}"')
+        logger.error(f'unknown ner model "{args_.model}"')
         return None
     
 
     for id, doc in enumerate(data_no_err):
-        logging.debug(f'NER for {len(doc.text_entities)} text entities in document {id} with id {doc.id_}')
-        for jt, te in enumerate(doc.text_entities):
-            logging.debug(f'text entity {jt} with id_={te.id_}')
-            named_entities = client.get_named_entities(text=te.text)
-            te.medicinal_products.extend([ne for ne in named_entities if ne.class_ == 'MP'])
-            te.adverse_reactions.extend([ne for ne in named_entities if ne.class_ == 'ADR'])
-            logging.debug(f'found {len(te.medicinal_products)} medicinal products')
-            logging.debug(f'found {len(te.adverse_reactions)} adverse reactions')
+        logger.debug(f'NER for document #{id} with id={doc.id_}')
+        named_entities = ner.apply(text=doc.text)
+        
+        # Add medicinal products
+        doc.medicinal_products.extend([ne for ne in named_entities if ne.class_ == 'MP'])
+        logger.debug(f'found {len(doc.medicinal_products)} medicinal products')
+        
+        # Add adverse reactions
+        doc.adverse_reactions.extend([ne for ne in named_entities if ne.class_ == 'ADR'])
+        logger.debug(f'found {len(doc.adverse_reactions)} adverse reactions')
 
-    logging.info('cleaning up named entities')
+    # TODO this must change!!!! include it into the NER class
+    logger.info('cleaning up named entities')
     _postprocess_named_entities(data)
 
     if save_data:
