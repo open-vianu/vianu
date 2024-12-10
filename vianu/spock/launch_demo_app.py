@@ -1,66 +1,69 @@
 from argparse import Namespace
+from datetime import datetime
+from pathlib import Path
+from typing import List
 
 import gradio as gr
 
 from vianu.spock.src import scraping as scp
-from vianu.spock.src import chunking as cnk
 from vianu.spock.src import ner
+from vianu.spock.src.data_model import Document, Query, FileHandler
+from vianu.spock.settings import DATE_FORMAT
+
+HEAD_FILE = Path(__file__).parent / "assets/head/scripts.html"
+CSS_FILE = Path(__file__).parent / "assets/css/styles.css"
+CONTAINER_TEMPLATE = """
+<div class="card-container">
+{cards}
+</div>
+"""
+
+CARD_TEMPLATE = """
+<div class="card">
+  <div class="card-title">{title}</div>
+  <div class="card-date">Date: {date}</div>
+  <div class="card-sources">Sources: {sources}</div>
+  <div class="card-stats">#Docs: {n_doc} | #ADR: {n_adr}</div>
+</div>
+"""
 
 
-namespace_kwargs = {
-    "min_chunk_size": 500,
-    "min_chunk_overlap": 50,
-    "source": "pubmed",
+NAMESPACE_KWARGS = {
+    "source": ["pubmed"],
     "model": "ollama",
 }
 
+SAMPLE_DATA = FileHandler('vianu/spock/assets/sample_data.json').read()
+SAMPLE_QUERY = Query(term="dafalgan", sources=["pubmed", "ema"], submission_date=datetime.now())
+
+
+def _format_search_card(query: Query, data: List[Document]):
+    title = query.term
+    sources = ', '.join(query.sources)
+    date = query.submission_date.strftime(DATE_FORMAT)
+    n_doc = len(data)
+    n_adr = sum([len(d.adverse_reactions) for d in data])
+    return CARD_TEMPLATE.format(title=title, date=date, sources=sources, n_doc=n_doc, n_adr=n_adr)
+
 
 # Processing search input
-def process_pipeline(search_text):
-    args = Namespace(term=search_text, **namespace_kwargs)
-    data = []
-    scp.apply(args_=args, data=data, save_data=False)
-    cnk.apply(args_=args, data=data, save_data=False)
-    data = data[:1]
-    ner.apply(args_=args, data=data, save_data=False)
-    text_entity = data[0].text_entities[0]
-    med_prod = ' '.join([ne.text for ne in text_entity.medicinal_products])
-    adv_react = ' '.join([ne.text for ne in text_entity.adverse_reactions])
-    response = f"{text_entity.text}\n\nMedicinal products: {med_prod}\n\nAdverse reactions: {adv_react}"
-    return response
+def _process_pipeline(search_text):
+    args = Namespace(term=search_text, **NAMESPACE_KWARGS)
+    
+    cards = [_format_search_card(SAMPLE_QUERY, SAMPLE_DATA) for _ in range(5)]
+    html_content = CONTAINER_TEMPLATE.format(cards="\n".join([c for c in cards]))
 
-custom_css = """ 
-#logo-image {
-    background-color: transparent !important;
-    border: none !important;
-    box-shadow: none !important;
-    padding: 0 !important;
-    height: 20vh;
-}
+    return html_content
 
-#title-text {
-    display: flex;
-    justify-content: center;
-    align-items: center; 
-    height: 100%; 
-    color: var(--block-title-text-color);
-    background: var(--block-title-background-fill);
-    border-radius: 10px;
-    font: Montserrat;
-    font-size: 40px;
-    font-weight: bold;
-    text-align: center;
-}
-"""
 
 # Layout resembling the image
-with gr.Blocks(css=custom_css, theme=gr.themes.Soft()) as demo:
+with gr.Blocks(head_paths=JS_FILE, css_paths=CSS_FILE, theme=gr.themes.Soft()) as demo:
     scraping_state = gr.State(value=False)
     ner_state = gr.State(value=False)
 
     with gr.Row():
         with gr.Column(scale=1):
-            gr.Image(value="vianu/spock/assets/spock_logo_circular.png", show_label=False, elem_id="logo-image")
+            gr.Image(value="vianu/spock/assets/images/spock_logo_circular.png", show_label=False, elem_id="logo-image")
         with gr.Column(scale=5):
             gr.Markdown("<div id='title-text'>SpoCK: Spotting Clinical Knowledge</div>")
                 
@@ -68,10 +71,10 @@ with gr.Blocks(css=custom_css, theme=gr.themes.Soft()) as demo:
         search_input = gr.Textbox(label="Search", placeholder="Enter your search here...")
             
     with gr.Row():
-        search_results = gr.Textbox(lines=10, label="Recently searched", interactive=False)
+        search_results = gr.HTML(label="Recently searched")
             
     search_input.submit(
-        fn=process_pipeline,
+        fn=_process_pipeline,
         inputs=search_input,
         outputs=search_results
     )   

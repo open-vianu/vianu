@@ -105,6 +105,7 @@ class Document(DataUnit):
             data=data,
             config=dacite.Config(type_hooks={datetime: datetime.fromisoformat})
         )
+    
 
 
 class DocumentJSONEncoder(json.JSONEncoder):
@@ -119,6 +120,13 @@ class DocumentJSONEncoder(json.JSONEncoder):
             return int(o)
         # Let the base class default method raise the TypeError
         return json.JSONEncoder.default(self, o)
+
+
+@dataclass
+class Query:
+    term: str
+    sources: List[str] | None = None
+    submission_date: datetime | None = None
 
 
 class FileHandler:

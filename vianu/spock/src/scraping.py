@@ -10,7 +10,7 @@ from typing import List
 import xml.etree.ElementTree as ET
 
 from .data_model import Document, FileHandler
-from ..settings import PUBMED_ESEARCH_URL, PUBMED_DB, PUBMED_EFETCH_URL, PUBMED_BATCH_SIZE, DEFAULT_MAX_TOKENS
+from ..settings import SCRAPINT_SOURCES, PUBMED_ESEARCH_URL, PUBMED_DB, PUBMED_EFETCH_URL, PUBMED_BATCH_SIZE, DEFAULT_MAX_TOKENS
 
 logger = logging.getLogger(__name__)
 
@@ -194,29 +194,35 @@ class PubmedScraper(Scraper):
         return documents
 
 
+
+class EMAScraper(Scraper):
+    _api_search_url_template = "https://www.ema.europa.eu/en/search?search_api_fulltext={term}&f%5B0%5D=ema_search_entity_is_document%3ADocument"
+    pass
+
+
 def cli_args() -> None:
     parser = ArgumentParser(add_help=False)
     group = parser.add_argument_group(MODULE_NAME)
-    group.add_argument('--source', dest='source', choices=['pubmed', 'faers'])
+    group.add_argument('--source', dest='source', action='append', choices=SCRAPINT_SOURCES)
     group.add_argument('--term', dest='term')
     return parser
 
 
 def apply(args_: Namespace, save_data: bool = True) -> List[Document]:
-    source = args_.source
+    sources = args_.source if args_.source is not None else SCRAPINT_SOURCES
     term = args_.term
     data = []
 
-    logger.info(f'crawling source "{source}" for term "{term}"')
-    if source == 'pubmed':
+    logger.info(f'crawling sources="{sources}" for term "{term}"')
+    if 'pubmed' in sources:
         scraper = PubmedScraper()
         documents = scraper.apply(term=args_.term)
         logger.info(f'found {len(documents)} pubmed articles')
         data.extend(documents)
-    elif source == 'faers':
-        logger.error('FAERS source not implemented yet')
+    elif 'ema' in sources:
+        logger.error('EMA source not implemented yet')
     else:
-        logger.error(f'Unknown source {source}')
+        logger.error(f'Unknown source {sources}')
     
     if save_data:
         FileHandler(args_.data_dump).write(data)
