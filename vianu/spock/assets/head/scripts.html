@@ -1,0 +1,13 @@
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        var card = document.getElementById('my_clickable_card');
+        var hiddenDiv = document.getElementById('hidden_content');
+        if (card && hiddenDiv) {
+            card.addEventListener('click', function() {
+                hiddenDiv.style.display = 'block';
+            });
+        }
+    });
+</script>
+
+
