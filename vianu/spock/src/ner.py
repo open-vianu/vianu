@@ -3,6 +3,7 @@ from argparse import ArgumentParser, Namespace
 import ast
 from copy import deepcopy
 import logging
+import re
 import requests
 from typing import List
 
@@ -12,11 +13,13 @@ from .data_model import Document, FileHandler, NamedEntity
 logger = logging.getLogger(__name__)
 
 MODULE_NAME = 'ner'
+
 NAMED_ENTITY_PROMPT = """
-You are an expert assistant trained to extract specific information from text. Given the following text, return a 
-Python list of tuples of all named entities together with their type mentioned in the text. You will focus on the 
-following entities: adverse drug reaction (entity type: ADR), medicinal product (entity type: MP).
-Provide only the Python list as your output, without any additional explanations or text.
+You are an expert in Natural Language Processing. Your task is to identify common named entities (NER) in a given text.
+You will focus on the following entities: adverse drug reaction (entity type: ADR), medicinal product (entity type: MP).
+Once you identified and extracted all named entities of the above types from the text, you return them as a
+Python list of tuples of all named entities together with their type. 
+It is of upmost importance to only provide the Python list as your output, without any additional explanations or text.
 
 Example 1:
 Input:
@@ -49,7 +52,7 @@ performing a fuzzy match within the original text. Do not provide any additional
 Output only the original drug name.
 
 Original text:
-{original_text}
+{text}
 
 Modified subtext:
 {subtext}
@@ -60,12 +63,12 @@ Modified subtext:
 class NER(ABC):
 
     @staticmethod
-    def get_loc_of_subtext(text: str, sutext: str) -> List[int] | None:
+    def get_loc_of_subtext(text: str, subtext: str) -> List[int] | None:
         """Get the location of a subtext in a text."""
-        pos = text.find(sutext)
+        pos = text.find(subtext)
         if pos == -1:
             return None
-        return pos, pos + len(sutext)
+        return pos, pos + len(subtext)
 
 
     @abstractmethod
@@ -110,13 +113,13 @@ class OllamaNER(NER):
         }
         return data
     
-    def _get_loc_data(self, oritinal_text: str, subtext: str, stream: bool = False) -> dict:
+    def _get_loc_data(self, text: str, subtext: str, stream: bool = False) -> dict:
         data = {
             "model": self._model,
             "messages": [
                 {
                     "role": "user",
-                    "content": LOCATION_PROMPT_TEMPLATE.format(original_text=oritinal_text, subtext=subtext),
+                    "content": LOCATION_PROMPT_TEMPLATE.format(text=text, subtext=subtext),
                 }
             ],
             "stream": stream,
@@ -131,8 +134,8 @@ class OllamaNER(NER):
         return content
 
 
-    def _get_loc_model_answer(self, oritinal_text: str, subtext: str, stream: bool = False) -> str:
-        data = self._get_loc_data(oritinal_text=oritinal_text, subtext=subtext, stream=stream)
+    def _get_loc_model_answer(self, text: str, subtext: str, stream: bool = False) -> str:
+        data = self._get_loc_data(text=text, subtext=subtext, stream=stream)
         response = requests.post(self._endpoint, json=data, stream=stream)
         response.raise_for_status()
         content = response.json()['message']['content']
@@ -144,12 +147,12 @@ class OllamaNER(NER):
         for ne in named_entities:
             oritginal_text_low = txt_low[start:]
             ne_txt_low = ne.text.lower()
-            loc = self.get_loc_of_subtext(text=oritginal_text_low, sutext=ne_txt_low)
+            loc = self.get_loc_of_subtext(text=oritginal_text_low, subtext=ne_txt_low)
 
-            if loc is None:
-                # TODO make another call to the model to get the exact location
-                # make sure to use the original text low
-                pass
+            # if loc is None:
+            #     logger.warning(f'trying to find location for named entity "{ne.text}" of class "{ne.class_}" by additional request')
+            #     loc_model_answer = self._get_loc_model_answer(text=text[start:], subtext=ne.text)
+            #     loc = self.get_loc_of_subtext(text=oritginal_text_low, subtext=loc_model_answer.lower())
 
             if loc is not None:
                 loc = loc[0] + start, loc[1] + start
@@ -177,6 +180,7 @@ class OllamaNER(NER):
         except Exception as e:
             logger.error(f'error while parsing model answer: {e}')
             logger.debug(f'content: {content}')
+            ne_list = re.findall(r'\("[^"]*",\s?"(MP|ADR)"\)', content)
         
         named_entities = []
         for ne in ne_list:
@@ -189,8 +193,7 @@ class OllamaNER(NER):
 
         # Add locations to named entities
         self._add_loc_for_named_entities(text=text, named_entities=named_entities)
-        return named_entities
-
+        return [ne for ne in named_entities if ne.location is not None]
 
 
 def cli_args() -> None:    
@@ -198,7 +201,6 @@ def cli_args() -> None:
     group = parser.add_argument_group(MODULE_NAME)
     group.add_argument('--model', dest='model', choices=['ollama'], default='ollama')
     return parser
-
 
 
 def apply(args_: Namespace, data: List[Document] | None = None, save_data: bool = True) -> None:
