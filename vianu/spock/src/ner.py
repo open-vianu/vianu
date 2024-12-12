@@ -42,6 +42,20 @@ Output:
 Now, analyze the following text and return a Python list of all adverse events and side effects:
 """
 
+LOCATION_PROMPT_TEMPLATE = """
+I have a named entity extracted from a given original text. Unfortunately, the text of the named entity was slightly 
+modified and no longer matches its original counterpart. Identify and return the exact original text segment by 
+performing a fuzzy match within the original text. Do not provide any additional information or explanations. 
+Output only the original drug name.
+
+Original text:
+{original_text}
+
+Modified subtext:
+{subtext}
+"""
+
+
 
 class NER(ABC):
 
@@ -63,8 +77,9 @@ class NER(ABC):
 
 class OllamaNER(NER):
 
+
     def __init__(self, endpoint: str, model: str):
-        self._data = {
+        self._ner_data = {
             "model": model,
             "messages": [
                 {
@@ -75,25 +90,80 @@ class OllamaNER(NER):
             "stream": False,
         }
         self._endpoint = endpoint
+        self._model = model
 
 
-    def _get_model_answer(self, text: str) -> str:
-        data = deepcopy(self._data)
-        data['messages'].append({
-            "role": "user",
-            "content": text,
-        })
-        response = requests.post(self._endpoint, json=data, stream=False)
+    def _get_ner_data(self, text: str, stream: bool = False) -> dict:
+        data = {
+            "model": self._model,
+            "messages": [
+                {
+                    "role": "system",
+                    "content": NAMED_ENTITY_PROMPT,
+                },
+                {
+                    "role": "user",
+                    "content": text,
+                },
+            ],
+            "stream": stream,
+        }
+        return data
+    
+    def _get_loc_data(self, oritinal_text: str, subtext: str, stream: bool = False) -> dict:
+        data = {
+            "model": self._model,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": LOCATION_PROMPT_TEMPLATE.format(original_text=oritinal_text, subtext=subtext),
+                }
+            ],
+            "stream": stream,
+        }
+        return data
+
+    def _get_ner_model_answer(self, text: str, stream: bool = False) -> str:
+        data = self._get_ner_data(text=text, stream=stream)
+        response = requests.post(self._endpoint, json=data, stream=stream)
         response.raise_for_status()
         content = response.json()['message']['content']
-
         return content
-        
+
+
+    def _get_loc_model_answer(self, oritinal_text: str, subtext: str, stream: bool = False) -> str:
+        data = self._get_loc_data(oritinal_text=oritinal_text, subtext=subtext, stream=stream)
+        response = requests.post(self._endpoint, json=data, stream=stream)
+        response.raise_for_status()
+        content = response.json()['message']['content']
+        return content
+
+    def _add_loc_for_named_entities(self, text: str, named_entities: List[NamedEntity]) -> None:
+        txt_low = text.lower()
+        start = 0
+        for ne in named_entities:
+            oritginal_text_low = txt_low[start:]
+            ne_txt_low = ne.text.lower()
+            loc = self.get_loc_of_subtext(text=oritginal_text_low, sutext=ne_txt_low)
+
+            if loc is None:
+                # TODO make another call to the model to get the exact location
+                # make sure to use the original text low
+                pass
+
+            if loc is not None:
+                loc = loc[0] + start, loc[1] + start
+                ne.location = loc
+                ne.text = text[loc[0]:loc[1]]
+                start = loc[1]
+            else:
+                logger.warning(f'could not find location for named entity "{ne.text}" of class "{ne.class_}"')
+
 
     def apply(self, text: str) -> List[NamedEntity]:
-        # Request the text answer from the model endpoint
+        # Request the text answer from the model endpoint and transforms it into a list of NamedEntity objects
         try: 
-            content = self._get_model_answer(text=text)
+            content = self._get_ner_model_answer(text=text)
         except Exception as e:
             logger.error(f'error during inference of model endpoint: {e}')
             logger.debug(f'text: {text}')
@@ -116,6 +186,9 @@ class OllamaNER(NER):
             except Exception as e:
                 logger.error(f'error during creation of NamedEntity object: {e}')
                 logger.debug(f'ne={ne}')
+
+        # Add locations to named entities
+        self._add_loc_for_named_entities(text=text, named_entities=named_entities)
         return named_entities
 
 
@@ -127,34 +200,6 @@ def cli_args() -> None:
     return parser
 
 
-def _add_loc_for_medicinal_products(doc: Document) -> None:
-    txt_low = doc.text.lower()
-    for ne in doc.medicinal_products:
-        ne_txt_low = ne.text.lower()
-        loc = NER.get_loc_of_subtext(text=txt_low, sutext=ne_txt_low)
-        if loc is not None:
-            ne.location = loc
-            ne.text = doc.text[loc[0]:loc[1]]
-        else:
-            logger.warning(f'could not find location for medicinal product "{ne.text}"')
-
-
-def _add_loc_for_adverse_reactions(doc: Document) -> None:
-    txt_low = doc.text.lower()
-    for ne in doc.adverse_reactions:
-        ne_txt_low = ne.text.lower()
-        loc = NER.get_loc_of_subtext(text=txt_low, sutext=ne_txt_low)
-        if loc is not None:
-            ne.location = loc
-            ne.text = doc.text[loc[0]:loc[1]]
-        else:
-            logger.warning(f'could not find location for adverse reaction "{ne.text}"')
-
-def _postprocess_named_entities(data: List[Document]) -> None:
-    for doc in data:
-        _add_loc_for_medicinal_products(doc)
-        _add_loc_for_adverse_reactions(doc)
-    
 
 def apply(args_: Namespace, data: List[Document] | None = None, save_data: bool = True) -> None:
     if data is None:
@@ -182,9 +227,6 @@ def apply(args_: Namespace, data: List[Document] | None = None, save_data: bool 
         doc.adverse_reactions.extend([ne for ne in named_entities if ne.class_ == 'ADR'])
         logger.debug(f'found {len(doc.adverse_reactions)} adverse reactions')
 
-    # TODO this must change!!!! include it into the NER class
-    logger.info('cleaning up named entities')
-    _postprocess_named_entities(data)
 
     if save_data:
         FileHandler(args_.data_dump).write(data)

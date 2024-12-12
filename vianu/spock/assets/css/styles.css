@@ -26,6 +26,7 @@
     gap: 20px;
 }
 .card {
+    cursor: pointer;
     border: 1px solid #a0a0a0a0;
     border-radius: 8px;
     width: 300px;
@@ -51,3 +52,18 @@
     margin-bottom: 8px;
 }
 
+.details-container {
+    display: none;
+    border: 1px solid #a0a0a0a0;
+    border-radius: 8px;
+    padding: 16px;
+}
+.details-inner-title {
+    font-weight: bold;
+    font-size: 16px;
+    margin-bottom: 8px;
+}
+.details-inner-date { 
+    color: #a0a0a0;
+    margin-bottom: 8px;
+}

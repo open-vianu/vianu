@@ -105,7 +105,6 @@ class Document(DataUnit):
             data=data,
             config=dacite.Config(type_hooks={datetime: datetime.fromisoformat})
         )
-    
 
 
 class DocumentJSONEncoder(json.JSONEncoder):
@@ -127,6 +126,18 @@ class Query:
     term: str
     sources: List[str] | None = None
     submission_date: datetime | None = None
+
+
+@dataclass
+class SpoCK:
+    # Generic fields
+    status: str
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+
+    # Pipeline fields
+    query: Query | None = None
+    data: List[Document] | None = None
 
 
 class FileHandler:
