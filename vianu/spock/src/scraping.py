@@ -26,6 +26,11 @@ class Scraper(ABC):
     def apply(self, term: str) -> List[Document]:
         pass
 
+    @staticmethod
+    @abstractmethod
+    def get_source_favicon_url() -> str:
+        pass
+
 
     def get_text_chunks(self, text: str, max_size: int = _DEFAULT_MAX_SIZE) -> List[str]:
         """Split a text into chunks of a given max size."""
@@ -52,7 +57,7 @@ class PubmedEntrezHistoryParams(BaseModel):
 
 class PubmedScraper(Scraper):
 
-    source = 'Pubmed'
+    source = 'PubMed'
     source_url = 'https://pubmed.ncbi.nlm.nih.gov/'
 
     @staticmethod
@@ -86,19 +91,28 @@ class PubmedScraper(Scraper):
             else:
                 logger.error(f'batch failed with code={efetch.status_code}')
         return batches
-    
-    @staticmethod
-    def _extract_article(element: ET.Element) -> ET.Element | None:
-        """Extract the article element from a PubmedArticle element."""
 
+    @staticmethod
+    def _extract_medline_citation(element: ET.Element) -> ET.Element | None:
+        """Extract the MedlineCitation element from a PubmedArticle element."""
         # Find and extract the MedlineCitation element
         citation = element.find('MedlineCitation')
         if citation is None:
             logger.warning('no "MedlineCitation" element found')
             return None
-        
+        return citation
+
+    @staticmethod
+    def _extract_pmid(element: ET.Element) -> str | None:
+        """Extract the PMID from a MedlineCitation element."""
+        pmid = element.find('PMID')
+        return pmid.text if pmid is not None else None
+
+    @staticmethod
+    def _extract_article(element: ET.Element) -> ET.Element | None:
+        """Extract the article element from a PubmedArticle element."""
         # Find and extract the Article element
-        article = citation.find('Article')
+        article = element.find('Article')
         if article is None:
             logger.warning('no "Article" element found')
         return article
@@ -145,31 +159,42 @@ class PubmedScraper(Scraper):
         for batch in batches:
             pubmed_articles = ET.fromstring(batch.text).findall('PubmedArticle')
             for element in pubmed_articles:
-                article = self._extract_article(element=element)
-                if article is not None:
-                    # Extract the relevant information from the Article element
-                    title = self._extract_title(article=article)
-                    text = self._extract_abstract(article=article)
-                    if text is None:
-                        continue
-                    language = self._extract_language(article=article)
-                    publication_date = self._extract_date(article=article)
+                # Extract MedlineCitation and its PMID from PubmedArticle
+                citation = self._extract_medline_citation(element=element)
+                if citation is None:
+                    continue
+                pmid = self._extract_pmid(element=citation)
+                
+                # Extract the Article element from the PubmedArticle
+                article = self._extract_article(element=citation)
+                if article is None:
+                    continue
 
-                    # Split long texts into chunks
-                    texts = self.get_text_chunks(text=text)
+                # Extract the relevant information from the Article element
+                title = self._extract_title(article=article)
+                text = self._extract_abstract(article=article)
+                if text is None:
+                    continue
+                language = self._extract_language(article=article)
+                publication_date = self._extract_date(article=article)
 
-                    # Create the Document object(s)
-                    for text in texts:
-                        document = Document(
-                            id_=f'{self.source_url} {title} {text} {language} {publication_date}',
-                            text=text,
-                            source=self.source,
-                            title=title,
-                            source_url=self.source_url,
-                            language=language,
-                            publication_date=publication_date,
-                        )
-                        documents.append(document)
+                # Split long texts into chunks
+                texts = self.get_text_chunks(text=text)
+
+                # Create the Document object(s)
+                for text in texts:
+                    document = Document(
+                        id_=f'{self.source_url} {title} {text} {language} {publication_date}',
+                        text=text,
+                        source=self.source,
+                        title=title,
+                        url=f'{self.source_url}{pmid}/',
+                        source_url=self.source_url,
+                        source_favicon_url=self.get_source_favicon_url(),
+                        language=language,
+                        publication_date=publication_date,
+                    )
+                    documents.append(document)
         return documents
 
     
@@ -193,11 +218,18 @@ class PubmedScraper(Scraper):
         documents = self._parse_pubmed_articles(batches=batches)
         return documents
 
+    @staticmethod
+    def get_source_favicon_url() -> str:
+        return 'https://www.ncbi.nlm.nih.gov/favicon.ico'
 
 
 class EMAScraper(Scraper):
     _api_search_url_template = "https://www.ema.europa.eu/en/search?search_api_fulltext={term}&f%5B0%5D=ema_search_entity_is_document%3ADocument"
-    pass
+    
+    def get_source_favicon_url(self) -> str:
+        return 'https://www.ema.europa.eu/themes/custom/ema_theme/favicon.ico'
+
+
 
 
 def cli_args() -> None:

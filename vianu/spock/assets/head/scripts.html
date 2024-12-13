@@ -3,5 +3,17 @@
     var details = document.getElementById("details");
     details.style.display = "block";
     details.innerHTML = card.getAttribute("data-details");
+
+    var cards = document.getElementsByClassName("card");
+    for (let ic of cards) {
+      ic.style.borderWidth = "0px";
+    }
+
+
+    const color = getComputedStyle(document.documentElement).getPropertyValue('--block-title-text-color');
+
+    card.style.borderColor = color;
+    card.style.borderWidth = "4px";
+    card.style.borderStyle = "solid";
   }
 </script>

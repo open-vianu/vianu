@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from argparse import Namespace
 from dataclasses import dataclass, asdict, field
 from datetime import datetime
 import dacite
@@ -70,6 +71,7 @@ class Document(DataUnit):
     title: str | None = None
     url: str | None = None
     source_url: str | None = None
+    source_favicon_url: str | None = None
     language: str | None = None
     publication_date: datetime | None = None
 
@@ -139,6 +141,13 @@ class SpoCK:
     query: Query | None = None
     data: List[Document] | None = None
 
+    def runtime(self) -> datetime | None:
+        if self.started_at is not None:
+            if self.completed_at is None:
+                return datetime.now() - self.started_at
+            return self.completed_at - self.started_at
+        return None
+    
 
 class FileHandler:
     """Reads from and write data to a file."""

@@ -15,11 +15,11 @@ logger = logging.getLogger(__name__)
 MODULE_NAME = 'ner'
 
 NAMED_ENTITY_PROMPT = """
-You are an expert in Natural Language Processing. Your task is to identify common named entities (NER) in a given text.
+You are an expert in Natural Language Processing. Your task is to identify named entities (NER) in a given text.
 You will focus on the following entities: adverse drug reaction (entity type: ADR), medicinal product (entity type: MP).
-Once you identified and extracted all named entities of the above types from the text, you return them as a
-Python list of tuples of all named entities together with their type. 
-It is of upmost importance to only provide the Python list as your output, without any additional explanations or text.
+Once you identified all named entities of the above types, you return them as a Python list of tuples of the form (text, type). 
+It is important to only provide the Python list as your output, without any additional explanations or text.
+In addition, make sure that the named entity texts are exact copies of the original text segment
 
 Example 1:
 Input:
@@ -41,23 +41,7 @@ Input:
 
 Output:
 [("dizziness", "ADR"), ("stomach upset", "ADR"), ("temporary memory loss", "ADR"), ("Amitiza (lubiprostone)", "MP"), ("Trulance (plecanatide)", "MP")]
-
-Now, analyze the following text and return a Python list of all adverse events and side effects:
 """
-
-LOCATION_PROMPT_TEMPLATE = """
-I have a named entity extracted from a given original text. Unfortunately, the text of the named entity was slightly 
-modified and no longer matches its original counterpart. Identify and return the exact original text segment by 
-performing a fuzzy match within the original text. Do not provide any additional information or explanations. 
-Output only the original drug name.
-
-Original text:
-{text}
-
-Modified subtext:
-{subtext}
-"""
-
 
 
 class NER(ABC):
@@ -82,21 +66,12 @@ class OllamaNER(NER):
 
 
     def __init__(self, endpoint: str, model: str):
-        self._ner_data = {
-            "model": model,
-            "messages": [
-                {
-                    "role": "system",
-                    "content": NAMED_ENTITY_PROMPT,
-                },
-            ],
-            "stream": False,
-        }
         self._endpoint = endpoint
         self._model = model
 
 
     def _get_ner_data(self, text: str, stream: bool = False) -> dict:
+        user_text = f'Process the following input text: "{text}"'
         data = {
             "model": self._model,
             "messages": [
@@ -106,25 +81,13 @@ class OllamaNER(NER):
                 },
                 {
                     "role": "user",
-                    "content": text,
+                    "content": user_text,
                 },
             ],
             "stream": stream,
         }
         return data
     
-    def _get_loc_data(self, text: str, subtext: str, stream: bool = False) -> dict:
-        data = {
-            "model": self._model,
-            "messages": [
-                {
-                    "role": "user",
-                    "content": LOCATION_PROMPT_TEMPLATE.format(text=text, subtext=subtext),
-                }
-            ],
-            "stream": stream,
-        }
-        return data
 
     def _get_ner_model_answer(self, text: str, stream: bool = False) -> str:
         data = self._get_ner_data(text=text, stream=stream)
@@ -134,31 +97,15 @@ class OllamaNER(NER):
         return content
 
 
-    def _get_loc_model_answer(self, text: str, subtext: str, stream: bool = False) -> str:
-        data = self._get_loc_data(text=text, subtext=subtext, stream=stream)
-        response = requests.post(self._endpoint, json=data, stream=stream)
-        response.raise_for_status()
-        content = response.json()['message']['content']
-        return content
-
     def _add_loc_for_named_entities(self, text: str, named_entities: List[NamedEntity]) -> None:
         txt_low = text.lower()
-        start = 0
         for ne in named_entities:
-            oritginal_text_low = txt_low[start:]
             ne_txt_low = ne.text.lower()
-            loc = self.get_loc_of_subtext(text=oritginal_text_low, subtext=ne_txt_low)
-
-            # if loc is None:
-            #     logger.warning(f'trying to find location for named entity "{ne.text}" of class "{ne.class_}" by additional request')
-            #     loc_model_answer = self._get_loc_model_answer(text=text[start:], subtext=ne.text)
-            #     loc = self.get_loc_of_subtext(text=oritginal_text_low, subtext=loc_model_answer.lower())
+            loc = self.get_loc_of_subtext(text=txt_low, subtext=ne_txt_low)
 
             if loc is not None:
-                loc = loc[0] + start, loc[1] + start
                 ne.location = loc
                 ne.text = text[loc[0]:loc[1]]
-                start = loc[1]
             else:
                 logger.warning(f'could not find location for named entity "{ne.text}" of class "{ne.class_}"')
 
@@ -172,16 +119,11 @@ class OllamaNER(NER):
             logger.debug(f'text: {text}')
             return []
         
-        # Parse the model answer
-        try:
-            ne_list = ast.literal_eval(content)
-            if not isinstance(ne_list, list):
-                raise TypeError('parsed model answer is not a list')
-        except Exception as e:
-            logger.error(f'error while parsing model answer: {e}')
-            logger.debug(f'content: {content}')
-            ne_list = re.findall(r'\("[^"]*",\s?"(MP|ADR)"\)', content)
-        
+        # Parse the model answer and remove duplicates
+        ne_list = re.findall(r'\("([^"]+)",\s?"(MP|ADR)"\)', content)
+        ne_list = list(set(ne_list))
+
+        # Create list of NamedEntity objects
         named_entities = []
         for ne in ne_list:
             try:
