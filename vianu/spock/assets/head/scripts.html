@@ -6,16 +6,9 @@
 
     var cards = document.getElementsByClassName("card");
     for (let ic of cards) {
-      ic.style.borderWidth = "0px";
       ic.style.borderStyle = "none";
     }
 
-    const element = getComputedStyle(document.documentElement)
-    const color = element.getPropertyValue('--block-title-text-color');
-    const width = element.getPropertyValue('--spacing-md');
-
-    card.style.borderColor = color;
-    card.style.borderWidth = width;
     card.style.borderStyle = "solid";
   }
 </script>

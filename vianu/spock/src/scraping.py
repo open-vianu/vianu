@@ -10,12 +10,12 @@ from typing import List
 import xml.etree.ElementTree as ET
 
 from .data_model import Document, FileHandler
-from ..settings import SCRAPINT_SOURCES, PUBMED_ESEARCH_URL, PUBMED_DB, PUBMED_EFETCH_URL, PUBMED_BATCH_SIZE, DEFAULT_MAX_TOKENS
+from ..settings import SCRAPINT_SOURCES, MAX_CHUNK_SIZE
+from ..settings import PUBMED_ESEARCH_URL, PUBMED_DB, PUBMED_EFETCH_URL, PUBMED_BATCH_SIZE
 
 logger = logging.getLogger(__name__)
 
 MODULE_NAME = 'scraping'
-_DEFAULT_MAX_SIZE = round(DEFAULT_MAX_TOKENS / 0.8)
 
 
 class Scraper(ABC):
@@ -32,7 +32,7 @@ class Scraper(ABC):
         pass
 
 
-    def get_text_chunks(self, text: str, max_size: int = _DEFAULT_MAX_SIZE) -> List[str]:
+    def get_text_chunks(self, text: str, max_size: int = MAX_CHUNK_SIZE) -> List[str]:
         """Split a text into chunks of a given max size."""
         words = text.split(self._word_separator)
         N = len(words)

@@ -6,6 +6,8 @@ DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 # Scraping settings
 SCRAPINT_SOURCES = ['pubmed', 'ema']
+MAX_CHUNK_SIZE = 500
+
 PUBMED_ESEARCH_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
 PUBMED_EFETCH_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
 PUBMED_DB = 'pubmed'
