@@ -51,11 +51,11 @@ DETAILS_CONTAINER_ITEM_TEMPLATE = """
 """
 
 NER_MP_TEMPLATE = """
-<span class='ner mp'>{text}|{class_}</span>
+<span class='ner mp'>{text} | {class_}</span>
 """
 
 NER_ADR_TEMPLATE = """
-<span class='ner adr'>{text}|{class_}</span>
+<span class='ner adr'>{text} | {class_}</span>
 """
 
 

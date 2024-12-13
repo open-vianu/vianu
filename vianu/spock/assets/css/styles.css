@@ -36,7 +36,7 @@
 }
 .card {
     cursor: pointer;
-    border: solid var(--block-title-border-width) var(--block-title-border-color);
+    border: none var(--spacing-md) var(--block-title-border-color);
     border-radius: var(--radius-lg);
     width: var(--width-xs);
     padding: var(--scale-4);
@@ -105,10 +105,16 @@
     align-items: center; 
 }
 
+.details-container .items .item .bottom .ner.mp,
+.details-container .items .item .bottom .ner.adr {
+    padding: 0px 5px;
+    border-radius: 4px;
+}
+
 .details-container .items .item .bottom .ner.mp {
-    background-color: #0051ff8f;
+    background-color: var(--color-purple);
 } 
 
 .details-container .items .item .bottom .ner.adr {
-    background-color: #ff00007e;
+    background-color: var(--color-pink);
 } 
