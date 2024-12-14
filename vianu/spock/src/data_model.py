@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from argparse import Namespace
 from dataclasses import dataclass, asdict, field
 from datetime import datetime
 import dacite

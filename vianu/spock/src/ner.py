@@ -1,18 +1,15 @@
 from abc import ABC, abstractmethod
-from argparse import ArgumentParser, Namespace
-import ast
-from copy import deepcopy
+import aiohttp
+from argparse import Namespace
+import asyncio
 import logging
 import re
-import requests
 from typing import List
 
-from ..settings import OLLAMA_ENDPOINT, LLAMA_MODEL
-from .data_model import Document, FileHandler, NamedEntity
+from ..settings import N_CHAR_DOC_ID, OLLAMA_ENDPOINT, LLAMA_MODEL
+from .data_model import NamedEntity
 
 logger = logging.getLogger(__name__)
-
-MODULE_NAME = 'ner'
 
 NAMED_ENTITY_PROMPT = """
 You are an expert in Natural Language Processing. Your task is to identify named entities (NER) in a given text.
@@ -64,6 +61,7 @@ class NER(ABC):
 
 class OllamaNER(NER):
 
+    _ne_pat = re.compile(r'\("([^"]+)",\s?"(MP|ADR)"\)')
 
     def __init__(self, endpoint: str, model: str):
         self._endpoint = endpoint
@@ -89,11 +87,13 @@ class OllamaNER(NER):
         return data
     
 
-    def _get_ner_model_answer(self, text: str, stream: bool = False) -> str:
-        data = self._get_ner_data(text=text, stream=stream)
-        response = requests.post(self._endpoint, json=data, stream=stream)
-        response.raise_for_status()
-        content = response.json()['message']['content']
+    async def _get_ner_model_answer(self, text: str) -> str:
+        data = self._get_ner_data(text=text)
+        async with aiohttp.ClientSession() as session:
+            async with session.post(self._endpoint, json=data) as response:
+                response.raise_for_status()
+                resp_json = await response.json()
+                content = resp_json['message']['content']
         return content
 
 
@@ -110,67 +110,62 @@ class OllamaNER(NER):
                 logger.warning(f'could not find location for named entity "{ne.text}" of class "{ne.class_}"')
 
 
-    def apply(self, text: str) -> List[NamedEntity]:
-        # Request the text answer from the model endpoint and transforms it into a list of NamedEntity objects
-        try: 
-            content = self._get_ner_model_answer(text=text)
-        except Exception as e:
-            logger.error(f'error during inference of model endpoint: {e}')
-            logger.debug(f'text: {text}')
-            return []
-        
-        # Parse the model answer and remove duplicates
-        ne_list = re.findall(r'\("([^"]+)",\s?"(MP|ADR)"\)', content)
-        ne_list = list(set(ne_list))
+    async def apply(self, queue_in: asyncio.Queue, queue_out: asyncio.Queue) -> None:
+        """Apply NER to a texts in an input queue and put the results in an output queue."""
 
-        # Create list of NamedEntity objects
-        named_entities = []
-        for ne in ne_list:
+        while True:
+            # Get text from input queue
+            doc = await queue_in.get()
+
+            # Check stopping condition
+            if doc is None:
+                queue_in.task_done()
+                break
+
+            # Get the model response with named entities
+            logger.debug(f'starting ner for doc.id_={doc.id_[:N_CHAR_DOC_ID]}')
             try:
-                txt, cls_ = ne
-                named_entities.append(NamedEntity(id_=f'{text} {txt} {cls_}', text=txt, class_=cls_))
+                text = doc.text
+                content = await self._get_ner_model_answer(text=text)
             except Exception as e:
-                logger.error(f'error during creation of NamedEntity object: {e}')
-                logger.debug(f'ne={ne}')
+                logger.error(f'error during ner for doc.id_={doc.id_[:N_CHAR_DOC_ID]}: {e}')
+                queue_in.task_done()
+                continue
 
-        # Add locations to named entities
-        self._add_loc_for_named_entities(text=text, named_entities=named_entities)
-        return [ne for ne in named_entities if ne.location is not None]
+            # Parse the model answer and remove duplicates
+            ne_list = re.findall(self._ne_pat, content)
+            ne_list = list(set(ne_list))
+
+            # Create list of NamedEntity objects
+            named_entities = []
+            for ne in ne_list:
+                try:
+                    txt, cls_ = ne
+                    named_entities.append(NamedEntity(id_=f'{text} {txt} {cls_}', text=txt, class_=cls_))
+                except Exception as e:
+                    logger.error(f'error during creation of `NamedEntity` using {ne}: {e}')
+
+            # Add locations to named entities and put them in the document
+            self._add_loc_for_named_entities(text=text, named_entities=named_entities)
+            ne_mp = [ne for ne in named_entities if ne.class_ == 'MP']
+            ne_adr = [ne for ne in named_entities if ne.class_ == 'ADR']
+            logger.debug(f'found #mp={len(ne_mp)} and #adr={len(ne_adr)} for doc.id_={doc.id_[:N_CHAR_DOC_ID]}')
+            doc.medicinal_products = ne_mp
+            doc.adverse_reactions = ne_adr
+        
+            # Put the document in the output queue
+            await queue_out.put(doc)
+            queue_in.task_done()
+            logger.info(f'finished NER task for doc.id_={doc.id_[:N_CHAR_DOC_ID]}')
 
 
-def cli_args() -> None:    
-    parser = ArgumentParser(add_help=False)
-    group = parser.add_argument_group(MODULE_NAME)
-    group.add_argument('--model', dest='model', choices=['ollama'], default='ollama')
-    return parser
-
-
-def apply(args_: Namespace, data: List[Document] | None = None, save_data: bool = True) -> None:
-    if data is None:
-        data = FileHandler(args_.data_load).read()
+def create_tasks(args_: Namespace, queue_in: asyncio.Queue, queue_out: asyncio.Queue, n_tasks: int) -> None:
+    """Create asyncio NER tasks."""
     
-    data_no_err = [d for d in data if not d.has_error()]
-    logger.info(f'NER for {len(data_no_err)} documents')
-    
-    if args_.model == 'ollama':
+    if args_.model == 'llama':
         ner = OllamaNER(endpoint=OLLAMA_ENDPOINT, model=LLAMA_MODEL)
     else:
-        logger.error(f'unknown ner model "{args_.model}"')
-        return None
+        raise ValueError(f'unknown ner model "{args_.model}"')
     
-
-    for id, doc in enumerate(data_no_err):
-        logger.debug(f'NER for document #{id} with id={doc.id_}')
-        named_entities = ner.apply(text=doc.text)
-        
-        # Add medicinal products
-        doc.medicinal_products.extend([ne for ne in named_entities if ne.class_ == 'MP'])
-        logger.debug(f'found {len(doc.medicinal_products)} medicinal products')
-        
-        # Add adverse reactions
-        doc.adverse_reactions.extend([ne for ne in named_entities if ne.class_ == 'ADR'])
-        logger.debug(f'found {len(doc.adverse_reactions)} adverse reactions')
-
-
-    if save_data:
-        FileHandler(args_.data_dump).write(data)
+    tasks = [asyncio.create_task(ner.apply(queue_in=queue_in, queue_out=queue_out)) for _ in range(n_tasks)]
+    return tasks

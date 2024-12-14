@@ -1,24 +1,28 @@
+"""Module for scraping data from different sources.
 
-
+The module contains three main classes:
+- :class:`Scraper`: Abstract base class for scraping data from different sources
+- :class:`PubmedScraper`: Class for scraping data from the PubMed database
+- :class:`EMAScraper`: Class for scraping data from the European Medicines Agency
+"""
 
 from abc import ABC, abstractmethod
-from argparse import ArgumentParser, Namespace
+import aiohttp
+from argparse import Namespace
+import asyncio
+from dataclasses import dataclass
 from datetime import datetime
 import logging
 import numpy as np
-from pydantic import BaseModel
 import re
-import requests
 from typing import List
 import xml.etree.ElementTree as ET
 
-from .data_model import Document, FileHandler
-from ..settings import SCRAPINT_SOURCES, MAX_CHUNK_SIZE
+from .data_model import Document
+from ..settings import SCRAPING_SOURCES, MAX_CHUNK_SIZE
 from ..settings import PUBMED_ESEARCH_URL, PUBMED_DB, PUBMED_EFETCH_URL, PUBMED_BATCH_SIZE
 
 logger = logging.getLogger(__name__)
-
-MODULE_NAME = 'scraping'
 
 
 class Scraper(ABC):
@@ -26,16 +30,12 @@ class Scraper(ABC):
     _word_separator = ' '
 
     @abstractmethod
-    def apply(self, term: str) -> List[Document]:
-        pass
-
-    @staticmethod
-    @abstractmethod
-    def get_source_favicon_url() -> str:
+    async def apply(self, term: str, queue: asyncio.Queue) -> List[Document]:
+        """Main function for scraping data from a source."""
         pass
 
 
-    def get_text_chunks(self, text: str, max_size: int = MAX_CHUNK_SIZE) -> List[str]:
+    def split_text_into_chunks(self, text: str, max_size: int = MAX_CHUNK_SIZE) -> List[str]:
         """Split a text into chunks of a given max size."""
         words = text.split(self._word_separator)
         N = len(words)
@@ -43,15 +43,15 @@ class Scraper(ABC):
         n = N // s
         bnd = [round(i) for i in np.linspace(0, 1, n+1) * N]
 
-        texts = []
-        for start, stop in zip(bnd[:-1], bnd[1:]):
-            texts.append(self._word_separator.join(words[start:stop]))
-        return texts
+        chunks = [self._word_separator.join(words[start:stop]) for start, stop in zip(bnd[:-1], bnd[1:])]
+        return chunks
 
+@dataclass
+class PubmedEntrezHistoryParams:
+    """Class for optimizing Pubmed database retrieval for large numbers of documents.
 
-class PubmedEntrezHistoryParams(BaseModel):
-    """Class for optimizing Pubmed database for large numbers of documents.
-    An example can be found [here](https://www.ncbi.nlm.nih.gov/books/n/helpeutils/chapter3/#chapter3.Application_3_Retrieving_large)
+    An example can be found here:
+        https://www.ncbi.nlm.nih.gov/books/n/helpeutils/chapter3/#chapter3.Application_3_Retrieving_large
     """
     web: str
     key: str
@@ -60,13 +60,15 @@ class PubmedEntrezHistoryParams(BaseModel):
 
 class PubmedScraper(Scraper):
 
-    source = 'PubMed'
-    source_url = 'https://pubmed.ncbi.nlm.nih.gov/'
+    _source = 'PubMed'
+    _source_url = 'https://pubmed.ncbi.nlm.nih.gov/'
+    _source_favicon_url = 'https://www.ncbi.nlm.nih.gov/favicon.ico'
 
     @staticmethod
     def _get_entrez_history_params(text: str) -> PubmedEntrezHistoryParams:
         """Retrieving the entrez history parameters for optimized search when requesting large numbers of documents.
-        An example can be found [here](https://www.ncbi.nlm.nih.gov/books/n/helpeutils/chapter3/#chapter3.Application_3_Retrieving_large)
+        An example can be found here:
+            https://www.ncbi.nlm.nih.gov/books/n/helpeutils/chapter3/#chapter3.Application_3_Retrieving_large
         """
         web = re.search(r'<WebEnv>(\S+)<\/WebEnv>', text).group(1)
         key = re.search(r'<QueryKey>(\d+)<\/QueryKey>', text).group(1)
@@ -74,25 +76,29 @@ class PubmedScraper(Scraper):
         return PubmedEntrezHistoryParams(web=web, key=key, count=count)
     
     @staticmethod
-    def _pubmed_esearch(term: str) -> requests.Response:
+    async def _pubmed_esearch(term: str) -> str:
         """Search the Pubmed database with a given term and POST the results to entrez history server."""
         url = f'{PUBMED_ESEARCH_URL}?db={PUBMED_DB}&term={term}&usehistory=y'
         logger.debug(f'search pubmed database with url={url}')
-        return requests.get(url=url)
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url=url) as response:
+                response.raise_for_status()
+                esearch = await response.text()
+        return esearch
 
     @staticmethod
-    def _pubmed_efetch(params: PubmedEntrezHistoryParams) -> List[requests.Response]:
+    async def _pubmed_efetch(params: PubmedEntrezHistoryParams) -> List[str]:
         """Retrieve the relevant documents from the entrez history server."""
-        logger.debug(f'fetch {params.count} documents in {params.count // PUBMED_BATCH_SIZE + 1} batch(es) of size <= {PUBMED_BATCH_SIZE}')
+        logger.debug(f'fetch #docs={params.count} in {params.count // PUBMED_BATCH_SIZE + 1} batch(es) of size <= {PUBMED_BATCH_SIZE}')
         batches = []
         for retstart in range(0, int(params.count), PUBMED_BATCH_SIZE):
             url = f'{PUBMED_EFETCH_URL}?db={PUBMED_DB}&WebEnv={params.web}&query_key={params.key}&retstart={retstart}&retmax={PUBMED_BATCH_SIZE}'
             logger.debug(f'fetch documents with url={url}')
-            efetch = requests.get(url=url)
-            if efetch.status_code == 200:
-                batches.append(efetch)
-            else:
-                logger.error(f'batch failed with code={efetch.status_code}')
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url=url) as response:
+                    response.raise_for_status()
+                    efetch = await response.text()
+            batches.append(efetch)
         return batches
 
     @staticmethod
@@ -156,11 +162,11 @@ class PubmedScraper(Scraper):
         """Extract the publication types from an Article element."""
         return [t.text for t in article.find('PublicationTypeList').findall('PublicationType')]
 
-    def _parse_pubmed_articles(self, batches: List[requests.Response], publication_type_filter: List[str] | None = None) -> List[Document]:
+    def _parse_pubmed_articles(self, batches: List[str]) -> List[Document]:
         """Parse batches of ET.Elements into a single list of Document objects"""
-        documents = []
-        for batch in batches:
-            pubmed_articles = ET.fromstring(batch.text).findall('PubmedArticle')
+        data = []
+        for text in batches:
+            pubmed_articles = ET.fromstring(text).findall('PubmedArticle')
             for element in pubmed_articles:
                 # Extract MedlineCitation and its PMID from PubmedArticle
                 citation = self._extract_medline_citation(element=element)
@@ -182,48 +188,50 @@ class PubmedScraper(Scraper):
                 publication_date = self._extract_date(article=article)
 
                 # Split long texts into chunks
-                texts = self.get_text_chunks(text=text)
+                texts = self.split_text_into_chunks(text=text)
 
                 # Create the Document object(s)
                 for text in texts:
                     document = Document(
-                        id_=f'{self.source_url} {title} {text} {language} {publication_date}',
+                        id_=f'{self._source_url} {title} {text} {language} {publication_date}',
                         text=text,
-                        source=self.source,
+                        source=self._source,
                         title=title,
-                        url=f'{self.source_url}{pmid}/',
-                        source_url=self.source_url,
-                        source_favicon_url=self.get_source_favicon_url(),
+                        url=f'{self._source_url}{pmid}/',
+                        source_url=self._source_url,
+                        source_favicon_url=self._source_favicon_url,
                         language=language,
                         publication_date=publication_date,
                     )
-                    documents.append(document)
-        return documents
+                    data.append(document)
+        return data
 
     
 
-    def apply(self, term: str) -> List[Document]:
+    async def apply(self, term: str, queue: asyncio.Queue) -> None:
         """Query and retrieve all PubmedArticle Documents for the given search term.
 
         The retrieval is using two main functionalities of the Pubmed API:
         - ESearch: Identify the relevant documents and store them in the entrez history server
         - EFetch: Retrieve the relevant documents from the entrez history server
         """
+        logger.debug(f'starting scraping the source={self._source} with term={term}')
 
         # Search for relevant documents with a given term
-        esearch = self._pubmed_esearch(term=term)
+        esearch = await self._pubmed_esearch(term=term)
 
         # Retrieve relevant documents in batches
-        params = self._get_entrez_history_params(esearch.text)
-        batches = self._pubmed_efetch(params=params)
+        params = self._get_entrez_history_params(esearch)
+        batches = await self._pubmed_efetch(params=params)
 
         # Parse documents from batches
         documents = self._parse_pubmed_articles(batches=batches)
-        return documents
 
-    @staticmethod
-    def get_source_favicon_url() -> str:
-        return 'https://www.ncbi.nlm.nih.gov/favicon.ico'
+        # Add documents to the queue
+        for doc in documents:
+            await queue.put(doc)
+        
+        logger.info(f'found #docs={len(documents)} in source={self._source} for term={term}')
 
 
 class EMAScraper(Scraper):
@@ -233,33 +241,18 @@ class EMAScraper(Scraper):
         return 'https://www.ema.europa.eu/themes/custom/ema_theme/favicon.ico'
 
 
-
-
-def cli_args() -> None:
-    parser = ArgumentParser(add_help=False)
-    group = parser.add_argument_group(MODULE_NAME)
-    group.add_argument('--source', dest='source', action='append', choices=SCRAPINT_SOURCES)
-    group.add_argument('--term', dest='term')
-    return parser
-
-
-def apply(args_: Namespace, save_data: bool = True) -> List[Document]:
-    sources = args_.source if args_.source is not None else SCRAPINT_SOURCES
+def create_tasks(args_: Namespace, queue: asyncio.Queue) -> List[asyncio.Task]:
+    """Create the asyncio scraping tasks."""
+    sources = args_.source if args_.source is not None else SCRAPING_SOURCES
     term = args_.term
-    data = []
 
-    logger.info(f'crawling sources="{sources}" for term "{term}"')
+    scrapers = []       # type: List[Scraper]
     if 'pubmed' in sources:
-        scraper = PubmedScraper()
-        documents = scraper.apply(term=args_.term)
-        logger.info(f'found {len(documents)} pubmed articles')
-        data.extend(documents)
+        scrapers.append(PubmedScraper())
     elif 'ema' in sources:
-        logger.error('EMA source not implemented yet')
+        raise ValueError('EMA source not implemented yet')
     else:
-        logger.error(f'Unknown source {sources}')
+        raise ValueError(f'Unknown source {sources}')
     
-    if save_data:
-        FileHandler(args_.data_dump).write(data)
-    
-    return data
+    tasks = [asyncio.create_task(scp.apply(term=term, queue=queue)) for scp in scrapers]
+    return tasks
