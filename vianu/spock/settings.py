@@ -1,7 +1,7 @@
 # General settings
 LOGGING_LEVEL = 'INFO'
 LOGGING_FMT = "%(asctime)s | %(name)s | %(levelname)s | %(message)s"
-DATA_FILW = "/tmp/spock/data.json"
+DATA_FILE = "/tmp/spock/data.json"
 DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 # Scraping settings
