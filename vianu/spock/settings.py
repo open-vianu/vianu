@@ -1,7 +1,7 @@
 # General settings
-DEFAULT_LOGGING_LEVEL = 'INFO'
+LOGGING_LEVEL = 'INFO'
 LOGGING_FMT = "%(asctime)s | %(name)s | %(levelname)s | %(message)s"
-DEFAULT_DATA_DUMP = "/tmp/spock/data.json"
+DATA_FILW = "/tmp/spock/data.json"
 DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 # Scraping settings
@@ -14,6 +14,6 @@ PUBMED_DB = 'pubmed'
 PUBMED_BATCH_SIZE = 500
 
 # NER settings
-DEFAULT_MAX_TOKENS = 128.000
-DEFAULT_OLLAMA_ENDPOINT = "http://localhost:11434/api/chat"
-DEFAULT_LLAMA_MODEL='llama3.2'
+MAX_TOKENS = 128.000
+OLLAMA_ENDPOINT = "http://localhost:11434/api/chat"
+LLAMA_MODEL='llama3.2'

@@ -7,7 +7,7 @@ import re
 import requests
 from typing import List
 
-from ..settings import DEFAULT_OLLAMA_ENDPOINT, DEFAULT_LLAMA_MODEL
+from ..settings import OLLAMA_ENDPOINT, LLAMA_MODEL
 from .data_model import Document, FileHandler, NamedEntity
 
 logger = logging.getLogger(__name__)
@@ -153,7 +153,7 @@ def apply(args_: Namespace, data: List[Document] | None = None, save_data: bool 
     logger.info(f'NER for {len(data_no_err)} documents')
     
     if args_.model == 'ollama':
-        ner = OllamaNER(endpoint=DEFAULT_OLLAMA_ENDPOINT, model=DEFAULT_LLAMA_MODEL)
+        ner = OllamaNER(endpoint=OLLAMA_ENDPOINT, model=LLAMA_MODEL)
     else:
         logger.error(f'unknown ner model "{args_.model}"')
         return None
