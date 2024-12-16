@@ -12,18 +12,19 @@ import numpy as np
 from typing import List, Self
 
 
+logger = logging.getLogger(__name__)
+
+
 @dataclass
 class DataUnit(ABC):
-    """Abstract base class for all data entities.
+    """Abstract base class for all dataclass entities with customized id.
 
     Notes
         The identifier :param:`DataUnit.id_` is hashed and enriched with `_id_prefix` if this is
         not present. This means as long as the `id_` begins with `_id_prefix` nothing is done.
 
-        This behavior should make it easy for to user to call
-            Document(id_='This is my string that I want to hash')
-        or
-            Document(id_='doc_Ssdaf98safd85asfd57asdf8asdf98asdf5')
+        This behavior aims to allow:
+            SubDataUnit(id_='This is the string that identiies the entity')
     """
 
     id_: str
@@ -122,11 +123,39 @@ class DocumentJSONEncoder(json.JSONEncoder):
         return json.JSONEncoder.default(self, o)
 
 
-@dataclass
-class Query:
+@dataclass(eq=False)
+class Job(DataUnit):
+
+    # generic options
+    log_level: str
+
+    # scraping options
     term: str
-    sources: List[str] | None = None
+    source: List[str]
+
+    # NER options
+    model: str
+    ner_tasks: int
+
+    # optional fields
     submission_date: datetime | None = None
+    data_path: str | None = None
+    data_file: str | None = None
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.submission_date = datetime.now() if self.submission_date is None else self.submission_date
+
+    @property
+    def _id_prefix(self):
+        return 'job_'
+    
+
+@dataclass
+class QueueItem:
+    """Class for the async queue items"""
+    id_: str
+    doc: Document
 
 
 @dataclass
@@ -137,7 +166,7 @@ class SpoCK:
     completed_at: datetime | None = None
 
     # Pipeline fields
-    query: Query | None = None
+    job: Job | None = None
     data: List[Document] | None = None
 
     def runtime(self) -> datetime | None:
@@ -153,20 +182,24 @@ class FileHandler:
 
     _suffix = '.json'
 
-    def __init__(self, data_file: Path | str):
-        data_file = Path(data_file) if isinstance(data_file, str) else data_file
-        self._data_file = data_file.with_suffix(self._suffix)
-        if not self._data_file.parent.exists():
-            os.makedirs(self._data_file.parent)
-        logging.debug(f"FileHandler path: '{self._data_file}'")
+    def __init__(self, path: Path | str):
+        self._path = Path(path) if isinstance(path, str) else path
+        if not self._path.exists():
+            os.makedirs(self._path)
 
 
-    def read(self) -> List[Document]:
-        with open(self._data_file, 'r', encoding="utf-8") as dfile:
+    def read(self, file: str) -> List[Document]:
+        filename = (self._path / file).with_suffix(self._suffix)
+        logger.info('reading data from file {filename}')
+        with open(filename.with_suffix(self._suffix), 'r', encoding="utf-8") as dfile:
             entries = json.load(dfile)
         data = [Document.from_dict(x) for x in entries]
         return data
 
-    def write(self, data: List[Document]):
-        with open(self._data_file, 'w', encoding="utf-8") as dfile:
+
+    def write(self, file: str, data: List[Document]):
+        file = f'{file}_{datetime.now().strftime("%Y%m%d%H%M%S")}'
+        filename = (self._path / file).with_suffix(self._suffix)
+        logger.info(f'writing data to file {filename}')
+        with open(filename, 'w', encoding="utf-8") as dfile:
             json.dump(data, dfile, cls=DocumentJSONEncoder)

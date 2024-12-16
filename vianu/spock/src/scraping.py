@@ -18,11 +18,12 @@ import re
 from typing import List
 import xml.etree.ElementTree as ET
 
-from .data_model import Document
+from .data_model import Document, QueueItem
 from ..settings import SCRAPING_SOURCES, MAX_CHUNK_SIZE
 from ..settings import PUBMED_ESEARCH_URL, PUBMED_DB, PUBMED_EFETCH_URL, PUBMED_BATCH_SIZE
 
 logger = logging.getLogger(__name__)
+
 
 
 class Scraper(ABC):
@@ -165,24 +166,28 @@ class PubmedScraper(Scraper):
     def _parse_pubmed_articles(self, batches: List[str]) -> List[Document]:
         """Parse batches of ET.Elements into a single list of Document objects"""
         data = []
-        for text in batches:
+        for ib, text in enumerate(batches):
             pubmed_articles = ET.fromstring(text).findall('PubmedArticle')
-            for element in pubmed_articles:
+            logger.debug(f'found #articles={len(pubmed_articles)} in batch {ib}')
+            for ie, element in enumerate(pubmed_articles):
                 # Extract MedlineCitation and its PMID from PubmedArticle
                 citation = self._extract_medline_citation(element=element)
                 if citation is None:
+                    logger.debug(f'no citation found in PubmedArticle {ie} of batch {ib}')
                     continue
                 pmid = self._extract_pmid(element=citation)
                 
                 # Extract the Article element from the PubmedArticle
                 article = self._extract_article(element=citation)
                 if article is None:
+                    logger.debug(f'no article found in PubmedArticle {ie} of batch {ib}')
                     continue
 
                 # Extract the relevant information from the Article element
                 title = self._extract_title(article=article)
                 text = self._extract_abstract(article=article)
                 if text is None:
+                    logger.debug(f'no abstract found in PubmedArticle {ie} of batch {ib}')
                     continue
                 language = self._extract_language(article=article)
                 publication_date = self._extract_date(article=article)
@@ -228,8 +233,10 @@ class PubmedScraper(Scraper):
         documents = self._parse_pubmed_articles(batches=batches)
 
         # Add documents to the queue
-        for doc in documents:
-            await queue.put(doc)
+        for i, doc in enumerate(documents):
+            id_ = f'{self._source}_{i}'
+            item = QueueItem(id_=id_, doc=doc)
+            await queue.put(item)
         
         logger.info(f'found #docs={len(documents)} in source={self._source} for term={term}')
 

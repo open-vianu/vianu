@@ -3,7 +3,7 @@
 
 import argparse
 
-from ..settings import LOGGING_LEVEL, DATA_FILE, SCRAPING_SOURCES, N_TASKS_DEFAULT, NER_MODELS
+from ..settings import LOGGING_LEVEL, DATA_FILE, DATA_PATH, SCRAPING_SOURCES, N_TASKS_DEFAULT, NER_MODELS
 
 
 def parse_args(args_: argparse.Namespace) -> argparse.Namespace:
@@ -12,7 +12,8 @@ def parse_args(args_: argparse.Namespace) -> argparse.Namespace:
     # Add generic options
     gen_gp = parser.add_argument_group('generic')
     gen_gp.add_argument("--log-level", metavar='', type=str, default=LOGGING_LEVEL, help='log level')
-    gen_gp.add_argument("--data-file", metavar='', type=str, default=DATA_FILE, help='data file path for storing results')
+    gen_gp.add_argument("--data-path", metavar='', type=str, default=DATA_PATH, help='path for storing results')
+    gen_gp.add_argument("--data-file", metavar='', type=str, default=DATA_FILE, help='filename for storing results')
 
     # Add scraping group
     scp_gp = parser.add_argument_group('scraping')
@@ -22,6 +23,6 @@ def parse_args(args_: argparse.Namespace) -> argparse.Namespace:
     # Add NER group
     ner_gp = parser.add_argument_group('ner')
     ner_gp.add_argument('--model', '-m', type=str, choices=NER_MODELS, default='llama', help='NER model')
-    ner_gp.add_argument('--n-tasks', metavar='', type=int, default=N_TASKS_DEFAULT, help='number of async tasks')
+    ner_gp.add_argument('--ner-tasks', metavar='', type=int, default=N_TASKS_DEFAULT, help='number of async tasks')
 
     return parser.parse_args(args_)

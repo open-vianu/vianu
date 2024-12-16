@@ -6,8 +6,8 @@ import logging
 import re
 from typing import List
 
+from .data_model import NamedEntity, QueueItem
 from ..settings import N_CHAR_DOC_ID, OLLAMA_ENDPOINT, LLAMA_MODEL
-from .data_model import NamedEntity
 
 logger = logging.getLogger(__name__)
 
@@ -115,20 +115,22 @@ class OllamaNER(NER):
 
         while True:
             # Get text from input queue
-            doc = await queue_in.get()
+            item = await queue_in.get()
 
             # Check stopping condition
-            if doc is None:
+            if item is None:
                 queue_in.task_done()
                 break
 
             # Get the model response with named entities
-            logger.debug(f'starting ner for doc.id_={doc.id_[:N_CHAR_DOC_ID]}')
+            id_ = item.id_
+            doc = item.doc
+            logger.debug(f'starting ner for item.id_={id_} (doc.id_={doc.id_[:N_CHAR_DOC_ID]})')
             try:
                 text = doc.text
                 content = await self._get_ner_model_answer(text=text)
             except Exception as e:
-                logger.error(f'error during ner for doc.id_={doc.id_[:N_CHAR_DOC_ID]}: {e}')
+                logger.error(f'error during ner for item.id_={item.id_} (doc.id_={doc.id_[:N_CHAR_DOC_ID]}): {e}')
                 queue_in.task_done()
                 continue
 
@@ -149,17 +151,17 @@ class OllamaNER(NER):
             self._add_loc_for_named_entities(text=text, named_entities=named_entities)
             ne_mp = [ne for ne in named_entities if ne.class_ == 'MP']
             ne_adr = [ne for ne in named_entities if ne.class_ == 'ADR']
-            logger.debug(f'found #mp={len(ne_mp)} and #adr={len(ne_adr)} for doc.id_={doc.id_[:N_CHAR_DOC_ID]}')
+            logger.debug(f'found #mp={len(ne_mp)} and #adr={len(ne_adr)} for item.id_={id_} (doc.id_={doc.id_[:N_CHAR_DOC_ID]})')
             doc.medicinal_products = ne_mp
             doc.adverse_reactions = ne_adr
         
             # Put the document in the output queue
-            await queue_out.put(doc)
+            await queue_out.put(item)
             queue_in.task_done()
-            logger.info(f'finished NER task for doc.id_={doc.id_[:N_CHAR_DOC_ID]}')
+            logger.info(f'finished NER task for item.id_={id_} (doc.id_={doc.id_[:N_CHAR_DOC_ID]})')
 
 
-def create_tasks(args_: Namespace, queue_in: asyncio.Queue, queue_out: asyncio.Queue, n_tasks: int) -> None:
+def create_tasks(args_: Namespace, queue_in: asyncio.Queue, queue_out: asyncio.Queue, ner_tasks: int) -> None:
     """Create asyncio NER tasks."""
     
     if args_.model == 'llama':
@@ -167,5 +169,5 @@ def create_tasks(args_: Namespace, queue_in: asyncio.Queue, queue_out: asyncio.Q
     else:
         raise ValueError(f'unknown ner model "{args_.model}"')
     
-    tasks = [asyncio.create_task(ner.apply(queue_in=queue_in, queue_out=queue_out)) for _ in range(n_tasks)]
+    tasks = [asyncio.create_task(ner.apply(queue_in=queue_in, queue_out=queue_out)) for _ in range(ner_tasks)]
     return tasks

@@ -36,8 +36,7 @@ async def orchestrator(
     await ner_queue.put(None)
 
 
-
-async def main():
+async def main(save: bool = True) -> None:
     args_= parse_args(sys.argv[1:])
     logging.basicConfig(level=args_.log_level.upper(), format=LOGGING_FMT)
     logging.info(f'Starting SpoCK (args_={args_})')    
@@ -47,23 +46,23 @@ async def main():
     ner_queue = asyncio.Queue()
 
     # Start tasks
-    n_tasks = args_.n_tasks
+    ner_tasks = args_.ner_tasks
     scp_tasks = scp.create_tasks(args_=args_, queue=scp_queue)
-    ner_tasks = ner.create_tasks(args_=args_, queue_in=scp_queue, queue_out=ner_queue, n_tasks=n_tasks)
+    ner_tasks = ner.create_tasks(args_=args_, queue_in=scp_queue, queue_out=ner_queue, ner_tasks=ner_tasks)
     orc_task = asyncio.create_task(orchestrator(scp_tasks, ner_tasks, scp_queue, ner_queue))
 
     # Read results from NER queue
     data = []
     while True:
-        doc = await ner_queue.get()
+        item = await ner_queue.get()
 
         # Check stopping condition
-        if doc is None:
+        if item is None:
             ner_queue.task_done()
             break
 
         # Append document to data
-        data.append(doc)
+        data.append(item.doc)
         ner_queue.task_done()
     
     # Wait for orchestrator to finish and queue to be empty
@@ -71,10 +70,13 @@ async def main():
     await ner_queue.join()
 
     # Save data
-    FileHandler(args_.data_file).write(data)
-
+    if save:
+        filename = args_.data_filename
+        path = args_.data_path
+        if filename is not None and path is not None:
+            FileHandler(path=path).write(filename=filename, data=data)
     logging.info('Finished SpoCK')
 
 
 if __name__ == '__main__':
-    asyncio.run(main())
+    asyncio.run(main(save=True))

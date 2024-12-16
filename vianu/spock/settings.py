@@ -1,7 +1,8 @@
 # General settings
 LOGGING_LEVEL = 'INFO'
 LOGGING_FMT = "%(asctime)s | %(name)s | %(levelname)s | %(message)s"
-DATA_FILE = "/tmp/spock/data.json"
+DATA_PATH = "/tmp/spock/"
+DATA_FILE = "spock_data"
 DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 N_CHAR_DOC_ID = 12
 
