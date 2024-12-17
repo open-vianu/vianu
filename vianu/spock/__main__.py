@@ -1,10 +1,11 @@
+from argparse import Namespace
 import asyncio
 import logging
 import sys
-from typing import List
+from typing import List, Tuple
 
 from .src.cli import parse_args
-from .src.data_model import FileHandler
+from .src.data_model import Job, FileHandler
 from .src import scraping as scp
 from .src import ner
 from .settings import LOGGING_FMT
@@ -36,20 +37,27 @@ async def orchestrator(
     await ner_queue.put(None)
 
 
-async def main(save: bool = True) -> None:
-    args_= parse_args(sys.argv[1:])
-    logging.basicConfig(level=args_.log_level.upper(), format=LOGGING_FMT)
-    logging.info(f'Starting SpoCK (args_={args_})')    
-    
+def setup_framework(args_: Namespace | Job) -> Tuple:
     # Set up queues
     scp_queue = asyncio.Queue()
     ner_queue = asyncio.Queue()
 
     # Start tasks
-    ner_tasks = args_.ner_tasks
+    args_ = args_ if isinstance(args_, Namespace) else args_.to_namespace()
     scp_tasks = scp.create_tasks(args_=args_, queue=scp_queue)
-    ner_tasks = ner.create_tasks(args_=args_, queue_in=scp_queue, queue_out=ner_queue, ner_tasks=ner_tasks)
+    ner_tasks = ner.create_tasks(args_=args_, queue_in=scp_queue, queue_out=ner_queue, n_ner_tasks=args_.n_ner_tasks)
     orc_task = asyncio.create_task(orchestrator(scp_tasks, ner_tasks, scp_queue, ner_queue))
+    
+    return scp_queue, ner_queue, scp_tasks, ner_tasks, orc_task
+
+
+async def main(save: bool = True) -> None:
+    args_= parse_args(sys.argv[1:])
+    logging.basicConfig(level=args_.log_level.upper(), format=LOGGING_FMT)
+    logging.info(f'Starting SpoCK (args_={args_})')    
+
+    # Set up async structure
+    _, ner_queue, _, _, orc_task = setup_framework(args_)
 
     # Read results from NER queue
     data = []

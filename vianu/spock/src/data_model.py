@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from argparse import Namespace
 from dataclasses import dataclass, asdict, field
 from datetime import datetime
 import dacite
@@ -135,20 +136,23 @@ class Job(DataUnit):
 
     # NER options
     model: str
-    ner_tasks: int
+    n_ner_tasks: int
 
     # optional fields
-    submission_date: datetime | None = None
+    submission: datetime | None = None
     data_path: str | None = None
     data_file: str | None = None
 
     def __post_init__(self):
         super().__post_init__()
-        self.submission_date = datetime.now() if self.submission_date is None else self.submission_date
+        self.submission = datetime.now() if self.submission is None else self.submission
 
     @property
     def _id_prefix(self):
         return 'job_'
+    
+    def to_namespace(self):
+        return Namespace(**asdict(self))
     
 
 @dataclass
@@ -161,7 +165,7 @@ class QueueItem:
 @dataclass
 class SpoCK:
     # Generic fields
-    status: str
+    status: str | None = None
     started_at: datetime | None = None
     completed_at: datetime | None = None
 

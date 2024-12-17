@@ -1,13 +1,9 @@
-from argparse import Namespace
 import asyncio
 from datetime import datetime
 import logging
 from typing import List
 
 from vianu.spock.src.data_model import Document, Job, FileHandler
-from vianu.spock.__main__ import orchestrator
-from vianu.spock.src import scraping as scp
-from vianu.spock.src import ner
 from vianu.spock.settings import DATE_FORMAT
 
 logger = logging.getLogger(__name__)
@@ -86,10 +82,10 @@ def _get_details_data(data: List[Document]):
     return DETAILS_CONTAINER_CONTENT_TEMPLATE.format(items=_get_details_container_items(data=data))
 
 
-def _format_search_card(card_nmbr: int, query: Job, data: List[Document]):
-    title = query.term
-    sources = ", ".join(query.sources)
-    date = query.submission_date.strftime(DATE_FORMAT)
+def format_job_card(card_nmbr: int, job: Job, data: List[Document]):
+    title = job.term
+    sources = ", ".join(job.source)
+    date = job.submission.strftime(DATE_FORMAT)
     n_doc = len(data)
     n_adr = sum([len(d.adverse_reactions) for d in data])
     # TODO only save an id in data-id and then use that id to get the data from the data list
@@ -105,16 +101,7 @@ def _format_search_card(card_nmbr: int, query: Job, data: List[Document]):
     )
 
 
-
-
-async def run(args_: Namespace, scp_queue: asyncio.Queue, ner_queue: asyncio.Queue):
-
-    # Start tasks
-    ner_tasks = args_.ner_tasks
-    scp_tasks = scp.create_tasks(args_=args_, queue=scp_queue)
-    ner_tasks = ner.create_tasks(args_=args_, queue_in=scp_queue, queue_out=ner_queue, ner_tasks=ner_tasks)
-    orc_task = asyncio.create_task(orchestrator(scp_tasks, ner_tasks, scp_queue, ner_queue))
-
+async def conclusion(ner_queue: asyncio.Queue, orc_task: asyncio.Task):
     # Wait for orchestrator to finish and queue to be empty
     await orc_task
     await ner_queue.join()
@@ -123,28 +110,26 @@ async def run(args_: Namespace, scp_queue: asyncio.Queue, ner_queue: asyncio.Que
 # ---- Continue from here ----
 # TODO: delete all the unneeded imports and functions
 
-# Processing search input
-SAMPLE_DATA = FileHandler(path="vianu/spock/assets/sample_data.json").read()
-SAMPLE_QUERY_DAFALGAN = Job(
-    term="dafalgan", sources=["pubmed", "ema"], submission_date=datetime.now()
-)
-SAMPLE_QUERY_SILDENAFIL = Job(
-    term="sildenafil", sources=["pubmed", "ema"], submission_date=datetime.now()
-)
-SAMPLE_QUERY_FENTANYL = Job(
-    term="fentanyl", sources=["pubmed", "ema"], submission_date=datetime.now()
-)
+# # Processing search input
+# SAMPLE_DATA = FileHandler(path="vianu/spock/assets/sample_data.json").read()
+# SAMPLE_QUERY_DAFALGAN = Job(
+#     term="dafalgan", sources=["pubmed", "ema"], submission_date=datetime.now()
+# )
+# SAMPLE_QUERY_SILDENAFIL = Job(
+#     term="sildenafil", sources=["pubmed", "ema"], submission_date=datetime.now()
+# )
+# SAMPLE_QUERY_FENTANYL = Job(
+#     term="fentanyl", sources=["pubmed", "ema"], submission_date=datetime.now()
+# )
 
-# TODO only save an id in data-id and then use that id to get the data from the data list
-def _process_pipeline(search_text):
-    formated_cards = [
-        _format_search_card(0, SAMPLE_QUERY_DAFALGAN, SAMPLE_DATA),
-        _format_search_card(1, SAMPLE_QUERY_SILDENAFIL, SAMPLE_DATA),
-        # _format_search_card(2, SAMPLE_QUERY_FENTANYL, SAMPLE_DATA),
-    ]
-    html_content = CONTAINER_TEMPLATE.format(
-        cards="\n".join([fc for fc in formated_cards])
-    )
-    return html_content
-
-
+# # TODO only save an id in data-id and then use that id to get the data from the data list
+# def _process_pipeline(search_text):
+#     formated_cards = [
+#         format_search_card(0, SAMPLE_QUERY_DAFALGAN, SAMPLE_DATA),
+#         format_search_card(1, SAMPLE_QUERY_SILDENAFIL, SAMPLE_DATA),
+#         # _format_search_card(2, SAMPLE_QUERY_FENTANYL, SAMPLE_DATA),
+#     ]
+#     html_content = CONTAINER_TEMPLATE.format(
+#         cards="\n".join([fc for fc in formated_cards])
+#     )
+#     return html_content

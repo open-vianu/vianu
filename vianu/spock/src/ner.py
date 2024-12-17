@@ -161,7 +161,7 @@ class OllamaNER(NER):
             logger.info(f'finished NER task for item.id_={id_} (doc.id_={doc.id_[:N_CHAR_DOC_ID]})')
 
 
-def create_tasks(args_: Namespace, queue_in: asyncio.Queue, queue_out: asyncio.Queue, ner_tasks: int) -> None:
+def create_tasks(args_: Namespace, queue_in: asyncio.Queue, queue_out: asyncio.Queue, n_ner_tasks: int) -> None:
     """Create asyncio NER tasks."""
     
     if args_.model == 'llama':
@@ -169,5 +169,6 @@ def create_tasks(args_: Namespace, queue_in: asyncio.Queue, queue_out: asyncio.Q
     else:
         raise ValueError(f'unknown ner model "{args_.model}"')
     
-    tasks = [asyncio.create_task(ner.apply(queue_in=queue_in, queue_out=queue_out)) for _ in range(ner_tasks)]
+    logger.info(f'setting up {n_ner_tasks} NER task(s)')
+    tasks = [asyncio.create_task(ner.apply(queue_in=queue_in, queue_out=queue_out)) for _ in range(n_ner_tasks)]
     return tasks

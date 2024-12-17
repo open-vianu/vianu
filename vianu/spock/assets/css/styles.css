@@ -55,7 +55,7 @@
 }
 
 .details-container {
-    display: none;
+    display: flex;
     border-radius: 8px;
 }
 .details-container .title {

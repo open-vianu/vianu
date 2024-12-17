@@ -261,5 +261,6 @@ def create_tasks(args_: Namespace, queue: asyncio.Queue) -> List[asyncio.Task]:
     else:
         raise ValueError(f'Unknown source {sources}')
     
+    logger.info(f'setting up {len(scrapers)} scraping task(s) for source(s)={sources}')
     tasks = [asyncio.create_task(scp.apply(term=term, queue=queue)) for scp in scrapers]
     return tasks
