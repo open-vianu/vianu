@@ -1,20 +1,19 @@
 import asyncio
-from datetime import datetime
 import logging
 from typing import List
 
-from vianu.spock.src.data_model import Document, Job, FileHandler
+from vianu.spock.src.data_model import Document, Job
 from vianu.spock.settings import DATE_FORMAT
 
 logger = logging.getLogger(__name__)
 
 CARD_CONTAINER_TEMPLATE = """
-<div class="card-container">
-{cards}
+<div class="jobs-container">
+  {jobs}
 </div>
 """
 
-CARD_CONTAINER_CARD_TEMPLATE = """
+JOBS_CONTAINER_CARD_TEMPLATE = """
 <div id="card_{nmbr}" class="card" onclick="clickHandler(this)" {data}>
   <div class="title">{title}</div>
   <div class="info">Date: {date}</div>
@@ -79,8 +78,7 @@ def _get_details_container_items(data: List[Document]):
     return "\n".join(items)
 
 
-# TODO only save an id in data-id and then use that id to get the data from the data list
-def _get_details_data(data: List[Document]):
+def get_details_of_data(data: List[Document]):
     return DETAILS_CONTAINER_TEMPLATE.format(items=_get_details_container_items(data=data))
 
 
@@ -91,8 +89,8 @@ def format_job_card(card_nmbr: int, job: Job, data: List[Document]):
     n_doc = len(data)
     n_adr = sum([len(d.adverse_reactions) for d in data])
     # TODO only save an id in data-id and then use that id to get the data from the data list
-    data = f'data-details="{_get_details_data(data=data)}"'
-    return CARD_CONTAINER_CARD_TEMPLATE.format(
+    data = f'data-details="{get_details_of_data(data=data)}"'
+    return JOBS_CONTAINER_CARD_TEMPLATE.format(
         nmbr=card_nmbr,
         data=data,
         title=title,

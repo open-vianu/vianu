@@ -1,14 +1,11 @@
 <script>
   function clickHandler(card) {
-    var details = document.getElementById("details");
-    details.style.display = "block";
-    details.innerHTML = card.getAttribute("data-details");
-
     var cards = document.getElementsByClassName("card");
-    for (let ic of cards) {
-      ic.style.borderStyle = "none";
+    for (let c of cards) {
+      c.style.borderStyle = "none";
     }
 
     card.style.borderStyle = "solid";
   }
+
 </script>

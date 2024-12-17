@@ -7,12 +7,13 @@ import gradio as gr
 from vianu.spock.settings import LOGGING_FMT, LOGGING_LEVEL
 from vianu.spock.src.data_model import Job, SpoCK
 from vianu.spock.__main__ import setup_framework
-from vianu.spock.src.frontend import format_job_card, _get_details_data, CARD_CONTAINER_TEMPLATE
+from vianu.spock.src.frontend import format_job_card, _get_details_data, JOBS_CONTAINER_TEMPLATE
 
 
 logging.basicConfig(level=LOGGING_LEVEL.upper(), format=LOGGING_FMT)
 logger = logging.getLogger(__name__)
 
+UPDATE_INTERVAL = 0.5
 HEAD_FILE = Path(__file__).parent / "assets/head/scripts.html"
 CSS_FILE = Path(__file__).parent / "assets/css/styles.css"
 SPOCK_KWARGS = {
@@ -24,6 +25,7 @@ SPOCK_KWARGS = {
 ner_queue = None
 orc_task = None
 job = None
+cards = []
 spocks = []
 
 
@@ -44,8 +46,10 @@ async def start_processes():
 
 
 async def get_cards():
-    cards = [format_job_card(i, spk.job, spk.data) for i, spk in enumerate(spocks)]
-    return CARD_CONTAINER_TEMPLATE.format(cards="\n".join(cards))
+    global cards
+    while True:
+        cards = [format_job_card(i, spk.job, spk.data) for i, spk in enumerate(spocks)]
+        yield JOBS_CONTAINER_TEMPLATE.format(jobs="\n".join(cards))
 
 
 async def get_details():
@@ -57,7 +61,6 @@ async def get_details():
             break
         spock.data.append(item.doc)
         yield _get_details_data(spock.data)
-
 
 # Layout resembling the image
 with gr.Blocks(head_paths=HEAD_FILE, css_paths=CSS_FILE, theme=gr.themes.Soft()) as demo:
@@ -75,7 +78,7 @@ with gr.Blocks(head_paths=HEAD_FILE, css_paths=CSS_FILE, theme=gr.themes.Soft())
             gr.Markdown("<div id='title-text'>SpoCK: Spotting Clinical Knowledge</div>")
 
     with gr.Row():
-        search_input = gr.Textbox(label="Search", placeholder="Enter your search here...")
+        search_input = gr.Textbox(label="Search", placeholder="Enter your search here...", )
 
     with gr.Row():
         cards = gr.HTML('<div id="cards" class="cards-container"></div>')
@@ -89,9 +92,9 @@ with gr.Blocks(head_paths=HEAD_FILE, css_paths=CSS_FILE, theme=gr.themes.Soft())
     ).then(
         fn=start_processes
     ).then(
-        fn=get_cards, inputs=None, outputs=cards
+        fn=get_cards, inputs=None, outputs=cards, stream_every=UPDATE_INTERVAL
     ).then(
-        fn=get_details, outputs=details
+        fn=get_details, outputs=details, stream_every=UPDATE_INTERVAL
     )
 
 
