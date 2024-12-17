@@ -109,10 +109,12 @@
 .details-container .items .item .bottom .ner.adr {
     padding: 0px 5px;
     border-radius: 4px;
+    font-weight: var(--weight-bold);
 }
 
 .details-container .items .item .bottom .ner.mp {
-    background-color: var(--color-purple);
+    color: var(--color-grey-100);
+    background-color: var(--color-purple-700);
 } 
 
 .details-container .items .item .bottom .ner.adr {

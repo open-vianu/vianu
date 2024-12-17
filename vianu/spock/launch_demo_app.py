@@ -7,7 +7,7 @@ import gradio as gr
 from vianu.spock.settings import LOGGING_FMT, LOGGING_LEVEL
 from vianu.spock.src.data_model import Job, SpoCK
 from vianu.spock.__main__ import setup_framework
-from vianu.spock.src.frontend import format_job_card, CONTAINER_TEMPLATE
+from vianu.spock.src.frontend import format_job_card, _get_details_data, CARD_CONTAINER_TEMPLATE
 
 
 logging.basicConfig(level=LOGGING_LEVEL.upper(), format=LOGGING_FMT)
@@ -45,7 +45,7 @@ async def start_processes():
 
 async def get_cards():
     cards = [format_job_card(i, spk.job, spk.data) for i, spk in enumerate(spocks)]
-    return CONTAINER_TEMPLATE.format(cards="\n".join(cards))
+    return CARD_CONTAINER_TEMPLATE.format(cards="\n".join(cards))
 
 
 async def get_details():
@@ -56,7 +56,7 @@ async def get_details():
         if item is None:
             break
         spock.data.append(item.doc)
-        yield '\n'.join([f"{doc.id_[:12]}" for doc in spock.data])
+        yield _get_details_data(spock.data)
 
 
 # Layout resembling the image

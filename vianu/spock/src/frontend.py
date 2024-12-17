@@ -8,13 +8,13 @@ from vianu.spock.settings import DATE_FORMAT
 
 logger = logging.getLogger(__name__)
 
-CONTAINER_TEMPLATE = """
+CARD_CONTAINER_TEMPLATE = """
 <div class="card-container">
 {cards}
 </div>
 """
 
-CARD_TEMPLATE = """
+CARD_CONTAINER_CARD_TEMPLATE = """
 <div id="card_{nmbr}" class="card" onclick="clickHandler(this)" {data}>
   <div class="title">{title}</div>
   <div class="info">Date: {date}</div>
@@ -23,11 +23,13 @@ CARD_TEMPLATE = """
 </div>
 """
 
-DETAILS_CONTAINER_CONTENT_TEMPLATE = """
-<div class='items'>{items}</div>
+DETAILS_CONTAINER_TEMPLATE = """
+<div id='details' class='details-container'>
+  <div class='items'>{items}</div>
+</div>
 """
 
-DETAILS_CONTAINER_CONTENT_ITEM_TEMPLATE = """
+DETAILS_CONTAINER_ITEM_TEMPLATE = """
 <div class='item'>
   <div class='top'>
     <div class='favicon'><img src='{favicon}' alt='Favicon'></div>
@@ -62,10 +64,10 @@ def _get_document_text(doc: Document):
 
 def _get_details_container_items(data: List[Document]):
     items = []
-    max_title_lenth = 30
+    max_title_lenth = 50
     for doc in data:
         items.append(
-            DETAILS_CONTAINER_CONTENT_ITEM_TEMPLATE.format(
+            DETAILS_CONTAINER_ITEM_TEMPLATE.format(
                 favicon=doc.source_favicon_url,
                 url=doc.url,
                 title=doc.title[:max_title_lenth]
@@ -79,7 +81,7 @@ def _get_details_container_items(data: List[Document]):
 
 # TODO only save an id in data-id and then use that id to get the data from the data list
 def _get_details_data(data: List[Document]):
-    return DETAILS_CONTAINER_CONTENT_TEMPLATE.format(items=_get_details_container_items(data=data))
+    return DETAILS_CONTAINER_TEMPLATE.format(items=_get_details_container_items(data=data))
 
 
 def format_job_card(card_nmbr: int, job: Job, data: List[Document]):
@@ -90,7 +92,7 @@ def format_job_card(card_nmbr: int, job: Job, data: List[Document]):
     n_adr = sum([len(d.adverse_reactions) for d in data])
     # TODO only save an id in data-id and then use that id to get the data from the data list
     data = f'data-details="{_get_details_data(data=data)}"'
-    return CARD_TEMPLATE.format(
+    return CARD_CONTAINER_CARD_TEMPLATE.format(
         nmbr=card_nmbr,
         data=data,
         title=title,
@@ -106,30 +108,3 @@ async def conclusion(ner_queue: asyncio.Queue, orc_task: asyncio.Task):
     await orc_task
     await ner_queue.join()
 
-
-# ---- Continue from here ----
-# TODO: delete all the unneeded imports and functions
-
-# # Processing search input
-# SAMPLE_DATA = FileHandler(path="vianu/spock/assets/sample_data.json").read()
-# SAMPLE_QUERY_DAFALGAN = Job(
-#     term="dafalgan", sources=["pubmed", "ema"], submission_date=datetime.now()
-# )
-# SAMPLE_QUERY_SILDENAFIL = Job(
-#     term="sildenafil", sources=["pubmed", "ema"], submission_date=datetime.now()
-# )
-# SAMPLE_QUERY_FENTANYL = Job(
-#     term="fentanyl", sources=["pubmed", "ema"], submission_date=datetime.now()
-# )
-
-# # TODO only save an id in data-id and then use that id to get the data from the data list
-# def _process_pipeline(search_text):
-#     formated_cards = [
-#         format_search_card(0, SAMPLE_QUERY_DAFALGAN, SAMPLE_DATA),
-#         format_search_card(1, SAMPLE_QUERY_SILDENAFIL, SAMPLE_DATA),
-#         # _format_search_card(2, SAMPLE_QUERY_FENTANYL, SAMPLE_DATA),
-#     ]
-#     html_content = CONTAINER_TEMPLATE.format(
-#         cards="\n".join([fc for fc in formated_cards])
-#     )
-#     return html_content
