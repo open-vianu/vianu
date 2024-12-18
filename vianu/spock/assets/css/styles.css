@@ -30,26 +30,26 @@
 }
 
 .jobs-container {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--size-5);
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(var(--size-80), 1fr));
 }
-.jobs-container .card {
+.card {
+    justify-self: center;
     cursor: pointer;
     border: none var(--spacing-md) var(--block-title-border-color);
     border-radius: var(--radius-lg);
-    width: var(--width-xs);
+    width: var(--size-80);
     padding: var(--scale-4);
     font: var(--font);
     background: var(--block-label-background-fill);
 }
-.jobs-container .card .title {
+.card .title {
     font-weight: var(--weight-bold);
     font-size: var(--text-lg);
     color: var(--block-title-text-color);
     margin-bottom: var(--scale-0);
 }
-.jobs-container .card .info { 
+.card .info { 
     color: var(--block-info-text-color);
     margin-bottom: var(--block-label-margin);
 }

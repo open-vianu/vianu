@@ -37,7 +37,7 @@ async def orchestrator(
     await ner_queue.put(None)
 
 
-def setup_framework(args_: Namespace | Job) -> Tuple:
+def setup_asyncio_framework(args_: Namespace | Job) -> Tuple:
     # Set up queues
     scp_queue = asyncio.Queue()
     ner_queue = asyncio.Queue()
@@ -57,7 +57,7 @@ async def main(save: bool = True) -> None:
     logging.info(f'Starting SpoCK (args_={args_})')    
 
     # Set up async structure
-    _, ner_queue, _, _, orc_task = setup_framework(args_)
+    _, ner_queue, _, _, orc_task = setup_asyncio_framework(args_)
 
     # Read results from NER queue
     data = []
@@ -79,10 +79,10 @@ async def main(save: bool = True) -> None:
 
     # Save data
     if save:
-        filename = args_.data_filename
+        file = args_.data_file
         path = args_.data_path
-        if filename is not None and path is not None:
-            FileHandler(path=path).write(filename=filename, data=data)
+        if file is not None and path is not None:
+            FileHandler(path=path).write(file=file, data=data)
     logging.info('Finished SpoCK')
 
 

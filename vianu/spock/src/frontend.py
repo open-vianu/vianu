@@ -7,14 +7,9 @@ from vianu.spock.settings import DATE_FORMAT
 
 logger = logging.getLogger(__name__)
 
-CARD_CONTAINER_TEMPLATE = """
-<div class="jobs-container">
-  {jobs}
-</div>
-"""
 
 JOBS_CONTAINER_CARD_TEMPLATE = """
-<div id="card_{nmbr}" class="card" onclick="clickHandler(this)" {data}>
+<div class="card" onclick="clickHandler(this)">
   <div class="title">{title}</div>
   <div class="info">Date: {date}</div>
   <div class="info">Sources: {sources}</div>
@@ -79,6 +74,8 @@ def _get_details_container_items(data: List[Document]):
 
 
 def get_details_of_data(data: List[Document]):
+    if len(data) == 0:
+        return "<div>no results available yet</div>"
     return DETAILS_CONTAINER_TEMPLATE.format(items=_get_details_container_items(data=data))
 
 
@@ -88,11 +85,8 @@ def format_job_card(card_nmbr: int, job: Job, data: List[Document]):
     date = job.submission.strftime(DATE_FORMAT)
     n_doc = len(data)
     n_adr = sum([len(d.adverse_reactions) for d in data])
-    # TODO only save an id in data-id and then use that id to get the data from the data list
-    data = f'data-details="{get_details_of_data(data=data)}"'
     return JOBS_CONTAINER_CARD_TEMPLATE.format(
         nmbr=card_nmbr,
-        data=data,
         title=title,
         date=date,
         sources=sources,

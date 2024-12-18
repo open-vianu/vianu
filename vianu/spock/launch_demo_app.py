@@ -6,8 +6,8 @@ import gradio as gr
 
 from vianu.spock.settings import LOGGING_FMT, LOGGING_LEVEL
 from vianu.spock.src.data_model import Job, SpoCK
-from vianu.spock.__main__ import setup_framework
-from vianu.spock.src.frontend import format_job_card, _get_details_data, JOBS_CONTAINER_TEMPLATE
+from vianu.spock.__main__ import setup_asyncio_framework
+from vianu.spock.src.frontend import format_job_card, get_details_of_data
 
 
 logging.basicConfig(level=LOGGING_LEVEL.upper(), format=LOGGING_FMT)
@@ -22,50 +22,72 @@ SPOCK_KWARGS = {
     "n_ner_tasks": 1,
     "log_level": LOGGING_LEVEL,
 }
+MAX_JOBS = 5
+
+# Global variables
 ner_queue = None
 orc_task = None
 job = None
 cards = []
 spocks = []
+running = None
 
 
 async def setup_spock(term: str):
-    global spocks, job
+    global running, spocks, job
+    if len(spocks) >= MAX_JOBS:
+        logger.error(f"Max number of jobs reached: {MAX_JOBS}")
+        return None
     logger.info(f"Setting up SpoCK for term: {term}")
     args_ = deepcopy(SPOCK_KWARGS)
     args_["term"] = term
     job = Job(id_=f'{args_["term"]} {args_["source"]} {args_["model"]}', **args_)
-    spock = SpoCK(job=job, started_at=job.submission, data=[])
-    spocks.append(spock)
+    running = SpoCK(job=job, started_at=job.submission, data=[])
+    print(f'running exists len data={len(running.data)}')
+    spocks.append(running)
 
 
 async def start_processes():
     global ner_queue, orc_task
+    if len(spocks) >= MAX_JOBS:
+        return None
     logger.info("Starting SpoCK processes")
-    _, ner_queue, _, _, orc_task = setup_framework(args_=job)
+    _, ner_queue, _, _, orc_task = setup_asyncio_framework(args_=job)
 
 
-async def get_cards():
-    global cards
-    while True:
-        cards = [format_job_card(i, spk.job, spk.data) for i, spk in enumerate(spocks)]
-        yield JOBS_CONTAINER_TEMPLATE.format(jobs="\n".join(cards))
+async def add_cards():
+    global spocks
+    cards = []
+    for i, spk in enumerate(spocks):
+        html = format_job_card(i, spk.job, spk.data)
+        cards.append(gr.HTML(html, elem_id=f"job-{i}", visible=True))
+    cards.extend([gr.HTML('', elem_id=f'job-{len(spocks) + i}', visible=False) for i in range(MAX_JOBS - len(spocks))])
+    return cards
 
 
-async def get_details():
-    global ner_queue, spocks
-    spock = spocks[-1]
+async def add_data_to_spock():
+    global ner_queue, running
+    if len(spocks) >= MAX_JOBS:
+        return
     while True:
         item = await ner_queue.get()
         if item is None:
             break
-        spock.data.append(item.doc)
-        yield _get_details_data(spock.data)
+        running.data.append(item.doc)
+
+
+async def get_details(job_id: str):
+    global spocks
+    i = int(job_id.split("-")[-1])
+    while True:
+        data = get_details_of_data(spocks[i].data)
+        yield data
+
 
 # Layout resembling the image
 with gr.Blocks(head_paths=HEAD_FILE, css_paths=CSS_FILE, theme=gr.themes.Soft()) as demo:
-    scraping = gr.State(value=False)
-    nering = gr.State(value=False)
+    # scraping = gr.State(value=False)
+    # nering = gr.State(value=False)
 
     with gr.Row(elem_id="logo-title-row"):
         with gr.Column(scale=1):
@@ -76,26 +98,28 @@ with gr.Blocks(head_paths=HEAD_FILE, css_paths=CSS_FILE, theme=gr.themes.Soft())
             )
         with gr.Column(scale=5):
             gr.Markdown("<div id='title-text'>SpoCK: Spotting Clinical Knowledge</div>")
-
+    
     with gr.Row():
         search_input = gr.Textbox(label="Search", placeholder="Enter your search here...", )
 
-    with gr.Row():
-        cards = gr.HTML('<div id="cards" class="cards-container"></div>')
+    with gr.Row(elem_classes="jobs-container"):
+        cards = [gr.HTML('', elem_id=f'job-{i}', visible=False) for i in range(MAX_JOBS)]
 
     with gr.Row():
-        details = gr.HTML('<div id="details" class="details-container"></div>')
-        # details = gr.TextArea(label="Details", placeholder="Details will appear here...")
+        details = gr.HTML('<div id="details" class="details-container">Details</div>')
 
     search_input.submit(
         fn=setup_spock, inputs=search_input
     ).then(
         fn=start_processes
     ).then(
-        fn=get_cards, inputs=None, outputs=cards, stream_every=UPDATE_INTERVAL
+        fn=add_cards, outputs=cards
     ).then(
-        fn=get_details, outputs=details, stream_every=UPDATE_INTERVAL
+        fn=add_data_to_spock
     )
+    
+    for i, crd in enumerate(cards):
+        crd.click(fn=get_details, inputs=gr.Textbox(value=crd.elem_id, visible=False), outputs=details)
 
 
 if __name__ == "__main__":
