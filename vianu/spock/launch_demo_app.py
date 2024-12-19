@@ -1,3 +1,4 @@
+import asyncio
 from copy import deepcopy
 import logging
 from pathlib import Path
@@ -13,7 +14,6 @@ from vianu.spock.src.frontend import format_job_card, get_details_of_data
 logging.basicConfig(level=LOGGING_LEVEL.upper(), format=LOGGING_FMT)
 logger = logging.getLogger(__name__)
 
-UPDATE_INTERVAL = 0.5
 HEAD_FILE = Path(__file__).parent / "assets/head/scripts.html"
 CSS_FILE = Path(__file__).parent / "assets/css/styles.css"
 SPOCK_KWARGS = {
@@ -80,8 +80,10 @@ async def get_details(job_id: str):
     global spocks
     i = int(job_id.split("-")[-1])
     while True:
+        await asyncio.sleep(2)
         data = get_details_of_data(spocks[i].data)
         yield data
+
 
 
 # Layout resembling the image
@@ -106,7 +108,7 @@ with gr.Blocks(head_paths=HEAD_FILE, css_paths=CSS_FILE, theme=gr.themes.Soft())
         cards = [gr.HTML('', elem_id=f'job-{i}', visible=False) for i in range(MAX_JOBS)]
 
     with gr.Row():
-        details = gr.HTML('<div id="details" class="details-container">Details</div>')
+        details = gr.HTML('<div id="details" class="details-container"></div>')
 
     search_input.submit(
         fn=setup_spock, inputs=search_input
