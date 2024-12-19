@@ -68,7 +68,7 @@ class Document(DataUnit):
     text: str
     source: str
 
-    # optional document fields
+    # additional document fields
     title: str | None = None
     url: str | None = None
     source_url: str | None = None
@@ -76,12 +76,14 @@ class Document(DataUnit):
     language: str | None = None
     publication_date: datetime | None = None
 
-    # NER information (optional)
+    # named entities
     medicinal_products: List[NamedEntity] = field(default_factory=list)
     adverse_reactions: List[NamedEntity] = field(default_factory=list)
 
-    # Protected fields
+    # protected fields
     _errors: List[str] = field(default_factory=list)
+    _html: str | None = None
+    _html_hash: str | None = None
 
     @property
     def _id_prefix(self):
@@ -108,6 +110,34 @@ class Document(DataUnit):
             data=data,
             config=dacite.Config(type_hooks={datetime: datetime.fromisoformat})
         )
+    
+    def _get_html_hash(self) -> str:
+        ne_ids = [ne.id_ for ne in self.medicinal_products + self.adverse_reactions]
+        html_hash_str = ' '.join(ne_ids)
+        return sha256(html_hash_str.encode()).hexdigest()
+
+
+    def _get_html(self):
+        text = f"<div>{self.text}</div>"
+        mp_template = "<span class='ner mp'>{text} | {class_}</span>"
+        for ne in self.medicinal_products:
+            text = text.replace(
+                ne.text, mp_template.format(text=ne.text, class_=ne.class_)
+            )
+        adr_template = "<span class='ner adr'>{text} | {class_}</span>"
+        for ne in self.adverse_reactions:
+            text = text.replace(
+                ne.text, adr_template.format(text=ne.text, class_=ne.class_)
+            )
+        return text
+
+
+    def get_html(self):
+        html_hash = self._get_html_hash()
+        if self._html is None or html_hash != self._html_hash:
+            self._html = self._get_html()
+            self._html_hash = html_hash
+        return self._html
 
 
 class DocumentJSONEncoder(json.JSONEncoder):

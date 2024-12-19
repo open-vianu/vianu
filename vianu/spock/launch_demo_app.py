@@ -5,7 +5,7 @@ from pathlib import Path
 
 import gradio as gr
 
-from vianu.spock.settings import LOGGING_FMT, LOGGING_LEVEL
+from vianu.spock.settings import LOGGING_LEVEL, LOGGING_FMT
 from vianu.spock.src.data_model import Job, SpoCK
 from vianu.spock.__main__ import setup_asyncio_framework
 from vianu.spock.src.frontend import format_job_card, get_details_of_data
@@ -39,11 +39,11 @@ async def setup_spock(term: str):
         logger.error(f"Max number of jobs reached: {MAX_JOBS}")
         return None
     logger.info(f"Setting up SpoCK for term: {term}")
+    gr.Info(f'SpoCK started Job "{term}"')
     args_ = deepcopy(SPOCK_KWARGS)
     args_["term"] = term
     job = Job(id_=f'{args_["term"]} {args_["source"]} {args_["model"]}', **args_)
     running = SpoCK(job=job, started_at=job.submission, data=[])
-    print(f'running exists len data={len(running.data)}')
     spocks.append(running)
 
 
@@ -74,6 +74,14 @@ async def add_data_to_spock():
         if item is None:
             break
         running.data.append(item.doc)
+
+
+async def conclusion():
+    global ner_queue, orc_task, running
+    await orc_task
+    await ner_queue.join()
+    gr.Info(f'Job "{running.job.term}" finished')
+    running = None
 
 
 async def get_details(job_id: str):
@@ -118,6 +126,8 @@ with gr.Blocks(head_paths=HEAD_FILE, css_paths=CSS_FILE, theme=gr.themes.Soft())
         fn=add_cards, outputs=cards
     ).then(
         fn=add_data_to_spock
+    ).then(
+        fn=conclusion
     )
     
     for i, crd in enumerate(cards):

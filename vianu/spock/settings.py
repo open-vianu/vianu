@@ -1,5 +1,5 @@
 # General settings
-LOGGING_LEVEL = 'INFO'
+LOGGING_LEVEL = 'DEBUG'
 LOGGING_FMT = "%(asctime)s | %(name)s | %(levelname)s | %(message)s"
 DATA_PATH = "/tmp/spock/"
 DATA_FILE = "spock_data"

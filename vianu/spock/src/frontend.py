@@ -35,30 +35,10 @@ DETAILS_CONTAINER_ITEM_TEMPLATE = """
 </div>
 """
 
-NER_MP_TEMPLATE = """
-<span class='ner mp'>{text} | {class_}</span>
-"""
-
-NER_ADR_TEMPLATE = """
-<span class='ner adr'>{text} | {class_}</span>
-"""
-
-def _get_document_text(doc: Document):
-    text = f"<div>{doc.text}</div>"
-    for ne in doc.medicinal_products:
-        text = text.replace(
-            ne.text, NER_MP_TEMPLATE.format(text=ne.text, class_=ne.class_)
-        )
-    for ne in doc.adverse_reactions:
-        text = text.replace(
-            ne.text, NER_ADR_TEMPLATE.format(text=ne.text, class_=ne.class_)
-        )
-    return text
-
 
 def _get_details_container_items(data: List[Document]):
     items = []
-    max_title_lenth = 50
+    max_title_lenth = 120
     for doc in data:
         items.append(
             DETAILS_CONTAINER_ITEM_TEMPLATE.format(
@@ -66,7 +46,7 @@ def _get_details_container_items(data: List[Document]):
                 url=doc.url,
                 title=doc.title[:max_title_lenth]
                 + ("..." if len(doc.title) > max_title_lenth else ""),
-                text=_get_document_text(doc=doc),
+                text=doc.get_html(),
                 details="details",
             )
         )
@@ -95,8 +75,4 @@ def format_job_card(card_nmbr: int, job: Job, data: List[Document]):
     )
 
 
-async def conclusion(ner_queue: asyncio.Queue, orc_task: asyncio.Task):
-    # Wait for orchestrator to finish and queue to be empty
-    await orc_task
-    await ner_queue.join()
 
