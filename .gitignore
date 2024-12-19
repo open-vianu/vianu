@@ -108,6 +108,7 @@ venv.bak/
 # OS generated files
 .DS_Store
 Thumbs.db
+**/*.db
 
 # Local environment files
 .envrc
@@ -136,3 +137,5 @@ Thumbs.db
 
 # Poetry lock file (if you prefer not to include it)
 poetry.lock
+
+**/*/chromedriver
