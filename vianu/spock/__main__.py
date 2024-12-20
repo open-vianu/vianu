@@ -16,28 +16,46 @@ async def orchestrator(
         ner_tasks: List[asyncio.Task],
         scp_queue: asyncio.Queue,
         ner_queue: asyncio.Queue, 
-        ) -> None:
+    ) -> None:
+    """Orchestrates the scraping and NER tasks.
+    
+    It waits for all scraping tasks to finish, then sends a sentinel to the scp_queue for each ner task (which will 
+    trigger the ner tasks to finish -> cf :func:`vianu.spock.src.ner.apply`). 
+    """
     
     # Wait for all scraper tasks to finish and stop them
-    await asyncio.gather(*scp_tasks)
+    try:
+        await asyncio.gather(*scp_tasks)
+    except asyncio.CancelledError:
+        logging.warning('scraping tasks canceled')
     for st in scp_tasks:
         st.cancel()
 
     # Insert sentinel for each NER
-    for _ in range(len(ner_tasks)):
-        await scp_queue.put(None)
+    try: 
+        for _ in range(len(ner_tasks)):
+            await scp_queue.put(None)
+    except asyncio.CancelledError:
+        logging.warning('scraping queue canceled')
     
     # Wait for NER tasks to process all items and finish
-    await scp_queue.join()
-    await asyncio.gather(*ner_tasks)
+    try: 
+        await scp_queue.join()
+        await asyncio.gather(*ner_tasks)
+    except asyncio.CancelledError:
+        logging.error('scp_queue/ner task(s) canceled')
     for nt in ner_tasks:
         nt.cancel()
 
-    # Insert sentinel into ner_queue to indicate no more results
-    await ner_queue.put(None)
+    # Insert sentinel into ner_queue to indicate end of processing
+    try:
+        await ner_queue.put(None)
+    except asyncio.CancelledError:
+        logging.error('ner queue canceled')
 
 
-def setup_asyncio_framework(args_: Namespace | Job) -> Tuple:
+def setup_asyncio_framework(args_: Namespace | Job) -> Tuple[asyncio.Queue, asyncio.Queue, List[asyncio.Task], List[asyncio.Task], asyncio.Task]:
+    """Set up the asyncio framework for the SpoCK application."""
     # Set up queues
     scp_queue = asyncio.Queue()
     ner_queue = asyncio.Queue()
@@ -52,6 +70,7 @@ def setup_asyncio_framework(args_: Namespace | Job) -> Tuple:
 
 
 async def main(save: bool = True) -> None:
+    """Main function for the SpoCK pipeline."""
     args_= parse_args(sys.argv[1:])
     logging.basicConfig(level=args_.log_level.upper(), format=LOGGING_FMT)
     logging.info(f'Starting SpoCK (args_={args_})')    

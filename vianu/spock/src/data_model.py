@@ -81,7 +81,6 @@ class Document(DataUnit):
     adverse_reactions: List[NamedEntity] = field(default_factory=list)
 
     # protected fields
-    _errors: List[str] = field(default_factory=list)
     _html: str | None = None
     _html_hash: str | None = None
 
@@ -89,22 +88,14 @@ class Document(DataUnit):
     def _id_prefix(self):
         return 'doc_'
     
-    def remove_named_entity_from_id(self, id_: str) -> None:
-        """Removes a named entity from the text entity."""
+    def remove_named_entity_by_id(self, id_: str) -> None:
+        """Removes a named entity from the document by a given `doc.id_`."""
         self.medicinal_products = [ne for ne in self.medicinal_products if ne.id_ != id_]
         self.adverse_reactions = [ne for ne in self.adverse_reactions if ne.id_ != id_]
 
-    def add_error(self, err: str) -> None:
-        self._errors.append(err)
-
-    def get_errors(self) -> List[str]:
-        return self._errors
-
-    def has_error(self) -> bool:
-        return len(self._errors) > 0
-
     @classmethod
     def from_dict(cls, data: dict) -> Self:
+        """Creates a :class:`Document` object from a dictionary."""
         return dacite.from_dict(
             data_class=cls,
             data=data,
@@ -112,27 +103,38 @@ class Document(DataUnit):
         )
     
     def _get_html_hash(self) -> str:
+        """Creates a sha256 hash from the named entities' ids. If the sets of named entities have been modified, this
+        function will return a different hash.
+        """
         ne_ids = [ne.id_ for ne in self.medicinal_products + self.adverse_reactions]
         html_hash_str = ' '.join(ne_ids)
         return sha256(html_hash_str.encode()).hexdigest()
 
 
-    def _get_html(self):
+    def _get_html(self) -> str:
+        """Creates the HTML representation of the document with highlighted named entities."""
         text = f"<div>{self.text}</div>"
+
+        # Highlight medicinal products accodring to the css class 'mp'
         mp_template = "<span class='ner mp'>{text} | {class_}</span>"
         for ne in self.medicinal_products:
             text = text.replace(
                 ne.text, mp_template.format(text=ne.text, class_=ne.class_)
             )
+        
+        # Highlight adverse drug reactions accodring to the css class 'adr'
         adr_template = "<span class='ner adr'>{text} | {class_}</span>"
         for ne in self.adverse_reactions:
             text = text.replace(
                 ne.text, adr_template.format(text=ne.text, class_=ne.class_)
             )
+        
         return text
 
 
-    def get_html(self):
+    def get_html(self) -> str:
+        """Returns the HTML representation of the document with highlighted named entities. This function checks if 
+        the set of named entities has been modified and updates the HTML representation if necessary."""
         html_hash = self._get_html_hash()
         if self._html is None or html_hash != self._html_hash:
             self._html = self._get_html()
@@ -141,6 +143,7 @@ class Document(DataUnit):
 
 
 class DocumentJSONEncoder(json.JSONEncoder):
+    """Custom JSON encoder for the :class:`Document` class."""
     def default(self, o):
         if isinstance(o, datetime):
             return o.isoformat()
@@ -156,6 +159,7 @@ class DocumentJSONEncoder(json.JSONEncoder):
 
 @dataclass(eq=False)
 class Job(DataUnit):
+    """Class for the job definition resulting from the cli arguments."""
 
     # generic options
     log_level: str
@@ -173,27 +177,29 @@ class Job(DataUnit):
     data_path: str | None = None
     data_file: str | None = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         super().__post_init__()
         self.submission = datetime.now() if self.submission is None else self.submission
 
     @property
-    def _id_prefix(self):
+    def _id_prefix(self) -> str:
         return 'job_'
     
-    def to_namespace(self):
+    def to_namespace(self) -> Namespace:
+        """Converts the :class:`Job` object to a :class:`argparse.Namespace` object."""
         return Namespace(**asdict(self))
     
 
 @dataclass
 class QueueItem:
-    """Class for the async queue items"""
+    """Class for the :class:`asyncio.Queue` items"""
     id_: str
     doc: Document
 
 
 @dataclass
 class SpoCK:
+    """Main class for the SpoCK pipeline mainly containing the job definition and the resulting data."""
     # Generic fields
     status: str | None = None
     started_at: datetime | None = None
@@ -212,28 +218,32 @@ class SpoCK:
     
 
 class FileHandler:
-    """Reads from and write data to a file."""
+    """Reads from and write data to a JSON file under a given file path."""
 
     _suffix = '.json'
 
-    def __init__(self, path: Path | str):
+    def __init__(self, path: Path | str) -> None:
         self._path = Path(path) if isinstance(path, str) else path
         if not self._path.exists():
             os.makedirs(self._path)
 
 
     def read(self, file: str) -> List[Document]:
+        """Reads the data from a JSON file and casts it into a list of :class:`Document` objects."""
         filename = (self._path / file).with_suffix(self._suffix)
+
         logger.info('reading data from file {filename}')
         with open(filename.with_suffix(self._suffix), 'r', encoding="utf-8") as dfile:
             entries = json.load(dfile)
-        data = [Document.from_dict(x) for x in entries]
-        return data
+        
+        return [Document.from_dict(x) for x in entries]
 
 
-    def write(self, file: str, data: List[Document]):
+    def write(self, file: str, data: List[Document]) -> None:
+        """Writes the data to a JSON file with name `[file]_%Y%m%d%H%M%S`."""
         file = f'{file}_{datetime.now().strftime("%Y%m%d%H%M%S")}'
         filename = (self._path / file).with_suffix(self._suffix)
+
         logger.info(f'writing data to file {filename}')
         with open(filename, 'w', encoding="utf-8") as dfile:
             json.dump(data, dfile, cls=DocumentJSONEncoder)

@@ -115,7 +115,7 @@ class OllamaNER(NER):
 
         while True:
             # Get text from input queue
-            item = await queue_in.get()
+            item = await queue_in.get()   # type: QueueItem
 
             # Check stopping condition
             if item is None:

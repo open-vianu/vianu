@@ -1,4 +1,3 @@
-import asyncio
 import logging
 from typing import List
 
@@ -9,7 +8,7 @@ logger = logging.getLogger(__name__)
 
 
 JOBS_CONTAINER_CARD_TEMPLATE = """
-<div class="card" onclick="clickHandler(this)">
+<div class="card" onclick="cardClickHandler(this)">
   <div class="title">{title}</div>
   <div class="info">Date: {date}</div>
   <div class="info">Sources: {sources}</div>
@@ -36,7 +35,10 @@ DETAILS_CONTAINER_ITEM_TEMPLATE = """
 """
 
 
-def _get_details_container_items(data: List[Document]):
+def _get_details_html_items(data: List[Document]):
+    """Get the HTML items for the details container. Each item contains the favicon, title, and the text with the 
+    highlighted named entities.
+    """
     items = []
     max_title_lenth = 120
     for doc in data:
@@ -53,13 +55,15 @@ def _get_details_container_items(data: List[Document]):
     return "\n".join(items)
 
 
-def get_details_of_data(data: List[Document]):
+def get_details_html(data: List[Document]):
+    """Get the stacked HTML items for each document."""
     if len(data) == 0:
         return "<div>no results available yet</div>"
-    return DETAILS_CONTAINER_TEMPLATE.format(items=_get_details_container_items(data=data))
+    return DETAILS_CONTAINER_TEMPLATE.format(items=_get_details_html_items(data=data))
 
 
-def format_job_card(card_nmbr: int, job: Job, data: List[Document]):
+def get_job_card_html(card_nmbr: int, job: Job, data: List[Document]):
+    """Get the HTML for the job card."""
     title = job.term
     sources = ", ".join(job.source)
     date = job.submission.strftime(DATE_FORMAT)
@@ -73,6 +77,3 @@ def format_job_card(card_nmbr: int, job: Job, data: List[Document]):
         n_doc=n_doc,
         n_adr=n_adr,
     )
-
-
-

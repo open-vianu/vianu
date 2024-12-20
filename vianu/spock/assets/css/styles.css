@@ -29,6 +29,39 @@
     padding: var(--scale-0)
 }
 
+.search-container {
+    display: flex;
+    align-items: flex-end;
+}
+
+
+.search-container .button-not-running,
+.search-container .button-running, 
+.search-container .canceling {
+    cursor: pointer;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: var(--color-grey-100);
+    border-radius: var(--radius-md);
+    font-size: var(--text-xxl);
+    font-weight: var(--weight-extrabold);
+    background: var(--color-green-700);
+}
+
+.search-container .button-not-running {
+    background: var(--color-green-700)
+}
+
+
+.search-container .button-running {
+    background: var(--color-red-600)
+}
+
+.search-container .canceling {
+    background: var(--color-grey-500)
+}
+
 .jobs-container {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(var(--size-80), 1fr));

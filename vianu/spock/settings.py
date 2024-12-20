@@ -21,3 +21,7 @@ NER_MODELS = ['llama']
 MAX_TOKENS = 128.000
 OLLAMA_ENDPOINT = "http://localhost:11434/api/chat"
 LLAMA_MODEL='llama3.2'
+
+# UI settings
+MAX_JOBS = 5
+
