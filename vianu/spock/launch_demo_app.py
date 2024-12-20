@@ -118,7 +118,11 @@ async def _add_data_to_running_spock():
     if len(spocks) >= MAX_JOBS:
         return
     while True:
-        item = await ner_queue.get()    # type: QueueItem
+        try:
+            item = await ner_queue.get()    # type: QueueItem
+        except asyncio.CancelledError:
+            logger.warning('_add_data_to_running_spock: ner queue canceled')
+            break
 
         # Check stopping condition (added by the `orchestrator` in `vianu.spock.__main__`)
         if item is None:
@@ -133,31 +137,35 @@ async def _conclusion():
     try:
         await orc_task
     except asyncio.CancelledError:
-        logger.warning('orchestrator task canceled')
+        logger.warning('_conclusion: orchestrator task canceled')
 
     # Wait for the NER queue to be empty (which means that they have all been added to `running_spock.data`)
     try:
         await ner_queue.join()
     except asyncio.CancelledError:
-        logger.warning('ner queue canceled')
+        logger.warning('_conclusion: ner queue canceled')
     
     # Log the conclusion and empty the running_spock
-    gr.Info(f'Job "{running_spock.job.term}" finished')
+    gr.Info(f'job "{running_spock.job.term}" finished')
     running_spock = None
 
 
 async def _canceling():
     """Cancel all running :class:`asyncio.Task`."""
+    msg = "canceling SpoCK processes"
+    gr.Warning(msg)
+    logger.warning(msg)
+
     # Get all pending tasks and without the current task (being the execution of this function)
     pending_tasks = asyncio.all_tasks()
     pending_tasks.remove(asyncio.current_task())
 
-    # Cancel all tasks
+    # Cancel all tasks and wait for them to finish
     for task in pending_tasks:
         task.cancel()
-
-    # Wait for all tasks to finish and stop the event loop
     await asyncio.gather(*pending_tasks, return_exceptions=True)
+
+    # Stop the event loop
     loop = asyncio.get_running_loop()
     loop.stop()
     loop.close()
@@ -168,7 +176,11 @@ async def _feed_details_to_ui(job_id: str):
     global spocks
     i = int(job_id.split("-")[-1])  # the job id is in the form of "job-{i}"
     while True:
-        await asyncio.sleep(2)
+        try:
+            await asyncio.sleep(1)
+        except asyncio.CancelledError:
+            logger.warning('_feed_details_to_ui: canceled')
+            break
         yield get_details_html(spocks[i].data)
 
 
