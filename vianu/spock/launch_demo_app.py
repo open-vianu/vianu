@@ -1,12 +1,13 @@
 import asyncio
 from copy import deepcopy
+from datetime import datetime
 import logging
 from pathlib import Path
 from typing import Tuple, List, Any
 
 import gradio as gr
 
-from vianu.spock.settings import LOGGING_LEVEL, LOGGING_FMT
+from vianu.spock.settings import LOGGING_LEVEL, LOGGING_FMT, UPDATE_INTERVAL, MAX_JOBS
 from vianu.spock.src.data_model import Job, SpoCK, QueueItem
 from vianu.spock.__main__ import setup_asyncio_framework
 from vianu.spock.src.ui import get_job_card_html, get_details_html
@@ -23,7 +24,6 @@ SPOCK_KWARGS = {
     "n_ner_tasks": 1,
     "log_level": LOGGING_LEVEL,
 }
-MAX_JOBS = 5
 
 # Global async variables
 scp_queue = None
@@ -75,8 +75,8 @@ async def _setup_spock(term: str) -> None:
     args_ = deepcopy(SPOCK_KWARGS)
     args_["term"] = term
     job = Job(id_=f'{args_["term"]} {args_["source"]} {args_["model"]}', **args_)
-    running_spock = SpoCK(job=job, started_at=job.submission, data=[])
-    spocks.append(running_spock)
+    running_spock = SpoCK(status='running', job=job, started_at=job.submission, data=[])
+    spocks.insert(0, running_spock)
 
 
 async def _setup_asyncio_framework() -> None:
@@ -103,7 +103,7 @@ async def _feed_cards_to_ui() -> List[gr.HTML]:
 
     # Create the job cards for the existing spocks
     cards = []
-    for i, spk in enumerate(spocks[::-1]):
+    for i, spk in enumerate(spocks):
         html = get_job_card_html(i, spk.job, spk.data)
         cards.append(gr.HTML(html, elem_id=f"job-{i}", visible=True))
 
@@ -118,12 +118,7 @@ async def _add_data_to_running_spock():
     if len(spocks) >= MAX_JOBS:
         return
     while True:
-        try:
-            item = await ner_queue.get()    # type: QueueItem
-        except asyncio.CancelledError:
-            logger.warning('_add_data_to_running_spock: ner queue canceled')
-            break
-
+        item = await ner_queue.get()    # type: QueueItem
         # Check stopping condition (added by the `orchestrator` in `vianu.spock.__main__`)
         if item is None:
             break
@@ -133,54 +128,59 @@ async def _add_data_to_running_spock():
 async def _conclusion():
     global ner_queue, orc_task, running_spock
 
-    # Wait for the orchestrator task to finish (which waits for the NER tasks to finish)
+    # Wait for the orchestrator task to finish (which implicitly waits for the NER tasks to finish)
     try:
         await orc_task
     except asyncio.CancelledError:
-        logger.warning('_conclusion: orchestrator task canceled')
+        logger.warning('orchestrator task canceled')
 
     # Wait for the NER queue to be empty (which means that they have all been added to `running_spock.data`)
-    try:
-        await ner_queue.join()
-    except asyncio.CancelledError:
-        logger.warning('_conclusion: ner queue canceled')
+    await ner_queue.join()
     
-    # Log the conclusion and empty the running_spock
+    # Update the running_spock with the final data
+    running_spock.status = 'completed'
+    running_spock.terminated_at = datetime.now()
+
+    # Log the conclusion and update/empty the running_spock
     gr.Info(f'job "{running_spock.job.term}" finished')
-    running_spock = None
+    logger.info(f'job "{running_spock.job.term}" finished in {running_spock.runtime()}')
 
 
 async def _canceling():
     """Cancel all running :class:`asyncio.Task`."""
+    global running_spock
+
     msg = "canceling SpoCK processes"
     gr.Warning(msg)
     logger.warning(msg)
+    running_spock.status = 'stopped'
+    running_spock.terminated_at = datetime.now()
 
-    # Get all pending tasks and without the current task (being the execution of this function)
-    pending_tasks = asyncio.all_tasks()
-    pending_tasks.remove(asyncio.current_task())
-
-    # Cancel all tasks and wait for them to finish
-    for task in pending_tasks:
+    # Cancel scraping tasks
+    logger.warning("canceling scraping tasks")
+    for task in scp_tasks:
         task.cancel()
-    await asyncio.gather(*pending_tasks, return_exceptions=True)
+    await asyncio.gather(*scp_tasks, return_exceptions=True)
 
-    # Stop the event loop
-    loop = asyncio.get_running_loop()
-    loop.stop()
-    loop.close()
+    # Cancel named entity recognition tasks
+    logger.warning("canceling named entity recognition tasks")
+    for task in ner_tasks:
+        task.cancel()
+    await asyncio.gather(*ner_tasks, return_exceptions=True)
+
+    # Cancel orchestrator task
+    logger.warning("canceling orchestrator task")
+    orc_task.cancel()
+    await asyncio.gather(orc_task, return_exceptions=True)
 
 
 async def _feed_details_to_ui(job_id: str):
     """Collect the (previously created) html texts for the documents of the selected job and feed them to the UI."""
     global spocks
     i = int(job_id.split("-")[-1])  # the job id is in the form of "job-{i}"
+    logger.debug(f'card clicked={i} and len(data)={len(spocks[i].data)}')
     while True:
-        try:
-            await asyncio.sleep(1)
-        except asyncio.CancelledError:
-            logger.warning('_feed_details_to_ui: canceled')
-            break
+        await asyncio.sleep(UPDATE_INTERVAL)
         yield get_details_html(spocks[i].data)
 
 
@@ -224,6 +224,8 @@ with gr.Blocks(head_paths=HEAD_FILE, css_paths=CSS_FILE, theme=gr.themes.Soft())
     ).then(
         fn=_setup_asyncio_framework
     ).then(
+        fn=lambda: None, outputs=search_term
+    ).then(
         fn=_feed_cards_to_ui, outputs=cards
     ).then(
         fn=_add_data_to_running_spock
@@ -235,8 +237,6 @@ with gr.Blocks(head_paths=HEAD_FILE, css_paths=CSS_FILE, theme=gr.themes.Soft())
     stop_button.click(
         fn=_show_cancel_button, outputs=[start_button, stop_button, cancel_button]
     ).then(
-        fn=_feed_cards_to_ui, outputs=cards
-    ).then(
         fn=_canceling
     ).then(
         fn=_toggle_is_running, inputs=[is_running], outputs=[is_running, start_button, stop_button, cancel_button]
@@ -244,7 +244,7 @@ with gr.Blocks(head_paths=HEAD_FILE, css_paths=CSS_FILE, theme=gr.themes.Soft())
     
     # Callback of the job cards to show the details
     for i, crd in enumerate(cards):
-        crd.click(fn=_feed_details_to_ui, inputs=gr.Textbox(value=crd.elem_id, visible=False), outputs=details)
+        crd.click(fn=_feed_details_to_ui, inputs=gr.Textbox(value=crd.elem_id, visible=False), outputs=details, queue=False)
 
 
 if __name__ == "__main__":

@@ -10,6 +10,8 @@ from .src import scraping as scp
 from .src import ner
 from .settings import LOGGING_FMT
 
+logger = logging.getLogger(__name__)
+
 
 async def orchestrator(
         scp_tasks: List[asyncio.Task],
@@ -27,31 +29,25 @@ async def orchestrator(
     try:
         await asyncio.gather(*scp_tasks)
     except asyncio.CancelledError:
-        logging.warning('scraping tasks canceled')
+        logger.warning('scraping task(s) have previously been canceled')
     for st in scp_tasks:
         st.cancel()
 
     # Insert sentinel for each NER
-    try: 
-        for _ in range(len(ner_tasks)):
-            await scp_queue.put(None)
-    except asyncio.CancelledError:
-        logging.warning('scraping queue canceled')
+    for _ in range(len(ner_tasks)):
+        await scp_queue.put(None)
     
     # Wait for NER tasks to process all items and finish
+    await scp_queue.join()
     try: 
-        await scp_queue.join()
         await asyncio.gather(*ner_tasks)
     except asyncio.CancelledError:
-        logging.error('scp_queue/ner task(s) canceled')
+        logger.warning('ner task(s) have previously been canceled')
     for nt in ner_tasks:
         nt.cancel()
 
     # Insert sentinel into ner_queue to indicate end of processing
-    try:
-        await ner_queue.put(None)
-    except asyncio.CancelledError:
-        logging.error('ner queue canceled')
+    await ner_queue.put(None)
 
 
 def setup_asyncio_framework(args_: Namespace | Job) -> Tuple[asyncio.Queue, asyncio.Queue, List[asyncio.Task], List[asyncio.Task], asyncio.Task]:
@@ -73,7 +69,7 @@ async def main(save: bool = True) -> None:
     """Main function for the SpoCK pipeline."""
     args_= parse_args(sys.argv[1:])
     logging.basicConfig(level=args_.log_level.upper(), format=LOGGING_FMT)
-    logging.info(f'Starting SpoCK (args_={args_})')    
+    logger.info(f'starting SpoCK (args_={args_})')    
 
     # Set up async structure
     _, ner_queue, _, _, orc_task = setup_asyncio_framework(args_)
@@ -102,7 +98,7 @@ async def main(save: bool = True) -> None:
         path = args_.data_path
         if file is not None and path is not None:
             FileHandler(path=path).write(file=file, data=data)
-    logging.info('Finished SpoCK')
+    logger.info('finished SpoCK')
 
 
 if __name__ == '__main__':

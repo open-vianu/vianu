@@ -19,7 +19,7 @@ from typing import List
 import xml.etree.ElementTree as ET
 
 from .data_model import Document, QueueItem
-from ..settings import SCRAPING_SOURCES, MAX_CHUNK_SIZE
+from ..settings import SCRAPING_SOURCES, MAX_CHUNK_SIZE, MAX_DOCS_PER_SOURCE
 from ..settings import PUBMED_ESEARCH_URL, PUBMED_DB, PUBMED_EFETCH_URL, PUBMED_BATCH_SIZE
 
 logger = logging.getLogger(__name__)
@@ -90,11 +90,18 @@ class PubmedScraper(Scraper):
     @staticmethod
     async def _pubmed_efetch(params: PubmedEntrezHistoryParams) -> List[str]:
         """Retrieve the relevant documents from the entrez history server."""
-        logger.debug(f'fetch #docs={params.count} in {params.count // PUBMED_BATCH_SIZE + 1} batch(es) of size <= {PUBMED_BATCH_SIZE}')
+        N = min(MAX_DOCS_PER_SOURCE, int(params.count))
+        batch_size = min(params.count, PUBMED_BATCH_SIZE)
+        logger.debug(f'fetch #docs={N} in {N // batch_size + 1} batch(es) of size <= {batch_size}')
         batches = []
-        for retstart in range(0, int(params.count), PUBMED_BATCH_SIZE):
-            url = f'{PUBMED_EFETCH_URL}?db={PUBMED_DB}&WebEnv={params.web}&query_key={params.key}&retstart={retstart}&retmax={PUBMED_BATCH_SIZE}'
+        for retstart in range(0, N, batch_size):
+
+            # Prepare URL for retrieving next batch of documents but stop if the maximum number is reached
+            retmax = min(MAX_DOCS_PER_SOURCE - len(batches)*batch_size, batch_size)
+            url = f'{PUBMED_EFETCH_URL}?db={PUBMED_DB}&WebEnv={params.web}&query_key={params.key}&retstart={retstart}&retmax={retmax}'
             logger.debug(f'fetch documents with url={url}')
+
+            # Fetch the documents
             async with aiohttp.ClientSession() as session:
                 async with session.get(url=url) as response:
                     response.raise_for_status()

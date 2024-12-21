@@ -203,7 +203,7 @@ class SpoCK:
     # Generic fields
     status: str | None = None
     started_at: datetime | None = None
-    completed_at: datetime | None = None
+    terminated_at: datetime | None = None
 
     # Pipeline fields
     job: Job | None = None
@@ -211,7 +211,7 @@ class SpoCK:
 
     def runtime(self) -> datetime | None:
         if self.started_at is not None:
-            if self.completed_at is None:
+            if self.terminated_at is None:
                 return datetime.now() - self.started_at
             return self.completed_at - self.started_at
         return None
