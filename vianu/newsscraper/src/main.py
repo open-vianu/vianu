@@ -22,11 +22,14 @@ else:
     DATABASE_PATH = "./data/database.db"
     db = DatabaseManager(db_mode="local", local_db_path=DATABASE_PATH)
 
+
 def list_terms():
     return db.list_terms()
 
+
 def list_articles(search_query=None):
     return db.get_articles(search_query=search_query)
+
 
 def get_statistics():
     terms = list_terms()
@@ -45,8 +48,10 @@ def get_statistics():
     """
     return summary_md
 
+
 def get_latest_metadata():
     return db.get_latest_metadata()
+
 
 def refresh_metadata():
     metadata = get_latest_metadata()
@@ -61,12 +66,14 @@ def refresh_metadata():
     else:
         return "<div style='margin-top: 20px;'><p>No scraping run has been executed yet.</p></div>"
 
+
 def generate_pill_html(terms):
     pill_html = '<div class="pill-container">'
     for term in terms:
         pill_html += f'<span class="pill">{term}</span>'
     pill_html += "</div>"
     return pill_html
+
 
 def add_term_and_scrape(term):
     term = term.strip()
@@ -81,7 +88,7 @@ def add_term_and_scrape(term):
         )
 
     db.insert_terms([term])
-    pages = [1, 2 ]
+    pages = [1, 2]
     start_scraper(pages, [term])
 
     updated_terms = list_terms()
@@ -93,6 +100,7 @@ def add_term_and_scrape(term):
         get_insights(),
         gr.update(choices=updated_terms, value=None),  # Update Dropdown choices
     )
+
 
 def delete_term(term):
     term = term.strip()
@@ -117,12 +125,14 @@ def delete_term(term):
         gr.update(choices=updated_terms, value=None),  # Update Dropdown choices
     )
 
+
 def refresh_data():
     articles = list_articles()
     pills = generate_pill_html(list_terms())
     stats = get_statistics()
     insights = get_insights()
     return articles, pills, stats, insights
+
 
 def search_and_update(query):
     articles = list_articles(query)
@@ -131,12 +141,14 @@ def search_and_update(query):
     insights = get_insights()
     return articles, generate_pill_html(terms), stats, insights
 
+
 def reset_search():
     articles = list_articles()
     terms = list_terms()
     stats = get_statistics()
     insights = get_insights()
     return articles, generate_pill_html(terms), stats, insights
+
 
 def get_term_counts():
     """Fetches the count of each term from the database."""
@@ -153,6 +165,7 @@ def get_term_counts():
             continue
     return term_counts
 
+
 def get_insights():
     """Generates a horizontal bar chart of term counts."""
     term_counts = get_term_counts()
@@ -160,7 +173,14 @@ def get_insights():
     counts = list(term_counts.values())
 
     fig = go.Figure(
-        data=[go.Bar(x=counts, y=terms, orientation='h', marker=dict(color='rgba(55, 128, 191, 0.7)'))]
+        data=[
+            go.Bar(
+                x=counts,
+                y=terms,
+                orientation="h",
+                marker=dict(color="rgba(55, 128, 191, 0.7)"),
+            )
+        ]
     )
     fig.update_layout(
         title="",
@@ -168,12 +188,13 @@ def get_insights():
         yaxis_title="Search Terms",
         yaxis=dict(
             autorange="reversed",  # To display the highest count on top
-            tickmode="linear"  # Ensure all labels are shown
+            tickmode="linear",  # Ensure all labels are shown
         ),
         template="plotly_white",
-        height=900
+        height=900,
     )
     return fig
+
 
 css = """
 <style>
@@ -211,11 +232,20 @@ css = """
 </style>
 """
 
+
 def load_all_data():
     articles, pills, stats, insights = refresh_data()
     terms = list_terms()
     metadata = refresh_metadata()
-    return articles, pills, stats, gr.update(choices=terms, value=None), metadata, insights
+    return (
+        articles,
+        pills,
+        stats,
+        gr.update(choices=terms, value=None),
+        metadata,
+        insights,
+    )
+
 
 with gr.Blocks(theme=gr.themes.Soft(), css=css, title="Parlament Scraper") as demo:
     gr.Markdown("# Parlament-Ticker")
@@ -264,13 +294,27 @@ with gr.Blocks(theme=gr.themes.Soft(), css=css, title="Parlament Scraper") as de
     add_button.click(
         add_term_and_scrape,
         inputs=[new_term],
-        outputs=[message_display, articles_table, terms_html, statistics_markdown, insights_plot, selected_term],
+        outputs=[
+            message_display,
+            articles_table,
+            terms_html,
+            statistics_markdown,
+            insights_plot,
+            selected_term,
+        ],
     )
 
     delete_term_button.click(
         delete_term,
         inputs=[selected_term],
-        outputs=[message_display, articles_table, terms_html, statistics_markdown, insights_plot, selected_term],
+        outputs=[
+            message_display,
+            articles_table,
+            terms_html,
+            statistics_markdown,
+            insights_plot,
+            selected_term,
+        ],
     )
 
     search_button.click(

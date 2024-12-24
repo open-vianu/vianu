@@ -9,7 +9,7 @@ class DatabaseManager:
     def __init__(
         self,
         local_db_path=os.getenv("LOCAL_DB_PATH", "./data/database.db"),
-        db_mode=os.getenv("DEPLOYMENT_MODE","local"),
+        db_mode=os.getenv("DEPLOYMENT_MODE", "local"),
         cloud_connection_string=None,
         cloud_db_name="articles",
     ):
@@ -28,7 +28,6 @@ class DatabaseManager:
         self.cloud_db_name = cloud_db_name
 
         logging.info(f"Initializing database with mode: {self.db_mode}")
-
 
         # Initialize the database (create tables if needed)
         if self.db_mode == "local":
@@ -164,12 +163,12 @@ class DatabaseManager:
         inserted_count = 0
         try:
             conn.execute("PRAGMA foreign_keys = ON")
-            
+
             # Record total changes before insertion
             before_changes = conn.total_changes
 
             # Prepare data for insertion
-            data_to_insert = df[['name', 'begriff', 'date', 'url']].values.tolist()
+            data_to_insert = df[["name", "begriff", "date", "url"]].values.tolist()
 
             # Perform bulk insert using executemany
             conn.executemany(
@@ -177,7 +176,7 @@ class DatabaseManager:
                 INSERT OR IGNORE INTO articles (name, begriff, date, url) 
                 VALUES (?, ?, ?, ?)
                 """,
-                data_to_insert
+                data_to_insert,
             )
 
             # Record total changes after insertion

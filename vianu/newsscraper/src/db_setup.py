@@ -3,8 +3,7 @@ import sqlite3
 import os
 
 
-def setup_db(DB_PATH = "/app/data/database.db"):
-    
+def setup_db(DB_PATH="/app/data/database.db"):
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
@@ -43,4 +42,4 @@ def setup_db(DB_PATH = "/app/data/database.db"):
 
 
 if __name__ == "__main__":
-    setup_db(DB_PATH = os.getenv("LOCAL_DB_PATH","/app/data/database.db"))
+    setup_db(DB_PATH=os.getenv("LOCAL_DB_PATH", "/app/data/database.db"))

@@ -2,7 +2,6 @@
 import os
 import re
 import sys
-import shutil
 import logging
 import time  # Added import for handling sleep
 from datetime import datetime
@@ -34,6 +33,7 @@ logging.basicConfig(
     handlers=[logging.StreamHandler(sys.stderr)],
 )
 
+
 def make_request_with_retries(url, max_retries=5, wait_time=300, **kwargs):
     """
     Makes an HTTP GET request with retry logic for handling 429 status codes.
@@ -55,17 +55,23 @@ def make_request_with_retries(url, max_retries=5, wait_time=300, **kwargs):
             response = requests.get(url, **kwargs)
             if response.status_code == 429:
                 if attempt < max_retries:
-                    logging.warning(f"Received 429 Too Many Requests for {url}. Waiting {wait_time} seconds before retrying... (Attempt {attempt}/{max_retries})")
+                    logging.warning(
+                        f"Received 429 Too Many Requests for {url}. Waiting {wait_time} seconds before retrying... (Attempt {attempt}/{max_retries})"
+                    )
                     time.sleep(wait_time)
                 else:
-                    logging.error(f"Received 429 Too Many Requests for {url}. Max retries ({max_retries}) exceeded. Exiting.")
+                    logging.error(
+                        f"Received 429 Too Many Requests for {url}. Max retries ({max_retries}) exceeded. Exiting."
+                    )
                     sys.exit(1)
             else:
                 return response
         except requests.RequestException as e:
             logging.error(f"RequestException for {url}: {e}")
             if attempt < max_retries:
-                logging.info(f"Waiting {wait_time} seconds before retrying... (Attempt {attempt}/{max_retries})")
+                logging.info(
+                    f"Waiting {wait_time} seconds before retrying... (Attempt {attempt}/{max_retries})"
+                )
                 time.sleep(wait_time)
             else:
                 logging.error(f"Max retries exceeded for {url}. Exiting.")
@@ -73,6 +79,7 @@ def make_request_with_retries(url, max_retries=5, wait_time=300, **kwargs):
     # If all retries are exhausted without returning, exit
     logging.error(f"Failed to fetch {url} after {max_retries} attempts.")
     sys.exit(1)
+
 
 def date_formatter(match):
     """
@@ -276,9 +283,7 @@ def load_data_geschaefte(html, begriff, driver, url_page):
     urls += [""] * (max_len - len(urls))
     dates += [None] * (max_len - len(dates))
 
-    df = pd.DataFrame(
-        {"name": names, "begriff": begriff, "date": dates, "url": urls}
-    )
+    df = pd.DataFrame({"name": names, "begriff": begriff, "date": dates, "url": urls})
     return df
 
 
@@ -338,7 +343,7 @@ def load_data_news(html, begriff):
     ]
 
     df = pd.DataFrame(
-        {   
+        {
             "name": names,
             "begriff": begriff,
             "date": dates,
@@ -374,7 +379,6 @@ def load_data_bulletin(html, begriff):
         else:
             names.append("")
 
-
     search_items_date = html.find_all("h4", class_="ms-srch-item-area")
     dates = []
     for item in search_items_date:
@@ -400,9 +404,7 @@ def load_data_bulletin(html, begriff):
         for url in urls
     ]
 
-    df = pd.DataFrame(
-        {"name": names, "begriff": begriff, "date": dates, "url": urls}
-    )
+    df = pd.DataFrame({"name": names, "begriff": begriff, "date": dates, "url": urls})
     return df
 
 
@@ -449,7 +451,9 @@ def load_and_fetch_fahne(begriff, driver):
                     if response_pdf.status_code == 200:
                         pdf_stream = BytesIO(response_pdf.content)
                         text = convert_pdf_to_txt(pdf_stream)
-                        date_match = re.search(r"e-parl (\d{1,2}\.\d{1,2}\.\d{4})", text)
+                        date_match = re.search(
+                            r"e-parl (\d{1,2}\.\d{1,2}\.\d{4})", text
+                        )
                         if date_match:
                             formatted_date = date_formatter(date_match)
                             dates.append(
@@ -458,7 +462,9 @@ def load_and_fetch_fahne(begriff, driver):
                                 else datetime.today().strftime("%Y-%m-%d")
                             )
                         else:
-                            generic_date_match = re.search(r"\d{1,2}\.\d{1,2}\.\d{4}", text)
+                            generic_date_match = re.search(
+                                r"\d{1,2}\.\d{1,2}\.\d{4}", text
+                            )
                             if generic_date_match:
                                 formatted_date = date_formatter(generic_date_match)
                                 dates.append(
@@ -504,7 +510,12 @@ def load_and_fetch_fahne(begriff, driver):
         return pd.DataFrame(columns=["name", "begriff", "date", "url"])
 
 
-def start_scraper(pages, begriffe, CHROME_DRIVER_PATH="/usr/local/bin/chromedriver", use_local_chrome=False):
+def start_scraper(
+    pages,
+    begriffe,
+    CHROME_DRIVER_PATH="/usr/local/bin/chromedriver",
+    use_local_chrome=False,
+):
     """
     Initializes the scraper, processes each search term and page, and stores the data in the database.
 
@@ -553,19 +564,41 @@ def start_scraper(pages, begriffe, CHROME_DRIVER_PATH="/usr/local/bin/chromedriv
 
             for page in pages:
                 logging.info(f"Fetching: Page {page}, Term {begriff}")
-                html_news = fetch_data(page, begriff, driver, "services/suche-news", "de")
-                html_curia_vista_de = fetch_data(page, begriff, driver, "ratsbetrieb/suche-curia-vista", "de")
-                html_curia_vista_fr = fetch_data(page, begriff, driver, "ratsbetrieb/suche-curia-vista", "fr")
-                html_curia_vista_it = fetch_data(page, begriff, driver, "ratsbetrieb/suche-curia-vista", "it")
-                html_bulletin = fetch_data(page, begriff, driver, "ratsbetrieb/suche-amtliches-bulletin", "de")
+                html_news = fetch_data(
+                    page, begriff, driver, "services/suche-news", "de"
+                )
+                html_curia_vista_de = fetch_data(
+                    page, begriff, driver, "ratsbetrieb/suche-curia-vista", "de"
+                )
+                html_curia_vista_fr = fetch_data(
+                    page, begriff, driver, "ratsbetrieb/suche-curia-vista", "fr"
+                )
+                html_curia_vista_it = fetch_data(
+                    page, begriff, driver, "ratsbetrieb/suche-curia-vista", "it"
+                )
+                html_bulletin = fetch_data(
+                    page, begriff, driver, "ratsbetrieb/suche-amtliches-bulletin", "de"
+                )
 
-                geschaefte_df_de = load_data_geschaefte(html_curia_vista_de, begriff, driver, page)
-                geschaefte_df_fr = load_data_geschaefte(html_curia_vista_fr, begriff, driver, page)
-                geschaefte_df_it = load_data_geschaefte(html_curia_vista_it, begriff, driver, page)
+                geschaefte_df_de = load_data_geschaefte(
+                    html_curia_vista_de, begriff, driver, page
+                )
+                geschaefte_df_fr = load_data_geschaefte(
+                    html_curia_vista_fr, begriff, driver, page
+                )
+                geschaefte_df_it = load_data_geschaefte(
+                    html_curia_vista_it, begriff, driver, page
+                )
                 news_df = load_data_news(html_news, begriff)
                 bulletin_df = load_data_bulletin(html_bulletin, begriff)
 
-                for df in [geschaefte_df_de, geschaefte_df_fr, geschaefte_df_it, news_df, bulletin_df]:
+                for df in [
+                    geschaefte_df_de,
+                    geschaefte_df_fr,
+                    geschaefte_df_it,
+                    news_df,
+                    bulletin_df,
+                ]:
                     if df is not None and not df.empty:
                         all_data.append(df)
     finally:
@@ -577,7 +610,9 @@ def start_scraper(pages, begriffe, CHROME_DRIVER_PATH="/usr/local/bin/chromedriv
         expected_columns = ["name", "begriff", "date", "url"]
         for i, df in enumerate(all_data):
             if set(df.columns) != set(expected_columns):
-                logging.warning(f"DataFrame {i} columns mismatch: {df.columns.tolist()}")
+                logging.warning(
+                    f"DataFrame {i} columns mismatch: {df.columns.tolist()}"
+                )
                 df = df.reindex(columns=expected_columns, fill_value=None)
 
         final_df = pd.concat(all_data, ignore_index=True)
@@ -585,12 +620,11 @@ def start_scraper(pages, begriffe, CHROME_DRIVER_PATH="/usr/local/bin/chromedriv
         final_df = pd.DataFrame(columns=["name", "begriff", "date", "url"])
 
     # Current date in the desired format
-    today_date = datetime.now().strftime('%Y-%m-%d')
+    today_date = datetime.now().strftime("%Y-%m-%d")
 
     # Replace None, empty strings, or NaN with today's date
-    final_df['date'] = final_df['date'].replace([None, ""], pd.NaT)
-    final_df['date'] = final_df['date'].fillna(today_date)
-
+    final_df["date"] = final_df["date"].replace([None, ""], pd.NaT)
+    final_df["date"] = final_df["date"].fillna(today_date)
 
     logging.info(f"Total records fetched: {len(final_df)}")
 
