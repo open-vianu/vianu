@@ -1,0 +1,4 @@
+DEPLOYMENT_MODE=cloud # cloud or local
+SQLIGHTCONNECTIONSTRING=1234 # sqlightcloud connection string
+REGISTRYPASSWORD=1234 # Azure container registry password
+MPLCONFIGDIR=/tmp/matplotlib # tmp dir for matplotlib
