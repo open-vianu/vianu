@@ -31,6 +31,7 @@ ner_queue = None
 scp_tasks = None
 ner_tasks = None
 orc_task = None
+col_task = None
 
 # Global SpoCK variables
 job = None
@@ -38,10 +39,11 @@ spocks = []
 running_spock = None
 
 
-async def _toggle_is_running(is_running: bool) -> Tuple[bool, dict[str, Any], dict[str, Any], dict[str, Any]]:
+async def _toggle_button(is_running: bool) -> Tuple[bool, dict[str, Any], dict[str, Any], dict[str, Any]]:
     """Toggle the state of the pipleline between running <-> not running. As a result the corresponding buttons are 
     shown/hidden.
     """
+    logger.debug(f'toggle button (is_running={is_running}->{not is_running})')
     is_running = not is_running
     if is_running:
         # Show the stop button and hide the start/cancel button
@@ -53,6 +55,7 @@ async def _toggle_is_running(is_running: bool) -> Tuple[bool, dict[str, Any], di
 
 async def _show_cancel_button() -> Tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
     """Shows the cancel button and hides the start and stop button."""
+    logger.debug('show cancel button')
     return gr.update(visible=False), gr.update(visible=False), gr.update(visible=True)
 
 
@@ -79,6 +82,23 @@ async def _setup_spock(term: str) -> None:
     spocks.insert(0, running_spock)
 
 
+async def _collector() -> None:
+    """Append the processed document from the NER queue to `running_spock.data`."""
+    global ner_queue, running_spock
+
+    logger.debug(f'starting collector (term={running_spock.job.term})')
+    if len(spocks) >= MAX_JOBS:
+        return
+    while True:
+        item = await ner_queue.get()    # type: QueueItem
+        # Check stopping condition (added by the `orchestrator` in `vianu.spock.__main__`)
+        if item is None:
+            ner_queue.task_done()
+            break
+        running_spock.data.append(item.doc)
+        ner_queue.task_done()
+
+
 async def _setup_asyncio_framework() -> None:
     """"Start the SpoCK processes by setting up the asyncio framework and starting the asyncio tasks.
     
@@ -89,57 +109,48 @@ async def _setup_asyncio_framework() -> None:
     - ner_tasks: named entity recognition tasks
     - orc_task: orchestrator task
     """
-    global scp_queue, ner_queue, scp_tasks, ner_tasks, orc_task
+    global scp_queue, ner_queue, scp_tasks, ner_tasks, orc_task, col_task
 
     if len(spocks) >= MAX_JOBS:
         return None
-    logger.info("starting SpoCK processes")
+    logger.info("setting up asyncio framework")
     scp_queue, ner_queue, scp_tasks, ner_tasks, orc_task = setup_asyncio_framework(args_=job)
+    col_task = asyncio.create_task(_collector())
 
 
-async def _feed_cards_to_ui() -> List[gr.HTML]:
+async def _feed_cards_to_ui() -> List[dict[str, Any]]:
     """From the current and previous SpoCKs, create and feed the job cards to the UI."""
     global spocks
 
+    logger.debug(f'feeding cards to UI (len(spocks)={len(spocks)})')
     # Create the job cards for the existing spocks
-    cards = []
+    cds = []
     for i, spk in enumerate(spocks):
         html = get_job_card_html(i, spk.job, spk.data)
-        cards.append(gr.HTML(html, elem_id=f"job-{i}", visible=True))
+        cds.append(gr.update(value=html, visible=True))
 
     # Extdend with empty cards (as dynamic number of gr.Blocks is not supported in gradio <= 5.0.0)
-    cards.extend([gr.HTML('', elem_id=f'job-{len(spocks) + i}', visible=False) for i in range(MAX_JOBS - len(spocks))])
-    return cards
-
-
-async def _add_data_to_running_spock():
-    """Append the processed document from the NER queue to `running_spock.data`."""
-    global ner_queue, running_spock
-    if len(spocks) >= MAX_JOBS:
-        return
-    while True:
-        item = await ner_queue.get()    # type: QueueItem
-        # Check stopping condition (added by the `orchestrator` in `vianu.spock.__main__`)
-        if item is None:
-            break
-        running_spock.data.append(item.doc)
+    cds.extend([gr.update(visible=False) for i in range(MAX_JOBS - len(spocks))])
+    return cds
 
 
 async def _conclusion():
-    global ner_queue, orc_task, running_spock
+    global ner_queue, orc_task, col_task, running_spock
 
-    # Wait for the orchestrator task to finish (which implicitly waits for the NER tasks to finish)
+    # Wait collector task to finish and join ner_queue
     try:
-        await orc_task
+        await col_task
     except asyncio.CancelledError:
-        logger.warning('orchestrator task canceled')
-
-    # Wait for the NER queue to be empty (which means that they have all been added to `running_spock.data`)
+        logger.warning('collector task canceled')
+        return None   # This stops the _conclusion step in the case the _canceling step was triggered
+    except Exception as e:
+        logger.error(f'collector task failed with error: {e}')
+        raise e
     await ner_queue.join()
     
     # Update the running_spock with the final data
     running_spock.status = 'completed'
-    running_spock.terminated_at = datetime.now()
+    running_spock.finished_at = datetime.now()
 
     # Log the conclusion and update/empty the running_spock
     gr.Info(f'job "{running_spock.job.term}" finished')
@@ -150,11 +161,9 @@ async def _canceling():
     """Cancel all running :class:`asyncio.Task`."""
     global running_spock
 
-    msg = "canceling SpoCK processes"
-    gr.Warning(msg)
-    logger.warning(msg)
+    gr.Warning(f'canceled SpoCK for "{running_spock.job.term}"')
     running_spock.status = 'stopped'
-    running_spock.terminated_at = datetime.now()
+    running_spock.finished_at = datetime.now()
 
     # Cancel scraping tasks
     logger.warning("canceling scraping tasks")
@@ -171,22 +180,31 @@ async def _canceling():
     # Cancel orchestrator task
     logger.warning("canceling orchestrator task")
     orc_task.cancel()
-    await asyncio.gather(orc_task, return_exceptions=True)
+    await asyncio.gather(orc_task, return_exceptions=True)    # we use return_exceptions=True to avoid raising exceptions due to the subtasks being canceled`
+
+    # Cancel collector task
+    logger.warning("canceling collector task")
+    col_task.cancel()
+    await asyncio.gather(col_task, return_exceptions=True)    # see remark above
 
 
-async def _feed_details_to_ui(job_id: str):
+def _change_card_number(icrd: int):
+    logger.debug(f'card clicked={icrd}')
+    return icrd
+
+
+def _feed_details_to_ui(icrd: int):
     """Collect the (previously created) html texts for the documents of the selected job and feed them to the UI."""
     global spocks
-    i = int(job_id.split("-")[-1])  # the job id is in the form of "job-{i}"
-    logger.debug(f'card clicked={i} and len(data)={len(spocks[i].data)}')
-    while True:
-        await asyncio.sleep(UPDATE_INTERVAL)
-        yield get_details_html(spocks[i].data)
+    if len(spocks) == 0:
+        return get_details_html([])
+    return get_details_html(spocks[icrd].data)
 
 
 # Design of the UI
 with gr.Blocks(head_paths=HEAD_FILE, css_paths=CSS_FILE, theme=gr.themes.Soft()) as demo:
     is_running = gr.State(value=False)
+    card_number = gr.State(value=0)
 
     # Logo and title
     with gr.Row(elem_id="logo-title-row"):
@@ -214,23 +232,23 @@ with gr.Blocks(head_paths=HEAD_FILE, css_paths=CSS_FILE, theme=gr.themes.Soft())
 
     # Details of the selected job
     with gr.Row():
-        details = gr.HTML('<div id="details" class="details-container"></div>')
+        details = gr.HTML('<div class="details-container"></div>')
 
     # Starting the pipeline with the search term
     start_button.click(
-        fn=_toggle_is_running, inputs=is_running, outputs=[is_running, start_button, stop_button, cancel_button]
+        fn=_toggle_button, inputs=is_running, outputs=[is_running, start_button, stop_button, cancel_button]
     ).then(
         fn=_setup_spock, inputs=search_term
     ).then(
         fn=_setup_asyncio_framework
     ).then(
-        fn=lambda: None, outputs=search_term
+        fn=lambda: None, outputs=search_term    # Empty the search term in the UI
     ).then(
         fn=_feed_cards_to_ui, outputs=cards
     ).then(
-        fn=_add_data_to_running_spock
-    ).then(
         fn=_conclusion
+    ).then(
+        fn=_toggle_button, inputs=[is_running], outputs=[is_running, start_button, stop_button, cancel_button]
     )
 
     # Stopping the pipeline
@@ -238,13 +256,14 @@ with gr.Blocks(head_paths=HEAD_FILE, css_paths=CSS_FILE, theme=gr.themes.Soft())
         fn=_show_cancel_button, outputs=[start_button, stop_button, cancel_button]
     ).then(
         fn=_canceling
-    ).then(
-        fn=_toggle_is_running, inputs=[is_running], outputs=[is_running, start_button, stop_button, cancel_button]
-    )
+    )   # Toggle button is not needed: '_canceling' is terminating the still running '_conclusion' step which is followed by the toggle button
     
-    # Callback of the job cards to show the details
-    for i, crd in enumerate(cards):
-        crd.click(fn=_feed_details_to_ui, inputs=gr.Textbox(value=crd.elem_id, visible=False), outputs=details, queue=False)
+    # Callback for the job cars to show the details
+    for icrd, crd in enumerate(cards):
+        crd.click(fn=_change_card_number, inputs=gr.Number(value=icrd, visible=False), outputs=card_number)
+    
+    feed_details_timer = gr.Timer(value=UPDATE_INTERVAL, active=True, render=True)
+    feed_details_timer.tick(fn=_feed_details_to_ui, inputs=card_number, outputs=details)
 
 
 if __name__ == "__main__":

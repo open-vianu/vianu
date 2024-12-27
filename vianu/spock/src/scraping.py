@@ -18,12 +18,11 @@ import re
 from typing import List
 import xml.etree.ElementTree as ET
 
-from .data_model import Document, QueueItem
-from ..settings import SCRAPING_SOURCES, MAX_CHUNK_SIZE, MAX_DOCS_PER_SOURCE
-from ..settings import PUBMED_ESEARCH_URL, PUBMED_DB, PUBMED_EFETCH_URL, PUBMED_BATCH_SIZE
+from vianu.spock.src.data_model import Document, QueueItem
+from vianu.spock.settings import SCRAPING_SOURCES, MAX_CHUNK_SIZE, MAX_DOCS_PER_SOURCE
+from vianu.spock.settings import PUBMED_ESEARCH_URL, PUBMED_DB, PUBMED_EFETCH_URL, PUBMED_BATCH_SIZE
 
 logger = logging.getLogger(__name__)
-
 
 
 class Scraper(ABC):
@@ -130,8 +129,6 @@ class PubmedScraper(Scraper):
         """Extract the article element from a PubmedArticle element."""
         # Find and extract the Article element
         article = element.find('Article')
-        if article is None:
-            logger.warning('no "Article" element found')
         return article
 
     @staticmethod
@@ -145,7 +142,8 @@ class PubmedScraper(Scraper):
         """Extract the abstract from an Article element."""
         separator = '\n\n'
         abstract = article.find('Abstract')
-        abstract = separator.join([a.text for a in abstract.findall('AbstractText')]) if abstract is not None else None
+        if abstract is not None:
+            abstract = separator.join([a.text for a in abstract.findall('AbstractText') if a.text is not None]) 
         return abstract
     
     @staticmethod
@@ -177,6 +175,7 @@ class PubmedScraper(Scraper):
             pubmed_articles = ET.fromstring(text).findall('PubmedArticle')
             logger.debug(f'found #articles={len(pubmed_articles)} in batch {ib}')
             for ie, element in enumerate(pubmed_articles):
+                logger.debug(f'parsing PubmedArticle {ie} of batch {ib}')
                 # Extract MedlineCitation and its PMID from PubmedArticle
                 citation = self._extract_medline_citation(element=element)
                 if citation is None:
@@ -216,10 +215,10 @@ class PubmedScraper(Scraper):
                         publication_date=publication_date,
                     )
                     data.append(document)
+        logger.debug(f'parsed #docs={len(data)} from #batches={len(batches)}')
         return data
 
     
-
     async def apply(self, term: str, queue: asyncio.Queue) -> None:
         """Query and retrieve all PubmedArticle Documents for the given search term.
 

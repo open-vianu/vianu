@@ -1,23 +1,36 @@
 # Spotting Clinical Knowledge (SpoCK)
 
+## Setup
+```bash
+git clone https://github.com/open-vianu/vianu.git
+cd vianu
+poetry install
+poetry shell
+```
+
+### Requirements specific for SpoCK
+- `aiohttp`
+- `dacite`
+- `gradio`
+- `numpy`
+
+
+## Demos
+Run a demo pipeline
+```bash
+python vianu/spock/launch_demo_pipeline.py
+```
+
+Run a demo app 
+```bash
+python vianu/spock/launch_demo_app.py
+```
+
 ## CLI
 ```bash
 alias spock="python -m vianu.spock"
 ```
-### Scraping
-```bash
-spock pipeline --steps "scp" --source pubmed --term dafalgan
-```
 
-### Chunking
-
-TODO define a file and load it from there with --data-load
 ```bash
-spock chunking --min-chunk-size 30 --min-chunk-overlap 5 --text-file "tests/tests-spock/data/chunking.txt"
-```
-
-### Pipeline
-```bash
-spock pipeline --steps "all" --min-chunk-size 30 --min-chunk-overlap 5 --source pubmed --term dafalgan
-spock pipeline --steps "scp,cnk" TODO
+spock --source pubmed --source ema --term dafalgan --log-level DEBUG --n-ner-tasks 1
 ```

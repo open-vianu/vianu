@@ -25,5 +25,5 @@ LLAMA_MODEL='llama3.2'
 
 # UI settings
 MAX_JOBS = 5
-UPDATE_INTERVAL = 1
+UPDATE_INTERVAL = 5
 

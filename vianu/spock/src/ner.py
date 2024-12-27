@@ -6,8 +6,8 @@ import logging
 import re
 from typing import List
 
-from .data_model import NamedEntity, QueueItem
-from ..settings import N_CHAR_DOC_ID, OLLAMA_ENDPOINT, LLAMA_MODEL
+from vianu.spock.src.data_model import NamedEntity, QueueItem
+from vianu.spock.settings import N_CHAR_DOC_ID, OLLAMA_ENDPOINT, LLAMA_MODEL
 
 logger = logging.getLogger(__name__)
 
@@ -147,8 +147,11 @@ class OllamaNER(NER):
                 except Exception as e:
                     logger.error(f'error during creation of `NamedEntity` using {ne}: {e}')
 
-            # Add locations to named entities and put them in the document
+            # Add locations to named entities and remove those without location
             self._add_loc_for_named_entities(text=text, named_entities=named_entities)
+            named_entities = [ne for ne in named_entities if ne.location is not None]
+
+            # Assign named entities to the document
             ne_mp = [ne for ne in named_entities if ne.class_ == 'MP']
             ne_adr = [ne for ne in named_entities if ne.class_ == 'ADR']
             logger.debug(f'found #mp={len(ne_mp)} and #adr={len(ne_adr)} for item.id_={id_} (doc.id_={doc.id_[:N_CHAR_DOC_ID]})')

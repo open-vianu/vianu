@@ -4,16 +4,16 @@ import logging
 import sys
 from typing import List, Tuple
 
-from .src.cli import parse_args
-from .src.data_model import Job, FileHandler
-from .src import scraping as scp
-from .src import ner
-from .settings import LOGGING_FMT
+from vianu.spock.src.cli import parse_args
+from vianu.spock.src.data_model import Job, Document, FileHandler
+from vianu.spock.src import scraping as scp
+from vianu.spock.src import ner
+from vianu.spock.settings import LOGGING_FMT
 
 logger = logging.getLogger(__name__)
 
 
-async def orchestrator(
+async def _orchestrator(
         scp_tasks: List[asyncio.Task],
         ner_tasks: List[asyncio.Task],
         scp_queue: asyncio.Queue,
@@ -30,6 +30,9 @@ async def orchestrator(
         await asyncio.gather(*scp_tasks)
     except asyncio.CancelledError:
         logger.warning('scraping task(s) have previously been canceled')
+    except Exception as e:
+        logger.error(f'scraping task(s) failed with error: {e}')
+        raise e
     for st in scp_tasks:
         st.cancel()
 
@@ -43,6 +46,9 @@ async def orchestrator(
         await asyncio.gather(*ner_tasks)
     except asyncio.CancelledError:
         logger.warning('ner task(s) have previously been canceled')
+    except Exception as e:
+        logger.error(f'ner task(s) failed with error: {e}')
+        raise e
     for nt in ner_tasks:
         nt.cancel()
 
@@ -60,21 +66,13 @@ def setup_asyncio_framework(args_: Namespace | Job) -> Tuple[asyncio.Queue, asyn
     args_ = args_ if isinstance(args_, Namespace) else args_.to_namespace()
     scp_tasks = scp.create_tasks(args_=args_, queue=scp_queue)
     ner_tasks = ner.create_tasks(args_=args_, queue_in=scp_queue, queue_out=ner_queue, n_ner_tasks=args_.n_ner_tasks)
-    orc_task = asyncio.create_task(orchestrator(scp_tasks, ner_tasks, scp_queue, ner_queue))
+    orc_task = asyncio.create_task(_orchestrator(scp_tasks, ner_tasks, scp_queue, ner_queue))
     
     return scp_queue, ner_queue, scp_tasks, ner_tasks, orc_task
 
 
-async def main(save: bool = True) -> None:
-    """Main function for the SpoCK pipeline."""
-    args_= parse_args(sys.argv[1:])
-    logging.basicConfig(level=args_.log_level.upper(), format=LOGGING_FMT)
-    logger.info(f'starting SpoCK (args_={args_})')    
-
-    # Set up async structure
-    _, ner_queue, _, _, orc_task = setup_asyncio_framework(args_)
-
-    # Read results from NER queue
+async def _collector(ner_queue: asyncio.Queue) -> List[Document]:
+    """Collect results from the NER queue."""
     data = []
     while True:
         item = await ner_queue.get()
@@ -88,8 +86,21 @@ async def main(save: bool = True) -> None:
         data.append(item.doc)
         ner_queue.task_done()
     
-    # Wait for orchestrator to finish and queue to be empty
-    await orc_task
+    return data
+
+
+async def _main(save: bool = True) -> None:
+    """Main function for the SpoCK pipeline."""
+    args_= parse_args(sys.argv[1:])
+    logging.basicConfig(level=args_.log_level.upper(), format=LOGGING_FMT)
+    logger.info(f'starting SpoCK (args_={args_})')    
+
+    # Set up async structure (scraping queue/tasks, NER queue/tasks, orchestrator task)
+    _, ner_queue, _, _, orc_task = setup_asyncio_framework(args_)
+
+    # Set up collector task and read results from NER queue
+    col_task = asyncio.create_task(_collector(ner_queue))
+    data = await col_task
     await ner_queue.join()
 
     # Save data
@@ -102,4 +113,4 @@ async def main(save: bool = True) -> None:
 
 
 if __name__ == '__main__':
-    asyncio.run(main(save=True))
+    asyncio.run(_main(save=True))

@@ -3,7 +3,7 @@
 
 import argparse
 
-from ..settings import LOGGING_LEVEL, DATA_FILE, DATA_PATH, SCRAPING_SOURCES, N_TASKS_DEFAULT, NER_MODELS
+from vianu.spock.settings import LOGGING_LEVEL, DATA_FILE, DATA_PATH, SCRAPING_SOURCES, N_TASKS_DEFAULT, NER_MODELS
 
 
 def parse_args(args_: argparse.Namespace) -> argparse.Namespace:
