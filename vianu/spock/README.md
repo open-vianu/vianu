@@ -32,5 +32,5 @@ alias spock="python -m vianu.spock"
 ```
 
 ```bash
-spock --source pubmed --source ema --term dafalgan --log-level DEBUG --n-ner-tasks 1
+spock --term dafalgan --log-level DEBUG --n-ner-tasks 1
 ```

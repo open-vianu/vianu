@@ -76,6 +76,9 @@
     font: var(--font);
     background: var(--block-label-background-fill);
 }
+.card:active {
+    transform: scale(0.97);
+}
 .card .title {
     font-weight: var(--weight-bold);
     font-size: var(--text-lg);

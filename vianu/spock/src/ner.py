@@ -53,10 +53,8 @@ class NER(ABC):
 
 
     @abstractmethod
-    def apply(text: str) -> List[NamedEntity]:
+    def apply(text: str, queue_in: asyncio.Queue, queue_out: asyncio.Queue) -> List[NamedEntity]:
         pass
-
-
 
 
 class OllamaNER(NER):
@@ -164,8 +162,9 @@ class OllamaNER(NER):
             logger.info(f'finished NER task for item.id_={id_} (doc.id_={doc.id_[:N_CHAR_DOC_ID]})')
 
 
-def create_tasks(args_: Namespace, queue_in: asyncio.Queue, queue_out: asyncio.Queue, n_ner_tasks: int) -> None:
+def create_tasks(args_: Namespace, queue_in: asyncio.Queue, queue_out: asyncio.Queue) -> List[asyncio.Task]:
     """Create asyncio NER tasks."""
+    n_ner_tasks = args_.n_ner_tasks
     
     if args_.model == 'llama':
         ner = OllamaNER(endpoint=OLLAMA_ENDPOINT, model=LLAMA_MODEL)

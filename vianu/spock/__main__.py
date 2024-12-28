@@ -8,24 +8,37 @@ from vianu.spock.src.cli import parse_args
 from vianu.spock.src.data_model import Job, Document, FileHandler
 from vianu.spock.src import scraping as scp
 from vianu.spock.src import ner
-from vianu.spock.settings import LOGGING_FMT
+from vianu.spock.settings import LOGGING_FMT, SCRAPING_SOURCES
 
 logger = logging.getLogger(__name__)
 
 
 async def _orchestrator(
-        scp_tasks: List[asyncio.Task],
-        ner_tasks: List[asyncio.Task],
+        args_: Namespace,
+        src_queue: asyncio.Queue,
         scp_queue: asyncio.Queue,
         ner_queue: asyncio.Queue, 
+        scp_tasks: List[asyncio.Task],
+        ner_tasks: List[asyncio.Task],
     ) -> None:
     """Orchestrates the scraping and NER tasks.
     
     It waits for all scraping tasks to finish, then sends a sentinel to the scp_queue for each ner task (which will 
     trigger the ner tasks to finish -> cf :func:`vianu.spock.src.ner.apply`). 
     """
-    
+    logger.debug('setting up orchestrator task')
+
+    # Insert sources into the source queue
+    sources = args_.source
+    for src in sources:
+        await src_queue.put(src)
+
+    # Insert sentinel for each scraping task
+    for _ in range(len(scp_tasks)):
+        await src_queue.put(None)
+
     # Wait for all scraper tasks to finish and stop them
+    await src_queue.join()
     try:
         await asyncio.gather(*scp_tasks)
     except asyncio.CancelledError:
@@ -56,19 +69,32 @@ async def _orchestrator(
     await ner_queue.put(None)
 
 
-def setup_asyncio_framework(args_: Namespace | Job) -> Tuple[asyncio.Queue, asyncio.Queue, List[asyncio.Task], List[asyncio.Task], asyncio.Task]:
+def setup_asyncio_framework(args_: Namespace | Job) -> Tuple[asyncio.Queue, List[asyncio.Task], List[asyncio.Task], asyncio.Task]:
     """Set up the asyncio framework for the SpoCK application."""
+    # Set up arguments
+    if args_.source is None:
+        args_.source = SCRAPING_SOURCES
+
     # Set up queues
+    src_queue = asyncio.Queue()
     scp_queue = asyncio.Queue()
     ner_queue = asyncio.Queue()
 
     # Start tasks
     args_ = args_ if isinstance(args_, Namespace) else args_.to_namespace()
-    scp_tasks = scp.create_tasks(args_=args_, queue=scp_queue)
-    ner_tasks = ner.create_tasks(args_=args_, queue_in=scp_queue, queue_out=ner_queue, n_ner_tasks=args_.n_ner_tasks)
-    orc_task = asyncio.create_task(_orchestrator(scp_tasks, ner_tasks, scp_queue, ner_queue))
-    
-    return scp_queue, ner_queue, scp_tasks, ner_tasks, orc_task
+    scp_tasks = scp.create_tasks(args_=args_, queue_in=src_queue, queue_out=scp_queue)
+    ner_tasks = ner.create_tasks(args_=args_, queue_in=scp_queue, queue_out=ner_queue)
+    orc_task = asyncio.create_task(
+        _orchestrator(
+            args_=args_,
+            src_queue=src_queue,
+            scp_queue=scp_queue,
+            ner_queue=ner_queue,
+            scp_tasks=scp_tasks,
+            ner_tasks=ner_tasks,
+        )
+    )
+    return ner_queue, scp_tasks, ner_tasks, orc_task
 
 
 async def _collector(ner_queue: asyncio.Queue) -> List[Document]:
@@ -89,28 +115,30 @@ async def _collector(ner_queue: asyncio.Queue) -> List[Document]:
     return data
 
 
-async def _main(save: bool = True) -> None:
+async def _main() -> None:
     """Main function for the SpoCK pipeline."""
     args_= parse_args(sys.argv[1:])
+
     logging.basicConfig(level=args_.log_level.upper(), format=LOGGING_FMT)
     logger.info(f'starting SpoCK (args_={args_})')    
 
     # Set up async structure (scraping queue/tasks, NER queue/tasks, orchestrator task)
-    _, ner_queue, _, _, orc_task = setup_asyncio_framework(args_)
+    ner_queue, _, _, _ = setup_asyncio_framework(args_)
 
-    # Set up collector task and read results from NER queue
+    # Set up collector task and wait for it to finish
+    # NOTE that if collector task is finished, the orchestrator is also finished (because of the sentinel in ner_queue)
+    # and therefore so are the scraping and NER tasks
     col_task = asyncio.create_task(_collector(ner_queue))
-    data = await col_task
+    data = await col_task   
     await ner_queue.join()
 
     # Save data
-    if save:
-        file = args_.data_file
-        path = args_.data_path
-        if file is not None and path is not None:
-            FileHandler(path=path).write(file=file, data=data)
+    file = args_.data_file
+    path = args_.data_path
+    if file is not None and path is not None:
+        FileHandler(path=path).write(file=file, data=data)
     logger.info('finished SpoCK')
 
 
 if __name__ == '__main__':
-    asyncio.run(_main(save=True))
+    asyncio.run(_main())

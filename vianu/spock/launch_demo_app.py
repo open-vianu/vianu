@@ -20,13 +20,13 @@ HEAD_FILE = Path(__file__).parent / "assets/head/scripts.html"
 CSS_FILE = Path(__file__).parent / "assets/css/styles.css"
 SPOCK_KWARGS = {
     "source": ["pubmed"], 
-    "model": "llama", 
+    "model": "llama",
+    "n_scp_tasks": 1,
     "n_ner_tasks": 1,
     "log_level": LOGGING_LEVEL,
 }
 
 # Global async variables
-scp_queue = None
 ner_queue = None
 scp_tasks = None
 ner_tasks = None
@@ -102,19 +102,19 @@ async def _collector() -> None:
 async def _setup_asyncio_framework() -> None:
     """"Start the SpoCK processes by setting up the asyncio framework and starting the asyncio tasks.
     
-    Tasks:
-    - scp_queue: queue for collecting results from scraping tasks
+    Main components of asyncio framework are:
     - ner_queue: queue for collecting results from named entity recognition tasks
     - scp_tasks: scraping tasks
     - ner_tasks: named entity recognition tasks
-    - orc_task: orchestrator task
+    - orc_task: orchestrating the scraping and named entity recognition tasks
+    - col_task: collecting the results from the named entity recognition tasks
     """
-    global scp_queue, ner_queue, scp_tasks, ner_tasks, orc_task, col_task
+    global ner_queue, scp_tasks, ner_tasks, orc_task, col_task
 
     if len(spocks) >= MAX_JOBS:
         return None
     logger.info("setting up asyncio framework")
-    scp_queue, ner_queue, scp_tasks, ner_tasks, orc_task = setup_asyncio_framework(args_=job)
+    ner_queue, scp_tasks, ner_tasks, orc_task = setup_asyncio_framework(args_=job)
     col_task = asyncio.create_task(_collector())
 
 
@@ -159,7 +159,7 @@ async def _conclusion():
 
 async def _canceling():
     """Cancel all running :class:`asyncio.Task`."""
-    global running_spock
+    global scp_tasks, ner_tasks, orc_task, col_task, running_spock
 
     gr.Warning(f'canceled SpoCK for "{running_spock.job.term}"')
     running_spock.status = 'stopped'
@@ -233,10 +233,16 @@ with gr.Blocks(head_paths=HEAD_FILE, css_paths=CSS_FILE, theme=gr.themes.Soft())
     # Details of the selected job
     with gr.Row():
         details = gr.HTML('<div class="details-container"></div>')
-
+    
+    # Timer for automatic update of the available documents for the running job
+    feed_details_timer = gr.Timer(value=UPDATE_INTERVAL, active=False, render=True)
+    feed_details_timer.tick(fn=_feed_details_to_ui, inputs=card_number, outputs=details)
+    
     # Starting the pipeline with the search term
     start_button.click(
         fn=_toggle_button, inputs=is_running, outputs=[is_running, start_button, stop_button, cancel_button]
+    ).then(
+        fn=lambda: gr.update(active=True), outputs=feed_details_timer
     ).then(
         fn=_setup_spock, inputs=search_term
     ).then(
@@ -248,6 +254,8 @@ with gr.Blocks(head_paths=HEAD_FILE, css_paths=CSS_FILE, theme=gr.themes.Soft())
     ).then(
         fn=_conclusion
     ).then(
+        fn=lambda: gr.update(active=False), outputs=feed_details_timer
+    ).then(
         fn=_toggle_button, inputs=[is_running], outputs=[is_running, start_button, stop_button, cancel_button]
     )
 
@@ -256,14 +264,15 @@ with gr.Blocks(head_paths=HEAD_FILE, css_paths=CSS_FILE, theme=gr.themes.Soft())
         fn=_show_cancel_button, outputs=[start_button, stop_button, cancel_button]
     ).then(
         fn=_canceling
-    )   # Toggle button is not needed: '_canceling' is terminating the still running '_conclusion' step which is followed by the toggle button
+    )    # NOTE thath "toggling the button" and "setting timer active=False" is not needed: '_canceling' is terminating the still running '_conclusion' step which is followed by these two steps
     
     # Callback for the job cars to show the details
     for icrd, crd in enumerate(cards):
-        crd.click(fn=_change_card_number, inputs=gr.Number(value=icrd, visible=False), outputs=card_number)
-    
-    feed_details_timer = gr.Timer(value=UPDATE_INTERVAL, active=True, render=True)
-    feed_details_timer.tick(fn=_feed_details_to_ui, inputs=card_number, outputs=details)
+        crd.click(
+            fn=_change_card_number, inputs=gr.Number(value=icrd, visible=False), outputs=card_number
+        ).then(
+            fn=_feed_details_to_ui, inputs=card_number, outputs=details
+        )
 
 
 if __name__ == "__main__":

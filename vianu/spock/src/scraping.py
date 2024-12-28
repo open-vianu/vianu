@@ -19,7 +19,7 @@ from typing import List
 import xml.etree.ElementTree as ET
 
 from vianu.spock.src.data_model import Document, QueueItem
-from vianu.spock.settings import SCRAPING_SOURCES, MAX_CHUNK_SIZE, MAX_DOCS_PER_SOURCE
+from vianu.spock.settings import MAX_CHUNK_SIZE, MAX_DOCS_PER_SOURCE
 from vianu.spock.settings import PUBMED_ESEARCH_URL, PUBMED_DB, PUBMED_EFETCH_URL, PUBMED_BATCH_SIZE
 
 logger = logging.getLogger(__name__)
@@ -254,19 +254,45 @@ class EMAScraper(Scraper):
         return 'https://www.ema.europa.eu/themes/custom/ema_theme/favicon.ico'
 
 
-def create_tasks(args_: Namespace, queue: asyncio.Queue) -> List[asyncio.Task]:
-    """Create the asyncio scraping tasks."""
-    sources = args_.source if args_.source is not None else SCRAPING_SOURCES
-    term = args_.term
+_SOURCE_TO_SCRAPER = {
+    'pubmed': PubmedScraper(),
+    # 'ema': EMAScraper(),
+}
 
-    scrapers = []       # type: List[Scraper]
-    if 'pubmed' in sources:
-        scrapers.append(PubmedScraper())
-    elif 'ema' in sources:
-        raise ValueError('EMA source not implemented yet')
-    else:
-        raise ValueError(f'Unknown source {sources}')
-    
-    logger.info(f'setting up {len(scrapers)} scraping task(s) for source(s)={sources}')
-    tasks = [asyncio.create_task(scp.apply(term=term, queue=queue)) for scp in scrapers]
+async def _apply(term: str, queue_in: asyncio.Queue, queue_out: asyncio.Queue) -> None:
+    """Apply the scraping task to a given term for a given source and put the results in an output queue."""
+
+    while True:
+        # Get source from input queue
+        source = await queue_in.get()
+
+        # Check stopping condition
+        if source is None:
+            queue_in.task_done()
+            break
+
+        # Get the scraper and apply it to the term
+        scraper = _SOURCE_TO_SCRAPER.get(source)
+        if scraper is None:
+            logger.error(f'unknown source={source}')
+            queue_in.task_done()
+            break
+
+        try:
+            await scraper.apply(term=term, queue=queue_out)
+        except Exception as e:
+            logger.error(f'error during scraping for source={source} and term={term}: {e}')
+            queue_in.task_done()
+            continue
+        queue_in.task_done()
+
+
+def create_tasks(args_: Namespace, queue_in: asyncio.Queue, queue_out: asyncio.Queue) -> List[asyncio.Task]:
+    """Create the asyncio scraping tasks."""
+    sources = args_.source
+    term = args_.term
+    n_scp_tasks = args_.n_scp_tasks
+
+    logger.info(f'setting up {n_scp_tasks} scraping task(s) for source(s)={sources}')
+    tasks = [asyncio.create_task(_apply(term=term, queue_in=queue_in, queue_out=queue_out)) for _ in range(n_scp_tasks)]
     return tasks

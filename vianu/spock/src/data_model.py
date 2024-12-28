@@ -167,6 +167,7 @@ class Job(DataUnit):
     # scraping options
     term: str
     source: List[str]
+    n_scp_tasks: int
 
     # NER options
     model: str
