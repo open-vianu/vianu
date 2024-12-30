@@ -74,6 +74,13 @@ class PubmedEntrezHistoryParams:
 
 
 class PubmedScraper(Scraper):
+    """Class for scraping data from the PubMed database.
+    
+    The scraper uses the Pubmed API to search for relevant documents. From the list of results it creates a list of
+    :class:`Document` objects by the following main steps:
+        - Extract all PubmedArticle elements from the search results (other types are ignored)
+        - Extract the AbstractText from the PubmedArticle (if there is no abstract, the document is ignored)
+    """
 
     _source = 'pubmed'
     _source_url = 'https://pubmed.ncbi.nlm.nih.gov/'
@@ -266,11 +273,11 @@ class EMAScraper(Scraper):
     """Class for scraping data from the European Medicines Agency.
     
     The scraper uses the same API as the web interface of the EMA to search for relevant documents. From the list of 
-    results we create a list of :class:`Document` objects by the following main steps:
-    - Search the EMA database (filter for PDF documents only)
-    - Extract the text from the PDF documents
-    - Use regex to find texts where adverse drug reactions (or similar) are mentioned
-    - Return the most recent :class:`Document` objects
+    results it creates a list of :class:`Document` objects by the following main steps:
+        - Search the EMA database (filter for PDF documents only)
+        - Extract the text from the PDF documents
+        - Use regex to find texts where adverse drug reactions (or similar) are mentioned
+        - Return the most recent :class:`Document` objects
     """
 
     _source = 'ema'
