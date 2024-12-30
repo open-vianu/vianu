@@ -115,9 +115,10 @@ async def _collector(ner_queue: asyncio.Queue) -> List[Document]:
     return data
 
 
-async def _main() -> None:
+async def main(args_: Namespace | None = None, save: bool = True) -> None:
     """Main function for the SpoCK pipeline."""
-    args_= parse_args(sys.argv[1:])
+    if args_ is None:
+        args_= parse_args(sys.argv[1:])
 
     logging.basicConfig(level=args_.log_level.upper(), format=LOGGING_FMT)
     logger.info(f'starting SpoCK (args_={args_})')    
@@ -126,19 +127,20 @@ async def _main() -> None:
     ner_queue, _, _, _ = setup_asyncio_framework(args_)
 
     # Set up collector task and wait for it to finish
-    # NOTE that if collector task is finished, the orchestrator is also finished (because of the sentinel in ner_queue)
+    # NOTE: if collector task is finished, the orchestrator is also finished (because of the sentinel in `ner_queue`)
     # and therefore so are the scraping and NER tasks
     col_task = asyncio.create_task(_collector(ner_queue))
     data = await col_task   
     await ner_queue.join()
 
     # Save data
-    file = args_.data_file
-    path = args_.data_path
-    if file is not None and path is not None:
-        FileHandler(path=path).write(file=file, data=data)
+    if save:
+        file = args_.data_file
+        path = args_.data_path
+        if file is not None and path is not None:
+            FileHandler(path=path).write(file=file, data=data)
     logger.info('finished SpoCK')
 
 
 if __name__ == '__main__':
-    asyncio.run(_main())
+    asyncio.run(main())

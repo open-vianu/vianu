@@ -52,12 +52,9 @@
 .search-container .button-not-running {
     background: var(--color-green-700)
 }
-
-
 .search-container .button-running {
     background: var(--color-red-600)
 }
-
 .search-container .canceling {
     background: var(--color-grey-500)
 }
@@ -72,7 +69,7 @@
     border: none var(--spacing-md) var(--block-title-border-color);
     border-radius: var(--radius-lg);
     width: var(--size-80);
-    padding: var(--scale-4);
+    padding: var(--scale-2);
     font: var(--font);
     background: var(--block-label-background-fill);
 }
@@ -84,6 +81,18 @@
     font-size: var(--text-lg);
     color: var(--block-title-text-color);
     margin-bottom: var(--scale-0);
+}
+.card .title .running{
+    color: var(--color-red-600);
+    font-size: var(--text-md);
+}
+.card .title .stopped{
+    color: var(--color-grey-500);
+    font-size: var(--text-md);
+}
+.card .title .completed{
+    color: var(--color-green-700);
+    font-size: var(--text-md);
 }
 .card .info { 
     color: var(--block-info-text-color);

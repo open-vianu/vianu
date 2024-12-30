@@ -18,7 +18,7 @@ PUBMED_DB = 'pubmed'
 PUBMED_BATCH_SIZE = 20
 
 # NER settings
-N_NER_TASKS_DEFAULT = 2
+N_NER_TASKS_DEFAULT = 1
 NER_MODELS = ['llama']
 MAX_TOKENS = 128.000
 OLLAMA_ENDPOINT = "http://localhost:11434/api/chat"

@@ -19,10 +19,10 @@ logger = logging.getLogger(__name__)
 HEAD_FILE = Path(__file__).parent / "assets/head/scripts.html"
 CSS_FILE = Path(__file__).parent / "assets/css/styles.css"
 SPOCK_KWARGS = {
-    "source": ["pubmed"], 
+    "source": ["pubmed", "ema"], 
     "model": "llama",
-    "n_scp_tasks": 1,
-    "n_ner_tasks": 1,
+    "n_scp_tasks": 2,
+    "n_ner_tasks": 2,
     "log_level": LOGGING_LEVEL,
 }
 
@@ -126,7 +126,7 @@ async def _feed_cards_to_ui() -> List[dict[str, Any]]:
     # Create the job cards for the existing spocks
     cds = []
     for i, spk in enumerate(spocks):
-        html = get_job_card_html(i, spk.job, spk.data)
+        html = get_job_card_html(i, spk)
         cds.append(gr.update(value=html, visible=True))
 
     # Extdend with empty cards (as dynamic number of gr.Blocks is not supported in gradio <= 5.0.0)
@@ -161,7 +161,7 @@ async def _canceling():
     """Cancel all running :class:`asyncio.Task`."""
     global scp_tasks, ner_tasks, orc_task, col_task, running_spock
 
-    gr.Warning(f'canceled SpoCK for "{running_spock.job.term}"')
+    gr.Info(f'canceled SpoCK for "{running_spock.job.term}"')
     running_spock.status = 'stopped'
     running_spock.finished_at = datetime.now()
 
@@ -195,7 +195,9 @@ def _change_card_number(icrd: int):
 
 def _feed_details_to_ui(icrd: int):
     """Collect the (previously created) html texts for the documents of the selected job and feed them to the UI."""
-    global spocks
+    global spocks, running_spock
+
+    logger.debug(f'feeding details to UI (len(data)={len(running_spock.data)})')
     if len(spocks) == 0:
         return get_details_html([])
     return get_details_html(spocks[icrd].data)
@@ -234,15 +236,18 @@ with gr.Blocks(head_paths=HEAD_FILE, css_paths=CSS_FILE, theme=gr.themes.Soft())
     with gr.Row():
         details = gr.HTML('<div class="details-container"></div>')
     
-    # Timer for automatic update of the available documents for the running job
-    feed_details_timer = gr.Timer(value=UPDATE_INTERVAL, active=False, render=True)
-    feed_details_timer.tick(fn=_feed_details_to_ui, inputs=card_number, outputs=details)
+    # Timer for automatic update of the ui for the running job
+    update_ui_timer = gr.Timer(value=UPDATE_INTERVAL, active=False, render=True)
+    update_ui_timer.tick(
+        fn=_feed_cards_to_ui, outputs=cards
+    ).then(
+        fn=_feed_details_to_ui, inputs=card_number, outputs=details
+    )
     
     # Starting the pipeline with the search term
-    start_button.click(
+    gr.on(
+        triggers=[search_term.submit, start_button.click],
         fn=_toggle_button, inputs=is_running, outputs=[is_running, start_button, stop_button, cancel_button]
-    ).then(
-        fn=lambda: gr.update(active=True), outputs=feed_details_timer
     ).then(
         fn=_setup_spock, inputs=search_term
     ).then(
@@ -252,9 +257,15 @@ with gr.Blocks(head_paths=HEAD_FILE, css_paths=CSS_FILE, theme=gr.themes.Soft())
     ).then(
         fn=_feed_cards_to_ui, outputs=cards
     ).then(
+        fn=lambda: gr.update(active=True), outputs=update_ui_timer
+    ).then(
         fn=_conclusion
     ).then(
-        fn=lambda: gr.update(active=False), outputs=feed_details_timer
+        fn=_feed_cards_to_ui, outputs=cards
+    ).then(
+        fn=_feed_details_to_ui, inputs=card_number, outputs=details
+    ).then(
+        fn=lambda: gr.update(active=False), outputs=update_ui_timer
     ).then(
         fn=_toggle_button, inputs=[is_running], outputs=[is_running, start_button, stop_button, cancel_button]
     )
@@ -264,7 +275,15 @@ with gr.Blocks(head_paths=HEAD_FILE, css_paths=CSS_FILE, theme=gr.themes.Soft())
         fn=_show_cancel_button, outputs=[start_button, stop_button, cancel_button]
     ).then(
         fn=_canceling
-    )    # NOTE thath "toggling the button" and "setting timer active=False" is not needed: '_canceling' is terminating the still running '_conclusion' step which is followed by these two steps
+    )
+    # NOTE: when `stop_button.click` is triggered, the above pipeline (started by `search_term.submit` or 
+    # `start_button.click`) is still running and awaiting the `_conclusion` step to finish. The `stop_button.click` 
+    # event will cause the `_conclusion` step to terminate, after which the subsequent steps: 
+    # - `_feed_cards_to_ui`
+    # - `_feed_details_to_ui`
+    # - `gr.update(active=False)`
+    # - `_toggle_button`
+    # will be executed; therefore, there is no need to add these steps here.
     
     # Callback for the job cars to show the details
     for icrd, crd in enumerate(cards):

@@ -1,7 +1,7 @@
 import logging
 from typing import List
 
-from vianu.spock.src.data_model import Document, Job
+from vianu.spock.src.data_model import Document, SpoCK
 from vianu.spock.settings import DATE_FORMAT
 
 logger = logging.getLogger(__name__)
@@ -9,10 +9,10 @@ logger = logging.getLogger(__name__)
 
 JOBS_CONTAINER_CARD_TEMPLATE = """
 <div class="card" onclick="cardClickHandler(this)">
-  <div class="title">{title}</div>
+  <div class="title">{title} {status}</div>
   <div class="info">Date: {date}</div>
   <div class="info">Sources: {sources}</div>
-  <div class="info">#Docs: {n_doc} | #ADR: {n_adr}</div>
+  <div class="info">#docs: {n_doc} | #adr: {n_adr}</div>
 </div>
 """
 
@@ -62,9 +62,25 @@ def get_details_html(data: List[Document]):
     return DETAILS_CONTAINER_TEMPLATE.format(items=_get_details_html_items(data=data))
 
 
-def get_job_card_html(card_nmbr: int, job: Job, data: List[Document]):
+def _get_status_html(status: str) -> str:
+    """Get the HTML for the status."""
+    if status == "running":
+        return f"<span class='running'>({status.upper()})</span>"
+    elif status == "completed":
+        return f"<span class='completed'>({status.upper()})</span>"
+    elif status == "stopped":
+        return f"<span class='stopped'>({status.upper()})</span>"
+    else:
+        logger.error(f"unknown status: {status.upper()})")
+        return '<span>(status unknown)</span>'
+
+def get_job_card_html(card_nmbr: int, spock: SpoCK):
     """Get the HTML for the job card."""
-    title = job.term
+    job = spock.job
+    data = spock.data
+
+    title = spock.job.term
+    status = _get_status_html(spock.status)
     sources = ", ".join(job.source)
     date = job.submission.strftime(DATE_FORMAT)
     n_doc = len(data)
@@ -72,6 +88,7 @@ def get_job_card_html(card_nmbr: int, job: Job, data: List[Document]):
     return JOBS_CONTAINER_CARD_TEMPLATE.format(
         nmbr=card_nmbr,
         title=title,
+        status=status,
         date=date,
         sources=sources,
         n_doc=n_doc,
