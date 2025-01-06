@@ -18,10 +18,10 @@ logger = logging.getLogger(__name__)
 
 HEAD_FILE = Path(__file__).parent / "assets/head/scripts.html"
 CSS_FILE = Path(__file__).parent / "assets/css/styles.css"
-SPOCK_KWARGS = {
-    "source": ["pubmed", "ema"], 
+SPOCK_SETTINGS = {
+    "source": ["mhra"], 
     "model": "llama",
-    "n_scp_tasks": 2,
+    "n_scp_tasks": 1,
     "n_ner_tasks": 2,
     "log_level": LOGGING_LEVEL,
 }
@@ -75,7 +75,7 @@ async def _setup_spock(term: str) -> None:
     gr.Info(msg)
     logger.info(msg)
 
-    args_ = deepcopy(SPOCK_KWARGS)
+    args_ = deepcopy(SPOCK_SETTINGS)
     args_["term"] = term
     job = Job(id_=f'{args_["term"]} {args_["source"]} {args_["model"]}', **args_)
     running_spock = SpoCK(status='running', job=job, started_at=job.submission, data=[])

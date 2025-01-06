@@ -24,7 +24,7 @@ import numpy as np
 import pymupdf
 
 from vianu.spock.src.data_model import Document, QueueItem
-from vianu.spock.settings import MAX_CHUNK_SIZE, MAX_DOCS_PER_SOURCE
+from vianu.spock.settings import MAX_CHUNK_SIZE, MAX_DOCS_PER_SOURCE, SCRAPING_SOURCES
 from vianu.spock.settings import PUBMED_ESEARCH_URL, PUBMED_DB, PUBMED_EFETCH_URL, PUBMED_BATCH_SIZE
 
 logger = logging.getLogger(__name__)
@@ -52,7 +52,7 @@ class Scraper(ABC):
         return chunks
     
     @staticmethod
-    async def _aiohttp_get(url: str, headers=None) -> str:
+    async def _aiohttp_get_html(url: str, headers=None) -> str:
         """Get the content of a given URL by an aiohttp GET request."""
         async with aiohttp.ClientSession(headers=headers) as session:
             async with session.get(url=url) as response:
@@ -103,7 +103,7 @@ class PubmedScraper(Scraper):
         """Search the Pubmed database with a given term and POST the results to entrez history server."""
         url = f'{PUBMED_ESEARCH_URL}?db={PUBMED_DB}&term={term}&usehistory=y'
         logger.debug(f'search pubmed database with url={url}')
-        esearch = await self._aiohttp_get(url=url)
+        esearch = await self._aiohttp_get_html(url=url)
         return esearch
 
     async def _pubmed_efetch(self, params: PubmedEntrezHistoryParams) -> List[str]:
@@ -125,7 +125,7 @@ class PubmedScraper(Scraper):
             logger.debug(f'fetch documents with url={url}')
 
             # Fetch the documents
-            efetch = await self._aiohttp_get(url=url)
+            efetch = await self._aiohttp_get_html(url=url)
             batches.append(efetch)
         return batches
 
@@ -301,7 +301,7 @@ class EMAScraper(Scraper):
         """Search the EMA database for PDF documents with a given term."""
         url = self._pdf_search_template.format(term=term)
         logger.debug(f'search ema database with url={url}')
-        content = await self._aiohttp_get(url=url, headers=self._headers)
+        content = await self._aiohttp_get_html(url=url, headers=self._headers)
         return content
 
     @staticmethod
@@ -376,8 +376,7 @@ class EMAScraper(Scraper):
         """Extract the publication date of the document."""
         time_tag = tag.find('time')
         if time_tag and time_tag.has_attr('datetime'):
-            time_str = time_tag['datetime'].replace('Z', '+00:00')
-            return datetime.fromisoformat(time_str)
+            return datetime.fromisoformat(time_tag['datetime'])
         return None
 
     async def _parse_documents(self, docs: List[Tag]) -> List[Document]:
@@ -430,12 +429,13 @@ class EMAScraper(Scraper):
         count = self._extract_search_results_count(soup=soup)
 
         # Extract the divs containing the search results
+        # TODO: Extracting all results accross pagination is not yet implemented
         docs = self._extract_search_item_divs(soup=soup)
         if len(docs) < count:
             logger.warning(f'from the total number of documents={count} only {len(docs)} will be parsed')
-        
+
         # Parse documents from links
-        documents = await self._parse_documents(docs=docs)
+        documents = await self._parse_documents(docs=docs[:MAX_DOCS_PER_SOURCE])
         documents = documents[:MAX_DOCS_PER_SOURCE]
 
         # Add documents to the queue
@@ -447,14 +447,150 @@ class EMAScraper(Scraper):
         logger.info(f'retrieved #docs={len(documents)} in source={self._source} for term={term}')
 
 
+class MHRAScraper(Scraper):
+    """Class for scraping data from the Medicines and Healthcare products Regulatory Agency.
+    
+    The scraper the MHRAs **Drug Safety Update** search API for retrieving relevant documents. From the list of results 
+    it creates a list of :class:`Document` objects by the following main steps:
+        TODO
+    """
 
-_SOURCE_TO_SCRAPER = {
-    'pubmed': PubmedScraper,
-    'ema': EMAScraper,
-}
+    _source = 'mhra'
+    _source_url = 'https://www.gov.uk/durg-safety-update'
+    _source_favicon_url = 'https://www.gov.uk/favicon.ico'
 
-async def _apply(term: str, queue_in: asyncio.Queue, queue_out: asyncio.Queue) -> None:
-    """Apply the scraping task to a given term for a given source and put the results in an output queue."""
+    _search_template = 'https://www.gov.uk/drug-safety-update?keywords={term}'
+    _source_base_url = 'https://www.gov.uk'
+    _language = 'en'
+
+    async def _mhra_document_search(self, term: str) -> str:
+        """Search the MHRA database for documents with a given term."""
+        url = self._search_template.format(term=term)
+        logger.debug(f"search mhra's drug safety update database with url={url}")
+        content = await self._aiohttp_get_html(url=url)
+        return content
+    
+    @staticmethod
+    def _extract_search_results_count(parent: Tag) -> int | None:
+        """Extract the number of search results."""
+        div = parent.find('div', class_='result-info__header')
+        h2 = div.find('h2') if div else None
+
+        if h2 is None:
+            return None
+        else:
+            text = h2.get_text(strip=True)
+            count = int(re.search(r'\d+', text).group())
+            return count
+
+    @staticmethod
+    def _extract_search_results_divs(parent: Tag) -> List[Tag]:
+        """Extract the divs containing the search results."""
+        return parent.find_all('li', class_='gem-c-document-list__item')
+    
+    def _extract_url(self, link: Tag) -> str | None:
+        """Extract the url to the document."""
+        href = link['href']
+        return f'{self._source_base_url}{href}' if href.startswith('/') else href
+
+
+    async def _extract_text(self, url: str) -> str:
+        """Extract the text from the document."""
+        content = await self._aiohttp_get_html(url=url)
+        soup = BeautifulSoup(content, 'html.parser')
+        main = soup.find('main')
+        text = main.get_text()
+
+        # Clean the spaces and newlines
+        text = re.sub(r'(\n\s*){3,}', '\n\n', text)
+        text = re.sub(r'^ +', '', text, flags=re.MULTILINE)
+        return text
+
+    @staticmethod
+    def _extract_date(tag: Tag) -> datetime | None:
+        """Extract the publication date of the document."""
+        time_tag = tag.find('time')
+        if time_tag and time_tag.has_attr('datetime'):
+            return datetime.fromisoformat(time_tag['datetime'])
+        return None
+
+    async def _parse_documents(self, docs: List[Tag]) -> List[Document]:
+        """From a list of divs containing the search results, extract the relevant information and parse it into a list
+        of :class:`Document` objects.
+        """
+        data = []
+        for i, doc in enumerate(docs):
+            link = doc.find('a', href=True)
+            if link is None:
+                logger.warning('no link found')
+                continue
+            url = self._extract_url(link=link)
+
+            # Extract the relevant information from the document
+            logger.debug(f'parsing document with url={url}')
+            title = link.get_text(strip=True)
+            text = await self._extract_text(url=url)
+            publication_date = self._extract_date(tag=doc)
+
+            # Split long texts into chunks
+            texts = self.split_text_into_chunks(text=text)
+            
+            # Create the Document object(s)
+            for text in texts:
+                document = Document(
+                    id_=f'{self._source_url} {title} {text} {publication_date}',
+                    text=text,
+                    source=self._source,
+                    title=title,
+                    url=url,
+                    source_url=self._source_url,
+                    source_favicon_url=self._source_favicon_url,
+                    language=self._language,
+                    publication_date=publication_date,
+                )
+                data.append(document)
+        logger.debug(f'parsed #docs={len(data)}')
+        return data
+
+    async def apply(self, term: str, queue: asyncio.Queue) -> None:
+        """Query and retrieve all drug safety updates for the given search term."""
+        logger.debug(f'starting scraping the source={self._source} with term={term}')
+
+        # Search for relevant documents with a given term
+        search_content = await self._mhra_document_search(term=term)
+        soup = BeautifulSoup(search_content, 'html.parser')
+
+        # Extract the div containing the search results
+        parent = soup.find('div', class_='govuk-grid-column-two-thirds js-live-search-results-block filtered-results')
+
+        # Extract the number of search results
+        count = self._extract_search_results_count(parent=parent)
+
+        # Extract the divs containing the search results
+        docs = self._extract_search_results_divs(parent=parent)
+        if len(docs) < count:
+            logger.warning(f'from the total number of documents={count} only {len(docs)} will be parsed')
+
+        # Parse documents from links
+        documents = await self._parse_documents(docs=docs[:MAX_DOCS_PER_SOURCE])
+        documents = documents[:MAX_DOCS_PER_SOURCE]
+
+        # Add documents to the queue
+        for i, doc in enumerate(documents):
+            id_ = f'{self._source}_{i}'
+            item = QueueItem(id_=id_, doc=doc)
+            await queue.put(item)
+        
+        logger.info(f'retrieved #docs={len(documents)} in source={self._source} for term={term}')
+
+
+_SCRAPERS = [PubmedScraper, EMAScraper, MHRAScraper]
+_SOURCE_TO_SCRAPER = {src: scr for src, scr in zip(SCRAPING_SOURCES, _SCRAPERS)}
+
+async def _scraping(term: str, queue_in: asyncio.Queue, queue_out: asyncio.Queue) -> None:
+    """Pop a source (str) from the input queue, perform  the scraping task with the given term, and put the results in
+    the output queue until the input queue is empty.
+    """
 
     while True:
         # Get source from input queue
@@ -488,5 +624,5 @@ def create_tasks(args_: Namespace, queue_in: asyncio.Queue, queue_out: asyncio.Q
     n_scp_tasks = args_.n_scp_tasks
 
     logger.info(f'setting up {n_scp_tasks} scraping task(s) for source(s)={sources}')
-    tasks = [asyncio.create_task(_apply(term=term, queue_in=queue_in, queue_out=queue_out)) for _ in range(n_scp_tasks)]
+    tasks = [asyncio.create_task(_scraping(term=term, queue_in=queue_in, queue_out=queue_out)) for _ in range(n_scp_tasks)]
     return tasks

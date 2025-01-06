@@ -7,9 +7,9 @@ DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 N_CHAR_DOC_ID = 12
 
 # Scraping settings
-SCRAPING_SOURCES = ['pubmed', 'ema']
+SCRAPING_SOURCES = ['pubmed', 'ema', 'mhra']
 MAX_CHUNK_SIZE = 500
-MAX_DOCS_PER_SOURCE = 10
+MAX_DOCS_PER_SOURCE = 5
 N_SCP_TASKS_DEFAULT = 1
 
 PUBMED_ESEARCH_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
