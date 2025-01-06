@@ -43,6 +43,9 @@ Output:
 
 class NER(ABC):
 
+    def __init__(self):
+        self.logger = logging.getLogger(self.__class__.__name__)
+
     @staticmethod
     def get_loc_of_subtext(text: str, subtext: str) -> List[int] | None:
         """Get the location of a subtext in a text."""
@@ -62,6 +65,7 @@ class OllamaNER(NER):
     _ne_pat = re.compile(r'\("([^"]+)",\s?"(MP|ADR)"\)')
 
     def __init__(self, endpoint: str, model: str):
+        super().__init__()
         self._endpoint = endpoint
         self._model = model
 
@@ -105,7 +109,7 @@ class OllamaNER(NER):
                 ne.location = loc
                 ne.text = text[loc[0]:loc[1]]
             else:
-                logger.warning(f'could not find location for named entity "{ne.text}" of class "{ne.class_}"')
+                self.logger.warning(f'could not find location for named entity "{ne.text}" of class "{ne.class_}"')
 
 
     async def apply(self, queue_in: asyncio.Queue, queue_out: asyncio.Queue) -> None:
@@ -123,12 +127,12 @@ class OllamaNER(NER):
             # Get the model response with named entities
             id_ = item.id_
             doc = item.doc
-            logger.debug(f'starting ner for item.id_={id_} (doc.id_={doc.id_[:N_CHAR_DOC_ID]})')
+            self.logger.debug(f'starting ner for item.id_={id_} (doc.id_={doc.id_[:N_CHAR_DOC_ID]})')
             try:
                 text = doc.text
                 content = await self._get_ner_model_answer(text=text)
             except Exception as e:
-                logger.error(f'error during ner for item.id_={item.id_} (doc.id_={doc.id_[:N_CHAR_DOC_ID]}): {e}')
+                self.logger.error(f'error during ner for item.id_={item.id_} (doc.id_={doc.id_[:N_CHAR_DOC_ID]}): {e}')
                 queue_in.task_done()
                 continue
 
@@ -143,7 +147,7 @@ class OllamaNER(NER):
                     txt, cls_ = ne
                     named_entities.append(NamedEntity(id_=f'{text} {txt} {cls_}', text=txt, class_=cls_))
                 except Exception as e:
-                    logger.error(f'error during creation of `NamedEntity` using {ne}: {e}')
+                    self.logger.error(f'error during creation of `NamedEntity` using {ne}: {e}')
 
             # Add locations to named entities and remove those without location
             self._add_loc_for_named_entities(text=text, named_entities=named_entities)
@@ -152,14 +156,14 @@ class OllamaNER(NER):
             # Assign named entities to the document
             ne_mp = [ne for ne in named_entities if ne.class_ == 'MP']
             ne_adr = [ne for ne in named_entities if ne.class_ == 'ADR']
-            logger.debug(f'found #mp={len(ne_mp)} and #adr={len(ne_adr)} for item.id_={id_} (doc.id_={doc.id_[:N_CHAR_DOC_ID]})')
+            self.logger.debug(f'found #mp={len(ne_mp)} and #adr={len(ne_adr)} for item.id_={id_} (doc.id_={doc.id_[:N_CHAR_DOC_ID]})')
             doc.medicinal_products = ne_mp
             doc.adverse_reactions = ne_adr
         
             # Put the document in the output queue
             await queue_out.put(item)
             queue_in.task_done()
-            logger.info(f'finished NER task for item.id_={id_} (doc.id_={doc.id_[:N_CHAR_DOC_ID]})')
+            self.logger.info(f'finished NER task for item.id_={id_} (doc.id_={doc.id_[:N_CHAR_DOC_ID]})')
 
 
 def create_tasks(args_: Namespace, queue_in: asyncio.Queue, queue_out: asyncio.Queue) -> List[asyncio.Task]:

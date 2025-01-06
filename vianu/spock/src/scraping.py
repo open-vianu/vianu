@@ -24,7 +24,7 @@ import numpy as np
 import pymupdf
 
 from vianu.spock.src.data_model import Document, QueueItem
-from vianu.spock.settings import MAX_CHUNK_SIZE, MAX_DOCS_PER_SOURCE, SCRAPING_SOURCES
+from vianu.spock.settings import MAX_CHUNK_SIZE, SCRAPING_SOURCES
 from vianu.spock.settings import PUBMED_ESEARCH_URL, PUBMED_DB, PUBMED_EFETCH_URL, PUBMED_BATCH_SIZE
 
 logger = logging.getLogger(__name__)
@@ -34,11 +34,13 @@ class Scraper(ABC):
 
     _word_separator = ' '
 
+    def __init__(self):
+        self.logger = logging.getLogger(self.__class__.__name__)
+
     @abstractmethod
-    async def apply(self, term: str, queue: asyncio.Queue) -> None:
+    async def apply(self, term: str, max_docs_src: int, queue: asyncio.Queue) -> None:
         """Main function for scraping data from a source."""
         pass
-
 
     def split_text_into_chunks(self, text: str, max_size: int = MAX_CHUNK_SIZE) -> List[str]:
         """Split a text into chunks of a given max size."""
@@ -102,40 +104,39 @@ class PubmedScraper(Scraper):
     async def _pubmed_esearch(self, term: str) -> str:
         """Search the Pubmed database with a given term and POST the results to entrez history server."""
         url = f'{PUBMED_ESEARCH_URL}?db={PUBMED_DB}&term={term}&usehistory=y'
-        logger.debug(f'search pubmed database with url={url}')
+        self.logger.debug(f'search pubmed database with url={url}')
         esearch = await self._aiohttp_get_html(url=url)
         return esearch
 
-    async def _pubmed_efetch(self, params: PubmedEntrezHistoryParams) -> List[str]:
+    async def _pubmed_efetch(self, params: PubmedEntrezHistoryParams, max_docs_src: int) -> List[str]:
         """Retrieve the relevant documents from the entrez history server."""
         # Reduce the number of documents to be retrieved for efficiency
-        N = min(MAX_DOCS_PER_SOURCE, int(params.count))
+        N = min(max_docs_src, int(params.count))
         if N < params.count:
-            logger.warning(f'from the total number of documents={params.count} only {N} will be retrieved')
+            self.logger.warning(f'from the total number of documents={params.count} only {N} will be retrieved')
         
         # Iterate over the batches of documents (with fixed batch size)
         batch_size = min(params.count, PUBMED_BATCH_SIZE)
-        logger.debug(f'fetch #docs={N} in {N // batch_size + 1} batch(es) of size <= {batch_size}')
+        self.logger.debug(f'fetch #docs={N} in {N // batch_size + 1} batch(es) of size <= {batch_size}')
         batches = []
         for retstart in range(0, N, batch_size):
 
             # Prepare URL for retrieving next batch of documents but stop if the maximum number is reached
-            retmax = min(MAX_DOCS_PER_SOURCE - len(batches)*batch_size, batch_size)
+            retmax = min(max_docs_src - len(batches)*batch_size, batch_size)
             url = f'{PUBMED_EFETCH_URL}?db={PUBMED_DB}&WebEnv={params.web}&query_key={params.key}&retstart={retstart}&retmax={retmax}'
-            logger.debug(f'fetch documents with url={url}')
+            self.logger.debug(f'fetch documents with url={url}')
 
             # Fetch the documents
             efetch = await self._aiohttp_get_html(url=url)
             batches.append(efetch)
         return batches
 
-    @staticmethod
-    def _extract_medline_citation(element: ET.Element) -> ET.Element | None:
+    def _extract_medline_citation(self, element: ET.Element) -> ET.Element | None:
         """Extract the MedlineCitation element from a PubmedArticle element."""
         # Find and extract the MedlineCitation element
         citation = element.find('MedlineCitation')
         if citation is None:
-            logger.warning('no "MedlineCitation" element found')
+            self.logger.warning('no "MedlineCitation" element found')
             return None
         return citation
 
@@ -194,27 +195,27 @@ class PubmedScraper(Scraper):
         data = []
         for ib, text in enumerate(batches):
             pubmed_articles = ET.fromstring(text).findall('PubmedArticle')
-            logger.debug(f'found #articles={len(pubmed_articles)} in batch {ib}')
+            self.logger.debug(f'found #articles={len(pubmed_articles)} in batch {ib}')
             for ie, element in enumerate(pubmed_articles):
-                logger.debug(f'parsing PubmedArticle {ie} of batch {ib}')
+                self.logger.debug(f'parsing PubmedArticle {ie} of batch {ib}')
                 # Extract MedlineCitation and its PMID from PubmedArticle
                 citation = self._extract_medline_citation(element=element)
                 if citation is None:
-                    logger.debug(f'no citation found in PubmedArticle {ie} of batch {ib}')
+                    self.logger.debug(f'no citation found in PubmedArticle {ie} of batch {ib}')
                     continue
                 pmid = self._extract_pmid(element=citation)
                 
                 # Extract the Article element from the PubmedArticle
                 article = self._extract_article(element=citation)
                 if article is None:
-                    logger.debug(f'no article found in PubmedArticle {ie} of batch {ib}')
+                    self.logger.debug(f'no article found in PubmedArticle {ie} of batch {ib}')
                     continue
 
                 # Extract the relevant information from the Article element
                 title = self._extract_title(article=article)
                 text = self._extract_abstract(article=article)
                 if text is None:
-                    logger.debug(f'no abstract found in PubmedArticle {ie} of batch {ib}')
+                    self.logger.debug(f'no abstract found in PubmedArticle {ie} of batch {ib}')
                     continue
                 language = self._extract_language(article=article)
                 publication_date = self._extract_date(article=article)
@@ -236,29 +237,29 @@ class PubmedScraper(Scraper):
                         publication_date=publication_date,
                     )
                     data.append(document)
-        logger.debug(f'parsed #docs={len(data)} from #batches={len(batches)}')
+        self.logger.debug(f'parsed #docs={len(data)} from #batches={len(batches)}')
         return data
 
     
-    async def apply(self, term: str, queue: asyncio.Queue) -> None:
+    async def apply(self, term: str, max_docs_src: int, queue: asyncio.Queue) -> None:
         """Query and retrieve all PubmedArticle Documents for the given search term.
 
         The retrieval is using two main functionalities of the Pubmed API:
         - ESearch: Identify the relevant documents and store them in the entrez history server
         - EFetch: Retrieve the relevant documents from the entrez history server
         """
-        logger.debug(f'starting scraping the source={self._source} with term={term}')
+        self.logger.debug(f'starting scraping the source={self._source} with term={term}')
 
         # Search for relevant documents with a given term
         esearch = await self._pubmed_esearch(term=term)
 
         # Retrieve relevant documents in batches
         params = self._get_entrez_history_params(esearch)
-        batches = await self._pubmed_efetch(params=params)
+        batches = await self._pubmed_efetch(params=params, max_docs_src=max_docs_src)
 
         # Parse documents from batches
         documents = self._parse_pubmed_articles(batches=batches)
-        documents = documents[:MAX_DOCS_PER_SOURCE]
+        documents = documents[:max_docs_src]
 
         # Add documents to the queue
         for i, doc in enumerate(documents):
@@ -266,7 +267,7 @@ class PubmedScraper(Scraper):
             item = QueueItem(id_=id_, doc=doc)
             await queue.put(item)
         
-        logger.info(f'retrieved #docs={len(documents)} in source={self._source} for term={term}')
+        self.logger.info(f'retrieved #docs={len(documents)} in source={self._source} for term={term}')
 
 
 class EMAScraper(Scraper):
@@ -300,7 +301,7 @@ class EMAScraper(Scraper):
     async def _ema_document_search(self, term: str) -> str:
         """Search the EMA database for PDF documents with a given term."""
         url = self._pdf_search_template.format(term=term)
-        logger.debug(f'search ema database with url={url}')
+        self.logger.debug(f'search ema database with url={url}')
         content = await self._aiohttp_get_html(url=url, headers=self._headers)
         return content
 
@@ -328,13 +329,13 @@ class EMAScraper(Scraper):
         """Extract the links href to the relevant PDF document."""
         link = tag.find('a', href=True)
         if link is None:
-            logger.warning('no link found')
+            self.logger.warning('no link found')
             return None
         
         href = link['href']
         url = f'{self._source_url}{href}' if href.startswith('/') else href
         if not url.endswith('.pdf'):
-            logger.warning(f'url={url} does not point to a PDF document')
+            self.logger.warning(f'url={url} does not point to a PDF document')
             return None
         return url
         
@@ -387,11 +388,11 @@ class EMAScraper(Scraper):
         for i, doc in enumerate(docs):
             url = self._extract_url(tag=doc)
             if url is None:
-                logger.debug(f'no url found for document {i}')
+                self.logger.debug(f'no url found for document {i}')
                 continue
 
             # Extract the relevant information from the document
-            logger.debug(f'parsing document with url={url}')
+            self.logger.debug(f'parsing document with url={url}')
             title = self._extract_title(tag=doc)
             text = await self._extract_text(url=url)
             language = self._extract_language(tag=doc)
@@ -414,12 +415,12 @@ class EMAScraper(Scraper):
                     publication_date=publication_date,
                 )
                 data.append(document)
-        logger.debug(f'parsed #docs={len(data)}')
+        self.logger.debug(f'parsed #docs={len(data)}')
         return data
 
-    async def apply(self, term: str, queue: asyncio.Queue) -> None:
+    async def apply(self, term: str, max_docs_src: int, queue: asyncio.Queue) -> None:
         """Query and retrieve all PRAC documents for the given search term."""
-        logger.debug(f'starting scraping the source={self._source} with term={term}')
+        self.logger.debug(f'starting scraping the source={self._source} with term={term}')
 
         # Search for relevant documents with a given term
         search_content = await self._ema_document_search(term=term)
@@ -432,11 +433,11 @@ class EMAScraper(Scraper):
         # TODO: Extracting all results accross pagination is not yet implemented
         docs = self._extract_search_item_divs(soup=soup)
         if len(docs) < count:
-            logger.warning(f'from the total number of documents={count} only {len(docs)} will be parsed')
+            self.logger.warning(f'from the total number of documents={count} only {len(docs)} will be parsed')
 
         # Parse documents from links
-        documents = await self._parse_documents(docs=docs[:MAX_DOCS_PER_SOURCE])
-        documents = documents[:MAX_DOCS_PER_SOURCE]
+        documents = await self._parse_documents(docs=docs[:max_docs_src])
+        documents = documents[:max_docs_src]
 
         # Add documents to the queue
         for i, doc in enumerate(documents):
@@ -444,15 +445,14 @@ class EMAScraper(Scraper):
             item = QueueItem(id_=id_, doc=doc)
             await queue.put(item)
 
-        logger.info(f'retrieved #docs={len(documents)} in source={self._source} for term={term}')
+        self.logger.info(f'retrieved #docs={len(documents)} in source={self._source} for term={term}')
 
 
 class MHRAScraper(Scraper):
     """Class for scraping data from the Medicines and Healthcare products Regulatory Agency.
     
     The scraper the MHRAs **Drug Safety Update** search API for retrieving relevant documents. From the list of results 
-    it creates a list of :class:`Document` objects by the following main steps:
-        TODO
+    it creates a list of :class:`Document` objects.
     """
 
     _source = 'mhra'
@@ -466,7 +466,7 @@ class MHRAScraper(Scraper):
     async def _mhra_document_search(self, term: str) -> str:
         """Search the MHRA database for documents with a given term."""
         url = self._search_template.format(term=term)
-        logger.debug(f"search mhra's drug safety update database with url={url}")
+        self.logger.debug(f"search mhra's drug safety update database with url={url}")
         content = await self._aiohttp_get_html(url=url)
         return content
     
@@ -522,12 +522,12 @@ class MHRAScraper(Scraper):
         for i, doc in enumerate(docs):
             link = doc.find('a', href=True)
             if link is None:
-                logger.warning('no link found')
+                self.logger.warning('no link found')
                 continue
             url = self._extract_url(link=link)
 
             # Extract the relevant information from the document
-            logger.debug(f'parsing document with url={url}')
+            self.logger.debug(f'parsing document with url={url}')
             title = link.get_text(strip=True)
             text = await self._extract_text(url=url)
             publication_date = self._extract_date(tag=doc)
@@ -549,12 +549,12 @@ class MHRAScraper(Scraper):
                     publication_date=publication_date,
                 )
                 data.append(document)
-        logger.debug(f'parsed #docs={len(data)}')
+        self.logger.debug(f'parsed #docs={len(data)}')
         return data
 
-    async def apply(self, term: str, queue: asyncio.Queue) -> None:
+    async def apply(self, term: str, max_docs_src: int, queue: asyncio.Queue) -> None:
         """Query and retrieve all drug safety updates for the given search term."""
-        logger.debug(f'starting scraping the source={self._source} with term={term}')
+        self.logger.debug(f'starting scraping the source={self._source} with term={term}')
 
         # Search for relevant documents with a given term
         search_content = await self._mhra_document_search(term=term)
@@ -569,11 +569,11 @@ class MHRAScraper(Scraper):
         # Extract the divs containing the search results
         docs = self._extract_search_results_divs(parent=parent)
         if len(docs) < count:
-            logger.warning(f'from the total number of documents={count} only {len(docs)} will be parsed')
+            self.logger.warning(f'from the total number of documents={count} only {len(docs)} will be parsed')
 
         # Parse documents from links
-        documents = await self._parse_documents(docs=docs[:MAX_DOCS_PER_SOURCE])
-        documents = documents[:MAX_DOCS_PER_SOURCE]
+        documents = await self._parse_documents(docs=docs[:max_docs_src])
+        documents = documents[:max_docs_src]
 
         # Add documents to the queue
         for i, doc in enumerate(documents):
@@ -581,16 +581,18 @@ class MHRAScraper(Scraper):
             item = QueueItem(id_=id_, doc=doc)
             await queue.put(item)
         
-        logger.info(f'retrieved #docs={len(documents)} in source={self._source} for term={term}')
+        self.logger.info(f'retrieved #docs={len(documents)} in source={self._source} for term={term}')
 
 
 _SCRAPERS = [PubmedScraper, EMAScraper, MHRAScraper]
 _SOURCE_TO_SCRAPER = {src: scr for src, scr in zip(SCRAPING_SOURCES, _SCRAPERS)}
 
-async def _scraping(term: str, queue_in: asyncio.Queue, queue_out: asyncio.Queue) -> None:
+async def _scraping(args_: Namespace, queue_in: asyncio.Queue, queue_out: asyncio.Queue) -> None:
     """Pop a source (str) from the input queue, perform  the scraping task with the given term, and put the results in
     the output queue until the input queue is empty.
     """
+    term = args_.term
+    max_docs_src = args_.max_docs_src
 
     while True:
         # Get source from input queue
@@ -609,7 +611,7 @@ async def _scraping(term: str, queue_in: asyncio.Queue, queue_out: asyncio.Queue
             break
 
         try:
-            await scraper().apply(term=term, queue=queue_out)
+            await scraper().apply(term=term, max_docs_src=max_docs_src, queue=queue_out)
         except Exception as e:
             logger.error(f'error during scraping for source={source} and term={term}: {e}')
             queue_in.task_done()
@@ -620,9 +622,8 @@ async def _scraping(term: str, queue_in: asyncio.Queue, queue_out: asyncio.Queue
 def create_tasks(args_: Namespace, queue_in: asyncio.Queue, queue_out: asyncio.Queue) -> List[asyncio.Task]:
     """Create the asyncio scraping tasks."""
     sources = args_.source
-    term = args_.term
     n_scp_tasks = args_.n_scp_tasks
 
     logger.info(f'setting up {n_scp_tasks} scraping task(s) for source(s)={sources}')
-    tasks = [asyncio.create_task(_scraping(term=term, queue_in=queue_in, queue_out=queue_out)) for _ in range(n_scp_tasks)]
+    tasks = [asyncio.create_task(_scraping(args_=args_, queue_in=queue_in, queue_out=queue_out)) for _ in range(n_scp_tasks)]
     return tasks

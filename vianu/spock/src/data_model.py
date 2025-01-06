@@ -163,6 +163,7 @@ class Job(DataUnit):
 
     # generic options
     log_level: str
+    max_docs_src: int
 
     # scraping options
     term: str

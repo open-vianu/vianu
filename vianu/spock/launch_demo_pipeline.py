@@ -2,11 +2,13 @@ from argparse import Namespace
 import asyncio
 
 from vianu.spock.__main__ import main
-from vianu.spock.settings import N_SCP_TASKS_DEFAULT, N_NER_TASKS_DEFAULT, SCRAPING_SOURCES
+from vianu.spock.settings import SCRAPING_SOURCES, MAX_DOCS_PER_SOURCE
+from vianu.spock.settings import N_SCP_TASKS_DEFAULT, N_NER_TASKS_DEFAULT
 
 
 _ARGS = {
-    'term': 'dafalgan',
+    'term': 'ibuprofen',
+    'max_docs_src': MAX_DOCS_PER_SOURCE,
     'source': SCRAPING_SOURCES,
     'model': 'llama',
     'n_scp_tasks': N_SCP_TASKS_DEFAULT,

@@ -19,10 +19,11 @@ logger = logging.getLogger(__name__)
 HEAD_FILE = Path(__file__).parent / "assets/head/scripts.html"
 CSS_FILE = Path(__file__).parent / "assets/css/styles.css"
 SPOCK_SETTINGS = {
-    "source": ["mhra"], 
+    "source": ["pubmed", "ema", "mhra"], 
+    "max_docs_src": 1,
     "model": "llama",
     "n_scp_tasks": 1,
-    "n_ner_tasks": 2,
+    "n_ner_tasks": 1,
     "log_level": LOGGING_LEVEL,
 }
 
