@@ -25,12 +25,16 @@ class ToxicologyGANClient:
         """
         pass
 
-    def compute_gradient_penalty(self, discriminator, real_samples, fake_samples, Stru, Time, Dose, device):
+    def compute_gradient_penalty(
+        self, discriminator, real_samples, fake_samples, Stru, Time, Dose, device
+    ):
         """Calculates the gradient penalty loss for WGAN GP"""
         # Random weight term for interpolation between real and fake samples
         alpha = torch.rand((real_samples.size(0), 1)).to(device)
         # Get random interpolation between real and fake samples
-        interpolates = (alpha * real_samples + ((1 - alpha) * fake_samples)).requires_grad_(True)
+        interpolates = (
+            alpha * real_samples + ((1 - alpha) * fake_samples)
+        ).requires_grad_(True)
         d_interpolates = discriminator(interpolates, Stru, Time, Dose)
         fake = torch.ones(real_samples.shape[0], 1).to(device)
         # Get gradient w.r.t. interpolates
@@ -51,7 +55,7 @@ class ToxicologyGANClient:
         Stru1 = Stru
         Time1 = Time
         Dose1 = Dose
-        idx=torch.randperm(b_sz)
+        idx = torch.randperm(b_sz)
         Stru2 = Stru[idx]
         Time2 = Time[idx]
         Dose2 = Dose[idx]
@@ -59,40 +63,69 @@ class ToxicologyGANClient:
         # Sample random numbers epsilon
         epsilon = torch.rand(b_sz, 1, device=device)
 
-        interpolated_Stru = epsilon*Stru1 + (1 - epsilon)*Stru2
-        interpolated_Time = epsilon*Time1 + (1 - epsilon)*Time2
-        interpolated_Dose = epsilon*Dose1 + (1 - epsilon)*Dose2
+        interpolated_Stru = epsilon * Stru1 + (1 - epsilon) * Stru2
+        interpolated_Time = epsilon * Time1 + (1 - epsilon) * Time2
+        interpolated_Dose = epsilon * Dose1 + (1 - epsilon) * Dose2
 
-        #conditions1 = torch.cat([Stru1, Time1, Dose1], -1)
-        #conditions2 = torch.cat([Stru2, Time2, Dose2], -1)
-        #interpolated_conditions = epsilon * conditions1 + (1 - epsilon) * conditions2
+        # conditions1 = torch.cat([Stru1, Time1, Dose1], -1)
+        # conditions2 = torch.cat([Stru2, Time2, Dose2], -1)
+        # interpolated_conditions = epsilon * conditions1 + (1 - epsilon) * conditions2
 
         perturbation_std = 0.01
         # perturbations = torch.randn(b_sz, interpolated_conditions.shape[0])*perturbation_std
         # perturbated_conditions = interpolated_conditions + perturbations
-        perturbated_Stru = interpolated_Stru + torch.randn(b_sz, interpolated_Stru.shape[1]).to(device)*perturbation_std
-        perturbated_Time = interpolated_Time + torch.randn(b_sz, interpolated_Time.shape[1]).to(device)*perturbation_std
-        perturbated_Dose = interpolated_Dose + torch.randn(b_sz, interpolated_Dose.shape[1]).to(device)*perturbation_std
+        perturbated_Stru = (
+            interpolated_Stru
+            + torch.randn(b_sz, interpolated_Stru.shape[1]).to(device)
+            * perturbation_std
+        )
+        perturbated_Time = (
+            interpolated_Time
+            + torch.randn(b_sz, interpolated_Time.shape[1]).to(device)
+            * perturbation_std
+        )
+        perturbated_Dose = (
+            interpolated_Dose
+            + torch.randn(b_sz, interpolated_Dose.shape[1]).to(device)
+            * perturbation_std
+        )
 
-        batch_interpolated_samples = generator(z.detach(),
-                                               interpolated_Stru.detach(),
-                                               interpolated_Time.detach(),
-                                               interpolated_Dose.detach())
+        batch_interpolated_samples = generator(
+            z.detach(),
+            interpolated_Stru.detach(),
+            interpolated_Time.detach(),
+            interpolated_Dose.detach(),
+        )
 
-        batch_noise_samples = generator(z.detach(),
-                                        perturbated_Stru.detach(),
-                                        perturbated_Time.detach(),
-                                        perturbated_Dose.detach())
+        batch_noise_samples = generator(
+            z.detach(),
+            perturbated_Stru.detach(),
+            perturbated_Time.detach(),
+            perturbated_Dose.detach(),
+        )
 
         gp_loss = torch.nn.MSELoss()
         gp = gp_loss(batch_interpolated_samples, batch_noise_samples)
         return gp
 
-
-
-    def train(self, generator, discriminator, dataloader, n_epochs, n_critic, Z_dim, device, lr, b1, b2, interval,
-              model_path, lambda_gp, lambda_GR):
-        '''
+    def train(
+        self,
+        generator,
+        discriminator,
+        dataloader,
+        n_epochs,
+        n_critic,
+        Z_dim,
+        device,
+        lr,
+        b1,
+        b2,
+        interval,
+        model_path,
+        lambda_gp,
+        lambda_GR,
+    ):
+        """
         Trains a Generative Adversarial Network (GAN) using a generator and discriminator.
 
         Args:
@@ -123,13 +156,15 @@ class ToxicologyGANClient:
             train(generator, discriminator, dataloader, n_epochs=50, n_critic=5, Z_dim=100, device='cuda',
                   lr=0.0002, b1=0.5, b2=0.999, interval=100, model_path='./models',
                   lambda_gp=10, lambda_GR=0.1)
-        '''
+        """
         ###################################################################################
         # First we start by defining optimizers for generator and discriminator
         ###################################################################################
 
         optimizer_G = torch.optim.Adam(generator.parameters(), lr=lr, betas=(b1, b2))
-        optimizer_D = torch.optim.Adam(discriminator.parameters(), lr=lr, betas=(b1, b2))
+        optimizer_D = torch.optim.Adam(
+            discriminator.parameters(), lr=lr, betas=(b1, b2)
+        )
 
         # Log initialization of training
         logger.info("STARTING TRAINING")
@@ -147,13 +182,26 @@ class ToxicologyGANClient:
                 z = 2 * z - 1
                 gen_Measurement = generator(z, Stru, Time, Dose)
                 validity_real = discriminator(Measurement, Stru, Time, Dose)
-                validity_fake = discriminator(gen_Measurement.detach(), Stru, Time, Dose)
+                validity_fake = discriminator(
+                    gen_Measurement.detach(), Stru, Time, Dose
+                )
 
                 # Compute the Wasserstein loss and gradient penalty for the discriminator
-                gradient_penalty = self.compute_gradient_penalty(discriminator, Measurement, gen_Measurement, Stru, Time, Dose,
-                                                            device)
+                gradient_penalty = self.compute_gradient_penalty(
+                    discriminator,
+                    Measurement,
+                    gen_Measurement,
+                    Stru,
+                    Time,
+                    Dose,
+                    device,
+                )
                 # Backpropagate and optimize the discriminator
-                d_loss = -torch.mean(validity_real) + torch.mean(validity_fake) + lambda_gp * gradient_penalty
+                d_loss = (
+                    -torch.mean(validity_real)
+                    + torch.mean(validity_fake)
+                    + lambda_gp * gradient_penalty
+                )
 
                 d_loss.backward()
                 optimizer_D.step()
@@ -164,7 +212,9 @@ class ToxicologyGANClient:
                     validity = discriminator(gen_Measurement, Stru, Time, Dose)
 
                     # Compute the Regularization term for genenerator LGR(G)
-                    LGR = lambda_GR * self.calc_generator_regularization(Stru, Time, Dose, z, device, generator)
+                    LGR = lambda_GR * self.calc_generator_regularization(
+                        Stru, Time, Dose, z, device, generator
+                    )
                     # Generator loss
                     g_loss = -torch.mean(validity) + LGR
 
@@ -174,17 +224,32 @@ class ToxicologyGANClient:
                     optimizer_G.step()
                 print(
                     "[Epoch %d/%d] [Batch %d/%d] [D loss: %f] [G loss: %f]"
-                    % (epoch + 1, n_epochs, i + 1, len(dataloader), d_loss.item(), g_loss.item())
+                    % (
+                        epoch + 1,
+                        n_epochs,
+                        i + 1,
+                        len(dataloader),
+                        d_loss.item(),
+                        g_loss.item(),
+                    )
                 )
             if (epoch + 1) % interval == 0:
-                print(f'this is model path: {model_path}')
+                print(f"this is model path: {model_path}")
                 if not os.path.exists(model_path):
                     print(model_path)
                     os.makedirs(model_path)
-                torch.save(generator.state_dict(), os.path.join(model_path, 'generator_{}'.format(epoch + 1))) # nosec
+                torch.save(
+                    generator.state_dict(),
+                    os.path.join(model_path, "generator_{}".format(epoch + 1)),
+                )  # nosec
 
-
-    def create_custom_dataloader(self, data_filepath: str, descriptors_path: str, batch_size: int, device: Union[str, torch.device]):
+    def create_custom_dataloader(
+        self,
+        data_filepath: str,
+        descriptors_path: str,
+        batch_size: int,
+        device: Union[str, torch.device],
+    ):
         """
         Create a custom DataLoader for data and conditions.
 
@@ -203,8 +268,16 @@ class ToxicologyGANClient:
 
         # Preprocess data
         scaler = MinMaxScaler(feature_range=(-1, 1))
-        descriptors = pd.DataFrame(scaler.fit_transform(descriptors), columns=descriptors.columns, index=descriptors.index)
-        data = data.iloc[:, 0:3].join(pd.DataFrame(scaler.fit_transform(data.iloc[:, 3:]), columns=data.columns[3:]))
+        descriptors = pd.DataFrame(
+            scaler.fit_transform(descriptors),
+            columns=descriptors.columns,
+            index=descriptors.index,
+        )
+        data = data.iloc[:, 0:3].join(
+            pd.DataFrame(
+                scaler.fit_transform(data.iloc[:, 3:]), columns=data.columns[3:]
+            )
+        )
 
         S = pd.DataFrame(columns=descriptors.columns)
         M = pd.DataFrame(columns=data.columns[3:])
@@ -212,7 +285,9 @@ class ToxicologyGANClient:
         D = []
         for i in range(len(data)):
             if data.iloc[i].COMPOUND_NAME in descriptors.index:
-                S = pd.concat([S, descriptors[descriptors.index == data.iloc[i].COMPOUND_NAME]])
+                S = pd.concat(
+                    [S, descriptors[descriptors.index == data.iloc[i].COMPOUND_NAME]]
+                )
                 subset_data = data.iloc[i, 3:].to_frame().T
                 M = pd.concat([M, subset_data], ignore_index=True)
                 T.append(self.Time(data.iloc[i].SACRI_PERIOD))
@@ -226,53 +301,87 @@ class ToxicologyGANClient:
         D = scaler.fit_transform(np.array(D, dtype=np.float32).reshape(len(D), -1))
         D = torch.tensor(D, device=device)
         dataset = torch.utils.data.TensorDataset(M, S, T, D)
-        dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True)
+        dataloader = torch.utils.data.DataLoader(
+            dataset, batch_size=batch_size, shuffle=True
+        )
 
         return dataloader
 
     def Time(self, SACRIFICE_PERIOD):
         switcher = {
-            '4 day': 4 / 29,
-            '8 day': 8 / 29,
-            '15 day': 15 / 29,
-            '29 day': 29 / 29
+            "4 day": 4 / 29,
+            "8 day": 8 / 29,
+            "15 day": 15 / 29,
+            "29 day": 29 / 29,
         }
-        return switcher.get(SACRIFICE_PERIOD, 'error')
+        return switcher.get(SACRIFICE_PERIOD, "error")
 
     def Dose(self, DOSE_LEVEL):
-        switcher = {
-            'Low': 0.1,
-            'Middle': 0.3,
-            'High': 1
-        }
-        return switcher.get(DOSE_LEVEL, 'error')
+        switcher = {"Low": 0.1, "Middle": 0.3, "High": 1}
+        return switcher.get(DOSE_LEVEL, "error")
 
-    def generate(self, treatments, descriptors, training_data, descriptors_training, result_path, generator, device, num_generate, latent_dim):
-        '''
+    def generate(
+        self,
+        treatments,
+        descriptors,
+        training_data,
+        descriptors_training,
+        result_path,
+        generator,
+        device,
+        num_generate,
+        latent_dim,
+    ):
+        """
         Args:
         treatments (pd.DataFrame): treatment conditions of interest
         descriptors (pd.DataFrame): molecular descriptors of the compounds of interest
         training_data (pd.DataFrame): all the training data used for the pretrained model
         descriptors_training (pd.DataFrame): molecular descriptors of the compounds used to train the model
         result_path (str) : path to the file where you want to store the results
-        '''
-
+        """
 
         scaler = MinMaxScaler(feature_range=(-1, 1))
 
         scaler.fit(descriptors_training)
-        scaled_MDs = pd.DataFrame(scaler.transform(descriptors), columns=descriptors.columns, index=descriptors.index)
+        scaled_MDs = pd.DataFrame(
+            scaler.transform(descriptors),
+            columns=descriptors.columns,
+            index=descriptors.index,
+        )
         S = pd.DataFrame()
         for i in range(len(treatments)):
-            S = pd.concat([S, scaled_MDs[scaled_MDs.index == treatments.iloc[i].COMPOUND_NAME]])
+            S = pd.concat(
+                [S, scaled_MDs[scaled_MDs.index == treatments.iloc[i].COMPOUND_NAME]]
+            )
         S = torch.tensor(S.to_numpy(dtype=np.float32), device=device)
 
-        scaler.fit(training_data['SACRI_PERIOD'].apply(self.Time).to_numpy(dtype=np.float32).reshape(-1, 1))
-        T = scaler.transform(treatments['SACRI_PERIOD'].apply(self.Time).to_numpy(dtype=np.float32).reshape(-1, 1))
+        scaler.fit(
+            training_data["SACRI_PERIOD"]
+            .apply(self.Time)
+            .to_numpy(dtype=np.float32)
+            .reshape(-1, 1)
+        )
+        T = scaler.transform(
+            treatments["SACRI_PERIOD"]
+            .apply(self.Time)
+            .to_numpy(dtype=np.float32)
+            .reshape(-1, 1)
+        )
         T = torch.tensor(T, device=device)
 
-        scaler.fit(training_data['DOSE_LEVEL'].apply(self.Dose).to_numpy(dtype=np.float32).reshape(-1, 1))
-        D = scaler.transform(treatments['DOSE_LEVEL'].apply(self.Dose).to_numpy(dtype=np.float32).reshape(-1, 1))
+        scaler.fit(
+            training_data["DOSE_LEVEL"]
+            .apply(self.Dose)
+            .to_numpy(dtype=np.float32)
+            .reshape(-1, 1)
+        )
+        D = scaler.transform(
+            treatments["DOSE_LEVEL"]
+            .apply(self.Dose)
+            .to_numpy(dtype=np.float32)
+            .reshape(-1, 1)
+        )
         D = torch.tensor(D, device=device)
 
         measurements = training_data.iloc[:, 3:]
@@ -282,16 +391,27 @@ class ToxicologyGANClient:
             num = 0
             while num < num_generate:
                 z = torch.randn(1, latent_dim).to(device)
-                generated_records = generator(z, S[i].view(1, -1), T[i].view(1, -1), D[i].view(1, -1))
-                generated_records = scaler.inverse_transform(generated_records.cpu().detach().numpy())
+                generated_records = generator(
+                    z, S[i].view(1, -1), T[i].view(1, -1), D[i].view(1, -1)
+                )
+                generated_records = scaler.inverse_transform(
+                    generated_records.cpu().detach().numpy()
+                )
                 check = np.sum(generated_records[:, 9:14])
                 # Source code 95 < check < 105
                 if 80 < check < 120:
                     num += 1
                     Results.loc[i] = generated_records.flatten()
-        Results = pd.concat([treatments.loc[treatments.index.repeat(num_generate)].reset_index(drop=True), Results], axis=1)
-        Results.to_csv(result_path, sep='\t', index=False)
-
+        Results = pd.concat(
+            [
+                treatments.loc[treatments.index.repeat(num_generate)].reset_index(
+                    drop=True
+                ),
+                Results,
+            ],
+            axis=1,
+        )
+        Results.to_csv(result_path, sep="\t", index=False)
 
 
 class GeneratorModel(nn.Module):
@@ -306,13 +426,15 @@ class GeneratorModel(nn.Module):
             return nn.Sequential(*layers)
 
         self.model = nn.Sequential(
-            *unitary_block(Z_dim + Stru_dim + Time_dim + Dose_dim, 4096, normalize=False),
+            *unitary_block(
+                Z_dim + Stru_dim + Time_dim + Dose_dim, 4096, normalize=False
+            ),
             *unitary_block(4096, 2048),
             *unitary_block(2048, 1024),
             *unitary_block(1024, 256),
             *unitary_block(256, 64),
             nn.Linear(64, Measurement_dim),
-            nn.Tanh()
+            nn.Tanh(),
         )
 
     def forward(self, noise, Stru, Time, Dose):

@@ -2,16 +2,16 @@ from pathlib import Path
 
 ROOT_PATH = Path(__file__).parents[2]
 
-working_dir = ROOT_PATH / r'toxicologygan'
+working_dir = ROOT_PATH / r"toxicologygan"
 
 #######################################################################
 # DEFAULT VALUES
 #######################################################################
 
 ## Data_path : where data is stored
-data_path: str = './dummy_data/Example_Data_training.tsv'
+data_path: str = "./dummy_data/Example_Data_training.tsv"
 ## descriptors_path : path to molecular descriptor file
-descriptors_path: str = './dummy_data/Example_MolecularDescriptors.tsv'
+descriptors_path: str = "./dummy_data/Example_MolecularDescriptors.tsv"
 ## N_epochs : number of epochs of training
 n_epochs: int = 10
 ## batch_size : size of batch
@@ -43,8 +43,8 @@ lambda_gp: float = 1.0
 ## lambda_GR : strength of the regularization term for generator
 lambda_GR: float = 0.2
 ## model_path : path to model saving folder
-model_path: str = './models'
+model_path: str = "./models"
 ## filename_Losses : filename of losses
-filename_Losses: str = 'Loss.txt'
+filename_Losses: str = "Loss.txt"
 ## num_generate : number of blood testing records you want to generate
 num_generate: int = 100
