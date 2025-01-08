@@ -131,7 +131,7 @@ async def _feed_cards_to_ui() -> List[dict[str, Any]]:
         cds.append(gr.update(value=html, visible=True))
 
     # Extdend with empty cards (as dynamic number of gr.Blocks is not supported in gradio <= 5.0.0)
-    cds.extend([gr.update(visible=False) for i in range(MAX_JOBS - len(spocks))])
+    cds.extend([gr.update(visible=False) for _ in range(MAX_JOBS - len(spocks))])
     return cds
 
 

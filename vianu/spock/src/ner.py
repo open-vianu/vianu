@@ -52,11 +52,11 @@ class NER(ABC):
         pos = text.find(subtext)
         if pos == -1:
             return None
-        return pos, pos + len(subtext)
+        return [pos, pos + len(subtext)]
 
 
     @abstractmethod
-    def apply(text: str, queue_in: asyncio.Queue, queue_out: asyncio.Queue) -> List[NamedEntity]:
+    def apply(self, queue_in: asyncio.Queue, queue_out: asyncio.Queue) -> List[NamedEntity]:
         pass
 
 
@@ -113,7 +113,7 @@ class OllamaNER(NER):
 
 
     async def apply(self, queue_in: asyncio.Queue, queue_out: asyncio.Queue) -> None:
-        """Apply NER to a texts in an input queue and put the results in an output queue."""
+        """Apply NER to a text received from input queue and put the results in an output queue."""
 
         while True:
             # Get text from input queue

@@ -96,9 +96,9 @@ class PubmedScraper(Scraper):
         An example can be found here:
             https://www.ncbi.nlm.nih.gov/books/n/helpeutils/chapter3/#chapter3.Application_3_Retrieving_large
         """
-        web = re.search(r'<WebEnv>(\S+)<\/WebEnv>', text).group(1)
-        key = re.search(r'<QueryKey>(\d+)<\/QueryKey>', text).group(1)
-        count = int(re.search(r'<Count>(\d+)<\/Count>', text).group(1))
+        web = re.search(r'<WebEnv>(\S+)</WebEnv>', text).group(1)
+        key = re.search(r'<QueryKey>(\d+)</QueryKey>', text).group(1)
+        count = int(re.search(r'<Count>(\d+)</Count>', text).group(1))
         return PubmedEntrezHistoryParams(web=web, key=key, count=count)
     
     async def _pubmed_esearch(self, term: str) -> str:
@@ -224,10 +224,10 @@ class PubmedScraper(Scraper):
                 texts = self.split_text_into_chunks(text=text)
 
                 # Create the Document object(s)
-                for text in texts:
+                for txt in texts:
                     document = Document(
-                        id_=f'{self._source_url} {title} {text} {language} {publication_date}',
-                        text=text,
+                        id_=f'{self._source_url} {title} {txt} {language} {publication_date}',
+                        text=txt,
                         source=self._source,
                         title=title,
                         url=f'{self._source_url}{pmid}/',

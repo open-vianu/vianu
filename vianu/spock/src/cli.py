@@ -2,13 +2,14 @@
 """
 
 import argparse
+from typing import Sequence
 
 from vianu.spock.settings import LOGGING_LEVEL, DATA_FILE, DATA_PATH, MAX_DOCS_PER_SOURCE
 from vianu.spock.settings import SCRAPING_SOURCES, N_SCP_TASKS_DEFAULT
 from vianu.spock.settings import N_NER_TASKS_DEFAULT, NER_MODELS
 
 
-def parse_args(args_: argparse.Namespace) -> argparse.Namespace:
+def parse_args(args_: Sequence) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="SpoCK", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
     # Add generic options

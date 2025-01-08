@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from argparse import Namespace
 from dataclasses import dataclass, asdict, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from hashlib import sha256
 import json
 import logging
@@ -144,17 +144,17 @@ class Document(DataUnit):
 
 class DocumentJSONEncoder(json.JSONEncoder):
     """Custom JSON encoder for the :class:`Document` class."""
-    def default(self, o):
-        if isinstance(o, datetime):
-            return o.isoformat()
-        if isinstance(o, Document):
-            return asdict(o)
-        if isinstance(o, np.float32):
-            return str(o)
-        if isinstance(o, np.int64):
-            return int(o)
+    def default(self, obj):
+        if isinstance(obj, datetime):
+            return obj.isoformat()
+        if isinstance(obj, Document):
+            return asdict(obj)
+        if isinstance(obj, np.float32):
+            return str(obj)
+        if isinstance(obj, np.int64):
+            return int(obj)
         # Let the base class default method raise the TypeError
-        return json.JSONEncoder.default(self, o)
+        return json.JSONEncoder.default(self, obj)
 
 
 @dataclass(eq=False)
@@ -211,7 +211,7 @@ class SpoCK:
     job: Job | None = None
     data: List[Document] = field(default_factory=list)
 
-    def runtime(self) -> datetime | None:
+    def runtime(self) -> timedelta | None:
         if self.started_at is not None:
             if self.finished_at is None:
                 return datetime.now() - self.started_at
