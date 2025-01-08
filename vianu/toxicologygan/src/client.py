@@ -181,7 +181,7 @@ class ToxicologyGANClient:
                 if not os.path.exists(model_path):
                     print(model_path)
                     os.makedirs(model_path)
-                torch.save(generator.state_dict(), os.path.join(model_path, 'generator_{}'.format(epoch + 1)))
+                torch.save(generator.state_dict(), os.path.join(model_path, 'generator_{}'.format(epoch + 1))) # nosec
 
 
     def create_custom_dataloader(self, data_filepath: str, descriptors_path: str, batch_size: int, device: Union[str, torch.device]):

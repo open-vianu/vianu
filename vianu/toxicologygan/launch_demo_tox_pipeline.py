@@ -1,6 +1,5 @@
 import os
 import torch
-#from utils import Time, Dose
 import pandas as pd
 
 from src.client import ToxicologyGANClient, GeneratorModel, Discriminator
@@ -44,7 +43,7 @@ generator = GeneratorModel(latent_dim, molecular_dim, Time_dim, Dose_dim, Measur
 
 # Load model
 model_path = os.path.join(path, 'models', 'generator_10')
-weights = torch.load(str(model_path))
+weights = torch.load(str(model_path)) # nosec
 generator.load_state_dict(weights)
 generator.eval()
 
