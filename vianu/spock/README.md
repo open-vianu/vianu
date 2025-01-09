@@ -43,6 +43,11 @@ docker run -d -v ollama:/root/.ollama -p 11434:11434 --name ollama ollama/ollama
 docker exec -it ollama ollama pull llama3.2
 ```
 
+**Environment Variables**
+Use an `.env` file for defining the following Envornment Variables:
+- `OLLAMA_ENDPOINT`: when using `--model ollama`
+- `OPENAI_API_KEY`: when using `--model openai`
+
 ### Run demo pipeline
 ```bash
 python vianu/spock/launch_demo_pipeline.py

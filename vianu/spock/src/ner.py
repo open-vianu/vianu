@@ -180,10 +180,10 @@ class OllamaNER(NER):
 
 class OpenAINER(NER):
 
-    def __init__(self, model: str):
+    def __init__(self, api_key: str, model: str):
         super().__init__()
         self._model = model
-        self._client = AsyncOpenAI()
+        self._client = AsyncOpenAI(api_key=api_key)
     
 
     async def _get_ner_model_answer(self, text: str) -> str:
@@ -205,8 +205,11 @@ def create_tasks(args_: Namespace, queue_in: asyncio.Queue, queue_out: asyncio.Q
         if endpoint is None:
             raise EnvironmentError("The ollama endpoint must be set by the OLLAMA_ENDPOINT environment variable")
         ner = OllamaNER(endpoint=endpoint, model=LLAMA_MODEL)
-    if model == 'openai':
-        ner = OpenAINER(model=OPENAI_MODEL)
+    elif model == 'openai':
+        api_key = os.environ.get('OPENAI_API_KEY')
+        if api_key is None:
+            raise EnvironmentError("The api_key for the OpenAI client must be set by the OPENAI_API_KEY environment variable")
+        ner = OpenAINER(api_key=api_key, model=OPENAI_MODEL)
     else:
         raise ValueError(f'unknown ner model "{args_.model}"')
     
