@@ -6,8 +6,7 @@
 - **`ner`**: Use LLMs to identify *drug names* and *adverse drug reactions*
 
 ### Why SpoCK?  
-Built with an `async` concurrency framework, SpoCK ensures efficient performance and simplifies horizontal and vertical 
-scaling; this aims to address the handling of growing data and user demands.
+Built with an `async` concurrency framework, SpoCK ensures efficient performance and simplifies horizontal scaling; this aims to address the handling of growing data and user demands.
 
 **SpoCK** is aimed to be highliy customizable. Here are some ideas adapt it to your needs:  
 
@@ -35,6 +34,8 @@ poetry shell
 - `gradio`
 - `numpy`
 - `pymupdf`
+- `python-dotenv`
+- `openai`
 
 **Local Ollama inference container**
 ```bash

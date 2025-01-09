@@ -5,6 +5,7 @@ DATA_PATH = "/tmp/spock/"
 DATA_FILE = "spock_data"
 DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 N_CHAR_DOC_ID = 12
+GRADIO_SERVER_PORT=7864
 
 # Scraping settings
 SCRAPING_SOURCES = ['pubmed', 'ema', 'mhra']
@@ -19,10 +20,10 @@ PUBMED_BATCH_SIZE = 20
 
 # NER settings
 N_NER_TASKS_DEFAULT = 1
-NER_MODELS = ['llama']
+NER_MODELS = ['llama', 'openai']
 MAX_TOKENS = 128.000
-OLLAMA_ENDPOINT = "http://localhost:11434/api/chat"
 LLAMA_MODEL='llama3.2'
+OPENAI_MODEL='gpt-4o'
 
 # UI settings
 MAX_JOBS = 5

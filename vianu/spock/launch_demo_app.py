@@ -7,7 +7,7 @@ from typing import Tuple, List, Any
 
 import gradio as gr
 
-from vianu.spock.settings import LOGGING_LEVEL, LOGGING_FMT, UPDATE_INTERVAL, MAX_JOBS
+from vianu.spock.settings import LOGGING_LEVEL, LOGGING_FMT, UPDATE_INTERVAL, MAX_JOBS, GRADIO_SERVER_PORT
 from vianu.spock.src.data_model import Job, SpoCK, QueueItem
 from vianu.spock.__main__ import setup_asyncio_framework
 from vianu.spock.src.ui import get_job_card_html, get_details_html
@@ -20,10 +20,10 @@ HEAD_FILE = Path(__file__).parent / "assets/head/scripts.html"
 CSS_FILE = Path(__file__).parent / "assets/css/styles.css"
 SPOCK_SETTINGS = {
     "source": ["pubmed", "ema", "mhra"], 
-    "max_docs_src": 2,
-    "model": "llama",
-    "n_scp_tasks": 1,
-    "n_ner_tasks": 1,
+    "max_docs_src": 5,
+    "model": "openai",
+    "n_scp_tasks": 2,
+    "n_ner_tasks": 2,
     "log_level": LOGGING_LEVEL,
 }
 
@@ -205,7 +205,7 @@ def _feed_details_to_ui(icrd: int):
 
 
 # Design of the UI
-with gr.Blocks(head_paths=HEAD_FILE, css_paths=CSS_FILE, theme=gr.themes.Soft()) as demo:
+with gr.Blocks(title='SpoCK', head_paths=HEAD_FILE, css_paths=CSS_FILE, theme=gr.themes.Soft()) as demo:
     is_running = gr.State(value=False)
     card_number = gr.State(value=0)
 
@@ -296,4 +296,9 @@ with gr.Blocks(head_paths=HEAD_FILE, css_paths=CSS_FILE, theme=gr.themes.Soft())
 
 
 if __name__ == "__main__":
-    demo.launch(debug=True)
+    demo.launch(
+        share=False,
+        debug=True,
+        favicon_path="vianu/spock/assets/images/favicon.png",
+        server_port=GRADIO_SERVER_PORT,     # On the default port 7860 the favicon might not appear becaus of cached previous favicons
+    )

@@ -3,13 +3,18 @@ import aiohttp
 from argparse import Namespace
 import asyncio
 import logging
+import os
 import re
 from typing import List
 
+from dotenv import load_dotenv
+from openai import AsyncOpenAI
+
 from vianu.spock.src.data_model import NamedEntity, QueueItem
-from vianu.spock.settings import N_CHAR_DOC_ID, OLLAMA_ENDPOINT, LLAMA_MODEL
+from vianu.spock.settings import N_CHAR_DOC_ID, LLAMA_MODEL, OPENAI_MODEL
 
 logger = logging.getLogger(__name__)
+load_dotenv()
 
 NAMED_ENTITY_PROMPT = """
 You are an expert in Natural Language Processing. Your task is to identify named entities (NER) in a given text.
@@ -43,11 +48,14 @@ Output:
 
 class NER(ABC):
 
+    _named_entity_pattern = re.compile(r'\("([^"]+)",\s?"(MP|ADR)"\)')
+
     def __init__(self):
         self.logger = logging.getLogger(self.__class__.__name__)
 
+
     @staticmethod
-    def get_loc_of_subtext(text: str, subtext: str) -> List[int] | None:
+    def _get_loc_of_subtext(text: str, subtext: str) -> List[int] | None:
         """Get the location of a subtext in a text."""
         pos = text.find(subtext)
         if pos == -1:
@@ -55,61 +63,37 @@ class NER(ABC):
         return [pos, pos + len(subtext)]
 
 
-    @abstractmethod
-    def apply(self, queue_in: asyncio.Queue, queue_out: asyncio.Queue) -> List[NamedEntity]:
-        pass
-
-
-class OllamaNER(NER):
-
-    _ne_pat = re.compile(r'\("([^"]+)",\s?"(MP|ADR)"\)')
-
-    def __init__(self, endpoint: str, model: str):
-        super().__init__()
-        self._endpoint = endpoint
-        self._model = model
-
-
-    def _get_ner_data(self, text: str, stream: bool = False) -> dict:
-        user_text = f'Process the following input text: "{text}"'
-        data = {
-            "model": self._model,
-            "messages": [
-                {
-                    "role": "system",
-                    "content": NAMED_ENTITY_PROMPT,
-                },
-                {
-                    "role": "user",
-                    "content": user_text,
-                },
-            ],
-            "stream": stream,
-        }
-        return data
-    
-
-    async def _get_ner_model_answer(self, text: str) -> str:
-        data = self._get_ner_data(text=text)
-        async with aiohttp.ClientSession() as session:
-            async with session.post(self._endpoint, json=data) as response:
-                response.raise_for_status()
-                resp_json = await response.json()
-                content = resp_json['message']['content']
-        return content
-
-
     def _add_loc_for_named_entities(self, text: str, named_entities: List[NamedEntity]) -> None:
         txt_low = text.lower()
         for ne in named_entities:
             ne_txt_low = ne.text.lower()
-            loc = self.get_loc_of_subtext(text=txt_low, subtext=ne_txt_low)
+            loc = self._get_loc_of_subtext(text=txt_low, subtext=ne_txt_low)
 
             if loc is not None:
                 ne.location = loc
                 ne.text = text[loc[0]:loc[1]]
             else:
                 self.logger.warning(f'could not find location for named entity "{ne.text}" of class "{ne.class_}"')
+
+
+    @staticmethod
+    def _get_messages(text: str) -> List[dict]:
+        text = f'Process the following input text: "{text}"'
+        return [
+                {
+                    "role": "system",
+                    "content": NAMED_ENTITY_PROMPT,
+                },
+                {
+                    "role": "user",
+                    "content": text,
+                },
+            ]
+
+
+    @abstractmethod
+    async def _get_ner_model_answer(self, text: str) -> str:
+        raise NotImplementedError('OpenAINER._get_ner_model_answer is not implemented yet')
 
 
     async def apply(self, queue_in: asyncio.Queue, queue_out: asyncio.Queue) -> None:
@@ -137,7 +121,7 @@ class OllamaNER(NER):
                 continue
 
             # Parse the model answer and remove duplicates
-            ne_list = re.findall(self._ne_pat, content)
+            ne_list = re.findall(self._named_entity_pattern, content)
             ne_list = list(set(ne_list))
 
             # Create list of NamedEntity objects
@@ -166,12 +150,63 @@ class OllamaNER(NER):
             self.logger.info(f'finished NER task for item.id_={id_} (doc.id_={doc.id_[:N_CHAR_DOC_ID]})')
 
 
+class OllamaNER(NER):
+
+    def __init__(self, endpoint: str, model: str):
+        super().__init__()
+        self._endpoint = endpoint
+        self._model = model
+
+
+    def _get_http_data(self, text: str, stream: bool = False) -> dict:
+        messages = self._get_messages(text=text)
+        data = {
+            "model": self._model,
+            "messages": messages,
+            "stream": stream,
+        }
+        return data
+    
+
+    async def _get_ner_model_answer(self, text: str) -> str:
+        data = self._get_http_data(text=text)
+        async with aiohttp.ClientSession() as session:
+            async with session.post(self._endpoint, json=data) as response:
+                response.raise_for_status()
+                resp_json = await response.json()
+                content = resp_json['message']['content']
+        return content
+
+
+class OpenAINER(NER):
+
+    def __init__(self, model: str):
+        super().__init__()
+        self._model = model
+        self._client = AsyncOpenAI()
+    
+
+    async def _get_ner_model_answer(self, text: str) -> str:
+        messages = self._get_messages(text=text)
+        chat_completion = await self._client.chat.completions.create(
+            messages=messages,
+            model=self._model,
+        )
+        return chat_completion.choices[0].message.content
+
+
 def create_tasks(args_: Namespace, queue_in: asyncio.Queue, queue_out: asyncio.Queue) -> List[asyncio.Task]:
     """Create asyncio NER tasks."""
     n_ner_tasks = args_.n_ner_tasks
+    model = args_.model
     
-    if args_.model == 'llama':
-        ner = OllamaNER(endpoint=OLLAMA_ENDPOINT, model=LLAMA_MODEL)
+    if model == 'llama':
+        endpoint = os.environ.get('OLLAMA_ENDPOINT')
+        if endpoint is None:
+            raise EnvironmentError("The ollama endpoint must be set by the OLLAMA_ENDPOINT environment variable")
+        ner = OllamaNER(endpoint=endpoint, model=LLAMA_MODEL)
+    if model == 'openai':
+        ner = OpenAINER(model=OPENAI_MODEL)
     else:
         raise ValueError(f'unknown ner model "{args_.model}"')
     
