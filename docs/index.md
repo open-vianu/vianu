@@ -1,6 +1,7 @@
 ---
-title: Home
+title: Getting started
 layout: home
+nav_order: 1
 ---
 
 # Welcome to VIANU!
@@ -17,30 +18,36 @@ data-driven applications.
 
 This is how you install all of our cool ninja moves
 
-### Available Tools
+## Available Tools
 
-Lasa: A tool for phonetic comparison of novel drug names with authorized ones from different locations.
-FraudCrawler: A data ingestion and transformation pipeline for real-world healthcare data.
+- **FraudCrawler**: A data ingestion and transformation pipeline for real-world healthcare data.
+- **Lasa**: A tool for phonetic comparison of novel drug names with authorized ones from different locations.
+- **Spock**: Perform literature research for adverse effects.
+- **Ragulator**: Conduct semantic searches in official guidelines.
+- 
+
+## Prerequisites
+- Python 3.11 or higher
+- Internet connection for API calls
+
+## Quick Installation
+```bash
+pip install vianu==0.1.2
+```
+
+### Example usage
+
+```python
+from vianu.fraudcrawler.src.client import FraudcrawlerClient
+
+fc = FraudcrawlerClient()
+fc.serpapi_token = "your_token"
+fc.zyte_api_key = "your_key"
+
+df = fc.search("sildenafil", num_results=5, location="Switzerland")
+print(df)
+```
 
 Other than that, go ahead and `have fun` with this repository!
-
-### Fraudcrawler
-
-This is a crawler
-
-### Ragulator
-
-This is a RAG system
-
-### Lasa
-
-This is a tool that solves the look alike sound alike 
-
----
-title: Installation
-layout: Installation
----
-
-----
 
 [Vianu]: https://github.com/open-vianu/vianu
