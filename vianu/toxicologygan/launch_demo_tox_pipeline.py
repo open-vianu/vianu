@@ -73,13 +73,13 @@ path = working_dir
 
 # Read data
 treatments = pd.read_csv(
-    os.path.join(path, "dummy_data", "Example_Treatments_test.tsv"), sep="\t"
+    path / 'dummy_data' / 'Example_Treatments_test.tsv', sep="\t"
 )
 training_data = pd.read_csv(
-    os.path.join(path, "dummy_data", "Example_Data_training.tsv"), sep="\t"
+    path / 'dummy_data' / 'Example_Data_training.tsv', sep="\t"
 )  ### this file should store all the training data used for the pretrained model
 MDs = pd.read_csv(
-    os.path.join(path, "dummy_data", "Example_MolecularDescriptors.tsv"),
+    path / 'dummy_data' / 'Example_MolecularDescriptors.tsv',
     index_col=0,
     sep="\t",
 )
@@ -92,7 +92,7 @@ generator = GeneratorModel(
 ).to(device)
 
 # Load model
-model_path = os.path.join(path, "models", "generator_10")
+model_path = path / 'models' / 'generator_10'
 weights = torch.load(str(model_path))  # nosec
 generator.load_state_dict(weights)
 generator.eval()

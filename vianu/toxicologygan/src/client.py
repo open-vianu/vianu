@@ -25,9 +25,16 @@ class ToxicologyGANClient:
         """
         pass
 
+    @staticmethod
     def compute_gradient_penalty(
-        self, discriminator, real_samples, fake_samples, Stru, Time, Dose, device
-    ):
+            discriminator: nn.Module,
+            real_samples: torch.Tensor,
+            fake_samples: torch.Tensor,
+            Stru: torch.Tensor,
+            Time: torch.Tensor,
+            Dose: torch.Tensor,
+            device: torch.device
+    ) -> torch.Tensor:
         """Calculates the gradient penalty loss for WGAN GP"""
         # Random weight term for interpolation between real and fake samples
         alpha = torch.rand((real_samples.size(0), 1)).to(device)
@@ -50,7 +57,15 @@ class ToxicologyGANClient:
         gradient_penalty = ((gradients.norm(2, dim=1) - 1) ** 2).mean()
         return gradient_penalty
 
-    def calc_generator_regularization(self, Stru, Time, Dose, z, device, generator):
+    @staticmethod
+    def calc_generator_regularization(
+            Stru: torch.Tensor,
+            Time: torch.Tensor,
+            Dose: torch.Tensor,
+            z: torch.Tensor,
+            device: torch.device,
+            generator: nn.Module
+    ) -> torch.Tensor:
         b_sz = Stru.shape[0]
         Stru1 = Stru
         Time1 = Time
@@ -110,21 +125,21 @@ class ToxicologyGANClient:
 
     def train(
         self,
-        generator,
-        discriminator,
+        generator: nn.Module,
+        discriminator: nn.Module,
         dataloader,
-        n_epochs,
-        n_critic,
-        Z_dim,
-        device,
-        lr,
-        b1,
-        b2,
-        interval,
-        model_path,
-        lambda_gp,
-        lambda_GR,
-    ):
+        n_epochs: int,
+        n_critic: int,
+        Z_dim: int,
+        device: torch.device,
+        lr: float,
+        b1: float,
+        b2: float,
+        interval: int,
+        model_path: str,
+        lambda_gp: float,
+        lambda_GR: float,
+    ) -> None:
         """
         Trains a Generative Adversarial Network (GAN) using a generator and discriminator.
 
@@ -208,6 +223,7 @@ class ToxicologyGANClient:
 
                 # Train the generator every n_critic steps
                 if (epoch * len(dataloader) + i) % n_critic == 0:
+
                     gen_Measurement = generator(z, Stru, Time, Dose)
                     validity = discriminator(gen_Measurement, Stru, Time, Dose)
 
@@ -283,15 +299,14 @@ class ToxicologyGANClient:
         M = pd.DataFrame(columns=data.columns[3:])
         T = []
         D = []
-        for i in range(len(data)):
-            if data.iloc[i].COMPOUND_NAME in descriptors.index:
-                S = pd.concat(
-                    [S, descriptors[descriptors.index == data.iloc[i].COMPOUND_NAME]]
-                )
-                subset_data = data.iloc[i, 3:].to_frame().T
+
+        for _ , row in data.iterrows():
+            if row.COMPOUND_NAME in descriptors.index:
+                S = pd.concat([S, descriptors[descriptors.index == row.COMPOUND_NAME]])
+                subset_data = row.iloc[3:].to_frame().T
                 M = pd.concat([M, subset_data], ignore_index=True)
-                T.append(self.Time(data.iloc[i].SACRI_PERIOD))
-                D.append(self.Dose(data.iloc[i].DOSE_LEVEL))
+                T.append(self.Time(row.SACRI_PERIOD))
+                D.append(self.Dose(row.DOSE_LEVEL))
 
         # Convert data to PyTorch tensors
         S = torch.tensor(S.to_numpy(dtype=np.float32), device=device)
@@ -307,7 +322,8 @@ class ToxicologyGANClient:
 
         return dataloader
 
-    def Time(self, SACRIFICE_PERIOD):
+    @staticmethod
+    def Time(SACRIFICE_PERIOD: str) -> Union[float, str]:
         switcher = {
             "4 day": 4 / 29,
             "8 day": 8 / 29,
@@ -316,21 +332,22 @@ class ToxicologyGANClient:
         }
         return switcher.get(SACRIFICE_PERIOD, "error")
 
-    def Dose(self, DOSE_LEVEL):
+    @staticmethod
+    def Dose(DOSE_LEVEL: str) -> Union[float, str]:
         switcher = {"Low": 0.1, "Middle": 0.3, "High": 1}
         return switcher.get(DOSE_LEVEL, "error")
 
     def generate(
         self,
-        treatments,
-        descriptors,
-        training_data,
-        descriptors_training,
-        result_path,
-        generator,
-        device,
-        num_generate,
-        latent_dim,
+        treatments: pd.DataFrame,
+        descriptors: pd.DataFrame,
+        training_data: pd.DataFrame,
+        descriptors_training: pd.DataFrame,
+        result_path: str,
+        generator: nn.Module,
+        device: torch.device,
+        num_generate: int,
+        latent_dim: int,
     ):
         """
         Args:
@@ -415,7 +432,14 @@ class ToxicologyGANClient:
 
 
 class GeneratorModel(nn.Module):
-    def __init__(self, Z_dim, Stru_dim, Time_dim, Dose_dim, Measurement_dim):
+    def __init__(
+            self,
+            Z_dim: int,
+            Stru_dim: int,
+            Time_dim: int,
+            Dose_dim: int,
+            Measurement_dim: int
+    ):
         super(GeneratorModel, self).__init__()
 
         def unitary_block(features_in, features_out, normalize=True):
@@ -445,7 +469,13 @@ class GeneratorModel(nn.Module):
 
 
 class Discriminator(nn.Module):
-    def __init__(self, Stru_dim, Time_dim, Dose_dim, Measurement_dim):
+    def __init__(
+            self,
+            Stru_dim: int,
+            Time_dim: int,
+            Dose_dim: int,
+            Measurement_dim: int
+    ):
         super(Discriminator, self).__init__()
 
         self.model = nn.Sequential(
