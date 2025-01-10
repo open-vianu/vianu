@@ -152,9 +152,9 @@ class NER(ABC):
 
 class OllamaNER(NER):
 
-    def __init__(self, endpoint: str, model: str):
+    def __init__(self, base_url: str, model: str):
         super().__init__()
-        self._endpoint = endpoint
+        self._base_url = base_url
         self._model = model
 
 
@@ -171,7 +171,7 @@ class OllamaNER(NER):
     async def _get_ner_model_answer(self, text: str) -> str:
         data = self._get_http_data(text=text)
         async with aiohttp.ClientSession() as session:
-            async with session.post(self._endpoint, json=data) as response:
+            async with session.post(self._base_url, json=data) as response:
                 response.raise_for_status()
                 resp_json = await response.json()
                 content = resp_json['message']['content']
@@ -201,10 +201,10 @@ def create_tasks(args_: Namespace, queue_in: asyncio.Queue, queue_out: asyncio.Q
     model = args_.model
     
     if model == 'llama':
-        endpoint = os.environ.get('OLLAMA_ENDPOINT')
-        if endpoint is None:
+        base_url = os.environ.get('OLLAMA_BASE_URL')
+        if base_url is None:
             raise EnvironmentError("The ollama endpoint must be set by the OLLAMA_ENDPOINT environment variable")
-        ner = OllamaNER(endpoint=endpoint, model=LLAMA_MODEL)
+        ner = OllamaNER(base_url=base_url, model=LLAMA_MODEL)
 
     elif model == 'openai':
         api_key = os.environ.get('OPENAI_API_KEY')

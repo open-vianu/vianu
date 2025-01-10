@@ -4,9 +4,9 @@
 import argparse
 from typing import Sequence
 
-from vianu.spock.settings import LOGGING_LEVEL, DATA_FILE, DATA_PATH, MAX_DOCS_PER_SOURCE
+from vianu.spock.settings import LOGGING_LEVEL, DATA_FILE, DATA_PATH, MAX_DOCS_SRC
 from vianu.spock.settings import SCRAPING_SOURCES, N_SCP_TASKS_DEFAULT
-from vianu.spock.settings import N_NER_TASKS_DEFAULT, NER_MODELS
+from vianu.spock.settings import N_NER_TASKS_DEFAULT, LARGE_LANGUAGE_MODELS
 
 
 def parse_args(args_: Sequence) -> argparse.Namespace:
@@ -17,7 +17,7 @@ def parse_args(args_: Sequence) -> argparse.Namespace:
     gen_gp.add_argument("--log-level", metavar='', type=str, default=LOGGING_LEVEL, help='log level')
     gen_gp.add_argument("--data-path", metavar='', type=str, default=DATA_PATH, help='path for storing results')
     gen_gp.add_argument("--data-file", metavar='', type=str, default=DATA_FILE, help='filename for storing results')
-    gen_gp.add_argument("--max-docs-src", metavar='', type=int, default=MAX_DOCS_PER_SOURCE, help='maximum number of documents per source')
+    gen_gp.add_argument("--max-docs-src", metavar='', type=int, default=MAX_DOCS_SRC, help='maximum number of documents per source')
 
     # Add scraping group
     scp_gp = parser.add_argument_group('scraping')
@@ -27,7 +27,7 @@ def parse_args(args_: Sequence) -> argparse.Namespace:
 
     # Add NER group
     ner_gp = parser.add_argument_group('ner')
-    ner_gp.add_argument('--model', '-m', type=str, choices=NER_MODELS, default='llama', help='NER model')
+    ner_gp.add_argument('--model', '-m', type=str, choices=LARGE_LANGUAGE_MODELS, default='llama', help='NER model')
     ner_gp.add_argument('--n-ner-tasks', metavar='', type=int, default=N_NER_TASKS_DEFAULT, help='number of async ner tasks')
 
     return parser.parse_args(args_)

@@ -2,12 +2,15 @@ import asyncio
 from copy import deepcopy
 from datetime import datetime
 import logging
+import os
 from pathlib import Path
 from typing import Tuple, List, Any
 
+from dotenv import load_dotenv
 import gradio as gr
 
 from vianu.spock.settings import LOGGING_LEVEL, LOGGING_FMT, UPDATE_INTERVAL, MAX_JOBS, GRADIO_SERVER_PORT
+from vianu.spock.settings import SCRAPING_SOURCES, MAX_DOCS_SRC, LARGE_LANGUAGE_MODELS
 from vianu.spock.src.data_model import Job, SpoCK, QueueItem
 from vianu.spock.__main__ import setup_asyncio_framework
 from vianu.spock.src.ui import get_job_card_html, get_details_html
@@ -15,6 +18,7 @@ from vianu.spock.src.ui import get_job_card_html, get_details_html
 
 logging.basicConfig(level=LOGGING_LEVEL.upper(), format=LOGGING_FMT)
 logger = logging.getLogger(__name__)
+load_dotenv()
 
 HEAD_FILE = Path(__file__).parent / "assets/head/scripts.html"
 CSS_FILE = Path(__file__).parent / "assets/css/styles.css"
@@ -40,6 +44,17 @@ spocks = []
 running_spock = None
 
 
+def _show_model_settings(model: str) -> Tuple[dict[str, Any], dict[str, Any]]:
+    """Update the visibility of the settings for the LLM model."""
+    logger.debug(f'show llm model settings (model={model})')
+    if model == 'llama':
+        return gr.update(visible=True), gr.update(visible=False)
+    elif model == 'openai':
+        return gr.update(visible=False), gr.update(visible=True)
+    else:
+        return gr.update(visible=False), gr.update(visible=False)
+
+
 async def _toggle_button(is_running: bool) -> Tuple[bool, dict[str, Any], dict[str, Any], dict[str, Any]]:
     """Toggle the state of the pipleline between running <-> not running. As a result the corresponding buttons are 
     shown/hidden.
@@ -60,7 +75,7 @@ async def _show_cancel_button() -> Tuple[dict[str, Any], dict[str, Any], dict[st
     return gr.update(visible=False), gr.update(visible=False), gr.update(visible=True)
 
 
-async def _setup_spock(term: str) -> None:
+async def _setup_spock(term: str, model: str, source: List[str], max_docs_src: int) -> None:
     """Setup the SpoCK (Job and Data) object and assign it to the global variable running_spock."""
     global running_spock, spocks, job
 
@@ -78,6 +93,9 @@ async def _setup_spock(term: str) -> None:
 
     args_ = deepcopy(SPOCK_SETTINGS)
     args_["term"] = term
+    args_["model"] = model
+    args_["source"] = source
+    args_["max_docs_src"] = max_docs_src
     job = Job(id_=f'{args_["term"]} {args_["source"]} {args_["model"]}', **args_)
     running_spock = SpoCK(status='running', job=job, started_at=job.submission, data=[])
     spocks.insert(0, running_spock)
@@ -220,22 +238,64 @@ with gr.Blocks(title='SpoCK', head_paths=HEAD_FILE, css_paths=CSS_FILE, theme=gr
         with gr.Column(scale=5):
             gr.Markdown("<div id='title-text'>SpoCK: Spotting Clinical Knowledge</div>")
     
-    # Search text field and start/stop/cancel buttons
-    with gr.Row(elem_classes="search-container"):        
-        with gr.Column(scale=3):
-            search_term = gr.Textbox(label="Search", show_label=False, placeholder="Enter your search term", )
-        with gr.Column(scale=1, elem_classes='pipeline-button'):
-            start_button = gr.HTML('<div class="button-not-running">Start</div>', visible=True)
-            stop_button = gr.HTML('<div class="button-running">Stop</div>', visible=False)
-            cancel_button = gr.HTML('<div class="canceling">canceling...</div>', visible=False)
+    # Bottom Part with Settings, Search field, Job Cards, and Details
+    with gr.Row(elem_classes="bottom-container"):
 
-    # Job summary cards
-    with gr.Row(elem_classes="jobs-container"):
-        cards = [gr.HTML('', elem_id=f'job-{i}', visible=False) for i in range(MAX_JOBS)]
+        # ---------------------------------------------------------
+        # Settings
+        # ---------------------------------------------------------
+        with gr.Column(scale=1):
+            with gr.Accordion(label='LLM Endpoint'):
+                names = ['Ollama', 'OpenAI']
+                choices = [(name, value) for name, value in zip(names, LARGE_LANGUAGE_MODELS)]
+                model_radio = gr.Radio(label='Model', show_label=False, choices=choices, value='llama', interactive=True)
+                hline = gr.Markdown('---', visible=False)
 
-    # Details of the selected job
-    with gr.Row():
-        details = gr.HTML('<div class="details-container"></div>')
+                # 'llama' specific settings
+                with gr.Group(visible=True) as ollama_group:
+                    value = os.environ.get("OLLAMA_BASE_URL")
+                    placeholder = 'base_url of ollama endpoint' if value is None else None
+                    gr.Markdown('---')
+                    ollama_base_url = gr.Textbox(label='base_url', show_label=False, info='base_url', placeholder=placeholder, value=value, interactive=True)
+
+                # 'openai' specific settings
+                with gr.Group(visible=False) as openai_group:
+                    value = os.environ.get("OPENAI_API_KEY")
+                    placeholder = 'api_key of openai endpoint' if value is None else None
+                    gr.Markdown('---')
+                    openai_api_key = gr.Textbox(label='api_key', show_label=False, info='api_key', placeholder=placeholder, value=value, interactive=True)
+
+            with gr.Accordion(label='Sources', open=True):
+                names = ['PubMed', 'EMA', 'MHRA']
+                choices = [(name, value) for name, value in zip(names, SCRAPING_SOURCES)]
+                sources = gr.CheckboxGroup(label='Sources', show_label=False, choices=choices, value=SCRAPING_SOURCES, interactive=True)
+                max_docs_src = gr.Number(label='max_docs_src', show_label=False, info='max number of docs per source', value=MAX_DOCS_SRC, interactive=True)
+
+        # ---------------------------------------------------------
+        # Search field, Job Cards, and Details
+        # ---------------------------------------------------------
+        with gr.Column(scale=5):
+            # Search text field and start/stop/cancel buttons
+            with gr.Row(elem_classes="search-container"):        
+                with gr.Column(scale=3):
+                    search_term = gr.Textbox(label="Search", show_label=False, placeholder="Enter your search term", )
+                with gr.Column(scale=1, elem_classes='pipeline-button'):
+                    start_button = gr.HTML('<div class="button-not-running">Start</div>', visible=True)
+                    stop_button = gr.HTML('<div class="button-running">Stop</div>', visible=False)
+                    cancel_button = gr.HTML('<div class="canceling">canceling...</div>', visible=False)
+
+            # Job summary cards
+            with gr.Row(elem_classes="jobs-container"):
+                cards = [gr.HTML('', elem_id=f'job-{i}', visible=False) for i in range(MAX_JOBS)]
+
+            # Details of the selected job
+            with gr.Row():
+                details = gr.HTML('<div class="details-container"></div>')
+
+    # Settings
+    model_radio.change(
+        fn=_show_model_settings, inputs=model_radio, outputs=[ollama_group, openai_group]
+    )
     
     # Timer for automatic update of the ui for the running job
     update_ui_timer = gr.Timer(value=UPDATE_INTERVAL, active=False, render=True)
@@ -250,7 +310,7 @@ with gr.Blocks(title='SpoCK', head_paths=HEAD_FILE, css_paths=CSS_FILE, theme=gr
         triggers=[search_term.submit, start_button.click],
         fn=_toggle_button, inputs=is_running, outputs=[is_running, start_button, stop_button, cancel_button]
     ).then(
-        fn=_setup_spock, inputs=search_term
+        fn=_setup_spock, inputs=[search_term, model_radio, sources, max_docs_src]
     ).then(
         fn=_setup_asyncio_framework
     ).then(
@@ -300,5 +360,6 @@ if __name__ == "__main__":
         share=False,
         debug=True,
         favicon_path="vianu/spock/assets/images/favicon.png",
-        server_port=GRADIO_SERVER_PORT,     # On the default port 7860 the favicon might not appear becaus of cached previous favicons
+        server_port=GRADIO_SERVER_PORT,     # On the default port 7860 there might run another gradio app
+        inbrowser=True,
     )

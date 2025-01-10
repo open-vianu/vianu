@@ -5,12 +5,12 @@ DATA_PATH = "/tmp/spock/"
 DATA_FILE = "spock_data"
 DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 N_CHAR_DOC_ID = 12
-GRADIO_SERVER_PORT=7864
+GRADIO_SERVER_PORT=7868
 
 # Scraping settings
 SCRAPING_SOURCES = ['pubmed', 'ema', 'mhra']
 MAX_CHUNK_SIZE = 500
-MAX_DOCS_PER_SOURCE = 5
+MAX_DOCS_SRC = 5
 N_SCP_TASKS_DEFAULT = 1
 
 PUBMED_ESEARCH_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
@@ -20,7 +20,7 @@ PUBMED_BATCH_SIZE = 20
 
 # NER settings
 N_NER_TASKS_DEFAULT = 1
-NER_MODELS = ['llama', 'openai']
+LARGE_LANGUAGE_MODELS = ['llama', 'openai']
 MAX_TOKENS = 128.000
 LLAMA_MODEL='llama3.2'
 OPENAI_MODEL='gpt-4o'
