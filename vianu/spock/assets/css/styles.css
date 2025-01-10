@@ -1,0 +1,167 @@
+#logo-title-row {
+    display: flex;
+    align-items: center;
+}
+
+#logo-image {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    height: 150px;
+}
+
+#title-text {
+    display: flex;
+    justify-content: center;
+    align-items: center; 
+    height: 100%; 
+    color: var(--block-title-text-color);
+    background: var(--block-title-background-fill);
+    border-radius: var(--radius-lg);
+    font: var(--font);
+    font-size: var(--text-xxl);
+    font-weight: var(--weight-extrabold);
+    text-align: center;
+    padding: var(--scale-0)
+}
+
+.search-container {
+    display: flex;
+    align-items: flex-end;
+}
+
+
+.search-container .button-not-running,
+.search-container .button-running, 
+.search-container .canceling {
+    cursor: pointer;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: var(--color-grey-100);
+    border-radius: var(--radius-md);
+    font-size: var(--text-xxl);
+    font-weight: var(--weight-extrabold);
+    background: var(--color-green-700);
+}
+
+.search-container .button-not-running {
+    background: var(--color-green-700)
+}
+.search-container .button-running {
+    background: var(--color-red-600)
+}
+.search-container .canceling {
+    background: var(--color-grey-500)
+}
+
+.jobs-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(var(--size-80), 1fr));
+}
+.card {
+    justify-self: center;
+    cursor: pointer;
+    border: none var(--spacing-md) var(--block-title-border-color);
+    border-radius: var(--radius-lg);
+    width: var(--size-80);
+    padding: var(--scale-2);
+    font: var(--font);
+    background: var(--block-label-background-fill);
+}
+.card:active {
+    transform: scale(0.97);
+}
+.card .title {
+    font-weight: var(--weight-bold);
+    font-size: var(--text-lg);
+    color: var(--block-title-text-color);
+    margin-bottom: var(--scale-0);
+}
+.card .title .running{
+    color: var(--color-red-600);
+    font-size: var(--text-md);
+}
+.card .title .stopped{
+    color: var(--color-grey-500);
+    font-size: var(--text-md);
+}
+.card .title .completed{
+    color: var(--color-green-700);
+    font-size: var(--text-md);
+}
+.card .info { 
+    color: var(--block-info-text-color);
+    margin-bottom: var(--block-label-margin);
+}
+
+.details-container {
+    display: flex;
+    border-radius: 8px;
+}
+.details-container .title {
+    font-weight: var(--weight-bold);
+    font-size: var(--text-xl);
+    padding-left: var(--scale-0);
+    margin: var(--block-label-margin) 0 var(--block-label-margin) 0;
+}
+.details-container .info { 
+    color: var(--block-info-text-color);
+    padding-left: var(--scale-0);
+    margin: var(--block-label-margin) 0 var(--block-label-margin) 0;
+}
+
+.details-container .items {
+    margin-top: var(--scale-4);
+}
+
+.details-container .items .item {
+    padding: var(--scale-0);
+    margin-bottom: var(--scale-0);
+    border: solid var(--block-label-border-width) var(--block-label-border-color);
+}
+
+.details-container .items .item .top{
+    display: flex;
+    align-items: center; 
+}
+
+.details-container .items .item .top .favicon{
+    display: flex;
+    align-items: center;
+    margin-right: var(--scale-0);
+}
+
+.details-container .items .item .top .favicon img{
+    height: 1.5em;
+}
+
+.details-container .items .item .top .title{
+    display: flex;
+    align-items: center; 
+}
+
+.details-container .items .item .bottom{
+    display: flex;
+    align-items: center; 
+}
+
+.details-container .items .item .bottom .ner.mp,
+.details-container .items .item .bottom .ner.adr {
+    padding: 0px 5px;
+    border-radius: 4px;
+    font-weight: var(--weight-bold);
+}
+
+.details-container .items .item .bottom .ner.mp {
+    color: var(--color-grey-100);
+    background-color: var(--color-purple-700);
+} 
+
+.details-container .items .item .bottom .ner.adr {
+    background-color: var(--color-pink);
+} 
