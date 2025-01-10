@@ -4,107 +4,89 @@ layout: home
 nav_order: 3
 ---
 
-# Welcome to ToxicologyGAN!
+# Welcome to ToxicologyGAN
 
-**ToxicologyGAN** is a *Gradio-based* application inspired on the work of Chen et al. (2023) (A generative adversarial 
-network model alternative to animal studies for clinical pathology assessment) designed to help  users to.... TODO
-A Generative Adversarial Network Model Alternative to Animal Studies for Clinical Pathology Assessment
+**ToxicologyGAN** is an out-of-the-box tool within the vianu package to help users facilitate the training of a GAN
+network in the context of simulating ...
 
 [Skip to Installation](#installation-guide){: .btn .btn-purple }
-[See in action](https://huggingface.co/spaces/vianu/drugsafetycompare){: .btn .btn-purple }
 
 ## Features
 
-1. **STEP 1**: Start by doing X. The application retrieves X...
+1. **Training of GAN Network**: Start by loading the relevant data and training a Generator and a Discriminator network.
 
-2. **STEP 2**:
-    - **Pipeline_1**: Uses X model to predict...
-    - **Pipeline_2**: Uses X Model to infer...
+2. **Generation**: Proceed with an already trained network and use the Generator with the corresponding trained weights
+to generate new data points.
 
-3. **STEP 3**:
-    - **FEATURE 1** ...
-    - **FEATURE 2** ...
-    - **FEATURE 3** ...
+## How it works
 
-## How It Works
+Based on the work of [Chen et al. (Nature Communications, 2023)](https://www.nature.com/articles/s41467-023-42933-9), 
+we implemented a simpler version of the code to make it more accessible and easy to use. Once having the correct input 
+data, the training of the network is easily performed with the implementation in vianu.
 
-1. **Search for a X**: Enter the name of Y. The application searches W
-
-2. **Select E**: Choose Q in order to do P.
-
-3. **Select Pipeline**:
-    - **Pipeline_1**:
-        - Does X
-        - Does Y
-        - Does Z
-        - Does P
-    - **Pipeline_2**:
-        - Does X.
-        - Does Y.
-        - Does Z.
-        - Does T.
-
-4. **Compare P**: Generates X
-
-### Pipeline_1
-
-![Pipeline_1](assets/images/placeholder_1.png)
-
-### Pipeline_2
-
-![Pipeline_2](assets/images/placeholder_2.jpg)
-
-## Getting Started
 
 ### Prerequisites
 
 - Python 3.11 or higher
-- Required Python packages (see `requirements.txt`)
-- OpenAI API key (for Pipeline)
+- Required Python packages
 
-
-## Usage
-
-1. **Enter X**: ...
-
-2. **Enter Y**: Click on the **black** button to retrieve X
-
-3. **Select W**: From the dropdown menus, select X
-
-4. **Select W**: Choose between the **Pipeline_1** and the **Pipeline_2**.
-
-5. **Provide OpenAI API Key** (if using Pipeline_2): Enter your OpenAI API key when prompted.
-
-6. **Compare W**: Click on the **Green** button to generate X.
-
-7. **Explore Results**:
-    - **Results_1**: Use X
-    - **Results_2**: Results 3
-    - **Results_3**: Results
-
-
-
-## Prerequisites
-
-Before you begin, ensure you have the following installed:
-
-- **Python 3.10 or higher**: [Download Python](https://www.python.org/downloads/)
-- **OpenAI API Key**: Obtain your API key from [OpenAI](https://platform.openai.com/account/api-keys)
-
-## Installation Guide
+## Installation guide
 
 1. **Download package**
 
    ```bash
    pip install vianu
    ```
-2. **Launch app** (with starterscript)
-    ```bash
-    vianu_toxicologygan_app
-    ```
-   The application will launch and can be accessed via your web browser at `http://127.0.0.1:7860/?__theme=light`.
-3. **Use Pipeline_1 to do X**: In Python you can use the following:
+   
+2. **Use Pipeline to train GAN network and generate new data points**: In Python you can use the following:
     ```python
-       print(hello)
+        from src.client import ToxicologyGANClient, GeneratorModel, Discriminator
+        from src.config import working_dir
+        from src.config import (data_path, descriptors_path, batch_size, latent_dim, molecular_dim, Time_dim,
+        Dose_dim,Measurement_dim)
+        from src.config import n_epochs, n_critic, lr, b1, b2, interval, model_path, lambda_gp, lambda_GR, num_generate
+        
+        # Change PATH to working directory - for example: working_dir = Path(__file__).parents[2] / r'toxicologygan'
+        os.chdir(working_dir)
+        
+        # Device config for torch routines
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        
+        # Instantiate the client
+        tg_client = ToxicologyGANClient()
+        
+        # Consume data into client
+        dataloader = tg_client.create_custom_dataloader(data_path, descriptors_path, batch_size, device)
+        
+        # Instantiate Generator and Discriminator
+        generator = GeneratorModel(latent_dim, molecular_dim, Time_dim, Dose_dim, Measurement_dim).to(device)
+        discriminator = Discriminator(molecular_dim, Time_dim, Dose_dim, Measurement_dim).to(device)
+        
+        # Training WGAN-GP with generator regularization
+        tg_client.train(generator, discriminator, dataloader, n_epochs, n_critic, latent_dim, device, lr, b1, b2, 
+                        interval, model_path, lambda_gp,lambda_GR)
+        
+        # USE TRAINED MODEL TO GENERATE NEW DATA
+        path = working_dir
+        
+        # Read data
+        treatments = pd.read_csv(os.path.join(path, "dummy_data", "Example_Treatments_test.tsv"), sep="\t")
+        training_data = pd.read_csv(os.path.join(path, "dummy_data", "Example_Data_training.tsv"), sep="\t")  ### this file should store all the training data used for the pretrained model
+        MDs = pd.read_csv(os.path.join(path, "dummy_data", "Example_MolecularDescriptors.tsv"),index_col=0, sep="\t")
+        descriptors_training = MDs[MDs.index.isin(training_data["COMPOUND_NAME"])]
+        descriptors = MDs[MDs.index.isin(treatments["COMPOUND_NAME"])]
+        
+        # Instantiate new generator model
+        generator = GeneratorModel(latent_dim, molecular_dim, Time_dim, Dose_dim, Measurement_dim).to(device)
+        
+        # Load model
+        model_path = os.path.join(path, "models", "generator_10")
+        weights = torch.load(str(model_path))  # nosec
+        generator.load_state_dict(weights)
+        generator.eval()
+        
+        # Generate and save
+        result_path = os.path.join(path, "results", "generated_data_{}.tsv".format(num_generate))
+        tg_client.generate(treatments,descriptors,training_data,descriptors_training,result_path,generator,device,
+                           num_generate,latent_dim,)
     ```
-
