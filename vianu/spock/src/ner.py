@@ -205,13 +205,15 @@ def create_tasks(args_: Namespace, queue_in: asyncio.Queue, queue_out: asyncio.Q
         if endpoint is None:
             raise EnvironmentError("The ollama endpoint must be set by the OLLAMA_ENDPOINT environment variable")
         ner = OllamaNER(endpoint=endpoint, model=LLAMA_MODEL)
+
     elif model == 'openai':
         api_key = os.environ.get('OPENAI_API_KEY')
         if api_key is None:
             raise EnvironmentError("The api_key for the OpenAI client must be set by the OPENAI_API_KEY environment variable")
         ner = OpenAINER(api_key=api_key, model=OPENAI_MODEL)
+
     else:
-        raise ValueError(f'unknown ner model "{args_.model}"')
+        raise ValueError(f"unknown ner model '{args_.model}'")
     
     logger.info(f'setting up {n_ner_tasks} NER task(s)')
     tasks = [asyncio.create_task(ner.apply(queue_in=queue_in, queue_out=queue_out)) for _ in range(n_ner_tasks)]

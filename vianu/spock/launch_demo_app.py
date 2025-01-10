@@ -20,10 +20,10 @@ HEAD_FILE = Path(__file__).parent / "assets/head/scripts.html"
 CSS_FILE = Path(__file__).parent / "assets/css/styles.css"
 SPOCK_SETTINGS = {
     "source": ["pubmed", "ema", "mhra"], 
-    "max_docs_src": 5,
+    "max_docs_src": 10,
     "model": "openai",
-    "n_scp_tasks": 2,
-    "n_ner_tasks": 2,
+    "n_scp_tasks": 3,
+    "n_ner_tasks": 3,
     "log_level": LOGGING_LEVEL,
 }
 
