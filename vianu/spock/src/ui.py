@@ -59,7 +59,9 @@ def get_details_html(data: List[Document]):
     """Get the stacked HTML items for each document."""
     if len(data) == 0:
         return "<div>no results available (yet)</div>"
-    return DETAILS_CONTAINER_TEMPLATE.format(items=_get_details_html_items(data=data))
+    sorted_data = sorted(data, key=lambda x: (len(x.adverse_reactions), len(x.medicinal_products)), reverse=True)
+    items = _get_details_html_items(data=sorted_data)
+    return DETAILS_CONTAINER_TEMPLATE.format(items=items)
 
 
 def _get_status_html(status: str) -> str:
