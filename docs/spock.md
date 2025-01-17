@@ -54,6 +54,7 @@ poetry shell
 - `pymupdf`
 - `python-dotenv`
 - `openai`
+- `defusedxml`
 
 #### Environment Variables
 You can use an `.env` file for defining the following Envornment Variables:

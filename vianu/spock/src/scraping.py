@@ -20,6 +20,7 @@ import xml.etree.ElementTree as ET
 import aiohttp
 from bs4 import BeautifulSoup
 from bs4.element import Tag
+import defusedxml.ElementTree as DET
 import numpy as np
 import pymupdf
 
@@ -198,7 +199,7 @@ class PubmedScraper(Scraper):
         """Parse batches of ET.Elements into a single list of Document objects"""
         data = []
         for ib, text in enumerate(batches):
-            pubmed_articles = ET.fromstring(text).findall('PubmedArticle')
+            pubmed_articles = DET.fromstring(text).findall('PubmedArticle')
             self.logger.debug(f'found #articles={len(pubmed_articles)} in batch {ib}')
             for ie, element in enumerate(pubmed_articles):
                 self.logger.debug(f'parsing PubmedArticle {ie} of batch {ib}')
