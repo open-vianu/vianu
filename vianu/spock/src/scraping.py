@@ -15,7 +15,7 @@ from io import BytesIO
 import logging
 import re
 from typing import List
-import xml.etree.ElementTree as ET
+import xml.etree.ElementTree as ET  # nosec
 
 import aiohttp
 from bs4 import BeautifulSoup

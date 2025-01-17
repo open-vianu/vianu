@@ -2,9 +2,10 @@
 """
 
 import argparse
+import tempfile
 from typing import Sequence
 
-from vianu.spock.settings import LOG_LEVEL, FILE_NAME, FILE_PATH, MAX_DOCS_SRC
+from vianu.spock.settings import LOG_LEVEL, MAX_DOCS_SRC
 from vianu.spock.settings import SCRAPING_SOURCES, N_SCP_TASKS
 from vianu.spock.settings import N_NER_TASKS, LARGE_LANGUAGE_MODELS
 
@@ -15,8 +16,8 @@ def parse_args(args_: Sequence) -> argparse.Namespace:
     # Add generic options
     gen_gp = parser.add_argument_group('generic')
     gen_gp.add_argument("--log-level", metavar='', type=str, default=LOG_LEVEL, help='log level')
-    gen_gp.add_argument("--file-path", metavar='', type=str, default=FILE_PATH, help='path for storing results')
-    gen_gp.add_argument("--file-name", metavar='', type=str, default=FILE_NAME, help='filename for storing results')
+    gen_gp.add_argument("--file-path", metavar='', type=str, default='/tmp/spock', help='path for storing results')
+    gen_gp.add_argument("--file-name", metavar='', type=str, default='spock', help='filename for storing results')
     gen_gp.add_argument("--max-docs-src", metavar='', type=int, default=MAX_DOCS_SRC, help='maximum number of documents per source')
 
     # Add scraping group
