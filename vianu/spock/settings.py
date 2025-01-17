@@ -2,6 +2,8 @@
 LOG_LEVEL = 'DEBUG'
 LOG_FMT = "%(asctime)s | %(name)s | %(funcName)s | %(levelname)s | %(message)s"
 N_CHAR_DOC_ID = 12
+FILE_PATH = "/tmp/spock/"  # nosec
+FILE_NAME = "spock"
 DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 # Gradio app settings
