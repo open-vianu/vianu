@@ -15,6 +15,7 @@ Vianu is a Python package designed for developers working in the **life sciences
 
 - **Lasa**: A tool for phonetic comparison of novel drug names with authorized ones from different locations.
 - **FraudCrawler**: A data ingestion and transformation pipeline for real-world healthcare data.
+- **SpoCK**: A tool to search public websites for spotting adverse drug reactions
 
 ## Installation
 
@@ -24,21 +25,20 @@ To install Vianu, use the following command:
 pip install vianu
 ```
 
-Alternatively, you can install from source:
+Alternatively, you can install vianu from source:
 
 ```bash
 git clone https://github.com/smc40/vianu.git
 cd vianu
 poetry install
+poetry shell
 ```
 
 
 ## Usage
 ### Lasa
-Give
+
 #### Launch a Demo App
-
-
 
 #### Launch a Demo Pipeline
 
@@ -54,19 +54,28 @@ python -m vianu.tools.tici.launch_demo_pipeline
 #### Launch a Demo App
 
 ```bash
-poetry install
-poetry shell
-python vianu/tools/fraudcrawler/launch_demo_app.py
+python vianu/fraudcrawler/launch_demo_app.py
 ```
 
 #### Launch a Demo Pipeline
 
 ```bash
-poetry install
-poetry shell
 python -m vianu.fraudcrawler.launch_demo_pipeline
 ```
 
+### SpoCK
+
+#### Launch a Demo App
+
+```bash
+python vianu/spock/launch_demo_app.py
+```
+
+#### Launch a Demo Pipeline
+
+```bash
+python -m vianu.spock.launch_demo_pipeline
+```
 ## Contributing
 
 We welcome contributions from the community! Please read the [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on how to get started.
