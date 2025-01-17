@@ -13,7 +13,7 @@ from vianu.spock.settings import LOG_LEVEL, N_SCP_TASKS, N_NER_TASKS
 from vianu.spock.settings import LARGE_LANGUAGE_MODELS, SCRAPING_SOURCES, MAX_DOCS_SRC
 from vianu.spock.settings import GRADIO_APP_NAME, GRADIO_SERVER_PORT, GRADIO_MAX_JOBS, GRADIO_UPDATE_INTERVAL
 from vianu.spock.settings import OLLAMA_BASE_URL_ENV_NAME, OPENAI_API_KEY_ENV_NAME
-from vianu.spock.src.base import Setup, SpoCK, SpoCKList, QueueItem
+from vianu.spock.src.base import Setup, SpoCK, SpoCKList, QueueItem         # noqa: F401
 from vianu.spock.app.base import BaseApp
 from vianu.spock.__main__ import setup_asyncio_framework
 import vianu.spock.app.formatter as fmt

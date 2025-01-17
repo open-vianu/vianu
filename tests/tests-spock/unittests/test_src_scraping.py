@@ -1,5 +1,3 @@
-import pytest
-
 from vianu.spock.src import scraping as scp
 
 

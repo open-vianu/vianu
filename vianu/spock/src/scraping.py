@@ -24,7 +24,7 @@ import defusedxml.ElementTree as DET
 import numpy as np
 import pymupdf
 
-from vianu.spock.src.base import Document, QueueItem
+from vianu.spock.src.base import Document, QueueItem    # noqa: F401
 from vianu.spock.settings import MAX_CHUNK_SIZE, SCRAPING_SOURCES
 from vianu.spock.settings import PUBMED_ESEARCH_URL, PUBMED_DB, PUBMED_EFETCH_URL, PUBMED_BATCH_SIZE
 

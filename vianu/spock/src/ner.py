@@ -10,7 +10,7 @@ from typing import List
 from dotenv import load_dotenv
 from openai import AsyncOpenAI
 
-from vianu.spock.src.base import NamedEntity, QueueItem
+from vianu.spock.src.base import NamedEntity, QueueItem     # noqa: F401
 from vianu.spock.settings import N_CHAR_DOC_ID, LLAMA_MODEL, OPENAI_MODEL
 
 logger = logging.getLogger(__name__)

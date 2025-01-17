@@ -1,6 +1,5 @@
 import logging
 import os
-from pathlib import Path
 
 from vianu.spock.app import App
 from vianu.spock.settings import LOG_LEVEL, LOG_FMT, GRADIO_SERVER_PORT
