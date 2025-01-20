@@ -1,8 +1,9 @@
 import logging
 import os
 
+from vianu import LOG_FMT
+from vianu.spock.settings import LOG_LEVEL, GRADIO_SERVER_PORT
 from vianu.spock.app import App
-from vianu.spock.settings import LOG_LEVEL, LOG_FMT, GRADIO_SERVER_PORT
 
 logging.basicConfig(level=LOG_LEVEL.upper(), format=LOG_FMT)
 os.environ["GRADIO_SERVER_PORT"] = str(GRADIO_SERVER_PORT)

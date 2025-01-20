@@ -1,6 +1,5 @@
 # General settings
 LOG_LEVEL = 'DEBUG'
-LOG_FMT = "%(asctime)s | %(name)s | %(funcName)s | %(levelname)s | %(message)s"
 N_CHAR_DOC_ID = 12
 FILE_PATH = "/tmp/spock/"  # nosec
 FILE_NAME = "spock"

@@ -5,12 +5,15 @@ import logging
 import sys
 from typing import List, Tuple
 
+from vianu import LOG_FMT
+from vianu.spock.settings import SCRAPING_SOURCES, LOG_LEVEL
 from vianu.spock.src.cli import parse_args
 from vianu.spock.src.base import Setup, Document, SpoCK, FileHandler
 from vianu.spock.src import scraping as scp
 from vianu.spock.src import ner
-from vianu.spock.settings import LOG_FMT, SCRAPING_SOURCES
 
+
+logging.basicConfig(format=LOG_FMT, level=LOG_LEVEL)
 logger = logging.getLogger(__name__)
 
 
