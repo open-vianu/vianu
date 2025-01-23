@@ -1,3 +1,22 @@
+/* no footer */
+footer {
+    display: none !important;
+}
+
+/* customize scrollbar in gr.Dataframe */
+::-webkit-scrollbar {
+    background: var(--background-fill-primary);
+}
+::-webkit-scrollbar-thumb {
+    background-color: var(--border-color-primary);
+    border: 4px solid transparent;
+    border-radius: 100px;
+    background-clip: content-box;
+}
+::-webkit-scrollbar-corner {
+    background: var(--background-fill-primary);
+}
+
 #logo-title-row {
     display: flex;
     align-items: center;
@@ -46,17 +65,16 @@
     border-radius: var(--radius-md);
     font-size: var(--text-xxl);
     font-weight: var(--weight-extrabold);
-    background: var(--color-green-700);
 }
 
 .search-container .button-not-running {
-    background: var(--color-green-700)
+    background: linear-gradient(to right, var(--color-pink-500), var(--button-primary-background-fill));
 }
 .search-container .button-running {
-    background: var(--color-red-600)
+    background: var(--color-red-600);
 }
 .search-container .canceling {
-    background: var(--color-grey-500)
+    background: var(--color-grey-500);
 }
 
 .jobs-container {

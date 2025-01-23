@@ -24,7 +24,11 @@ load_dotenv()
 # App settings
 _ASSETS_PATH = Path(__file__).parents[1] / "assets"
 _UI_SETTINGS_LLM_CHOICES = [(name, value) for name, value in zip(['Ollama', 'OpenAI'], LARGE_LANGUAGE_MODELS)]
-_UI_SETTINGS_SOURCE_CHOICES = [(name, value) for name, value in zip(['PubMed', 'EMA', 'MHRA'], SCRAPING_SOURCES)]
+_UI_SETTINGS_SOURCE_CHOICES = [(name, value) for name, value in zip(['PubMed', 'EMA', 'MHRA', 'FDA'], SCRAPING_SOURCES)]
+if not len(_UI_SETTINGS_LLM_CHOICES) == len(LARGE_LANGUAGE_MODELS):
+    raise ValueError('LARGE_LANGUAGE_MODELS and _UI_SETTINGS_LLM_CHOICES must have the same length')
+if not len(_UI_SETTINGS_SOURCE_CHOICES) == len(SCRAPING_SOURCES):
+    raise ValueError('SCRAPING_SOURCES and _UI_SETTINGS_SOURCE_CHOICES must have the same length')
 
 
 @dataclass

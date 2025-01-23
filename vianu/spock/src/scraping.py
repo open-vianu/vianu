@@ -282,8 +282,8 @@ class PubmedScraper(Scraper):
 
 
 @dataclass
-class EMASearchResults:
-    """Class for storing the search results from the EMA database."""
+class SearchResults:
+    """Class for storing the search results from different databases."""
     count: int | None
     n_pages: int | None
     items: List[Tag]
@@ -331,7 +331,7 @@ class EMAScraper(Scraper):
             a = nav.find('a', {'class': 'page-link', 'aria-label': 'Last'})
             if a and a.has_attr('href'):
                 href = a['href']
-                match = re.search(r'page=(\d+)', href)
+                match = re.search(r'&page=(\d+)', href)
                 if match:
                     return int(match.group(1)) + 1
         self.logger.warning('no pager found')
@@ -340,10 +340,10 @@ class EMAScraper(Scraper):
     @staticmethod
     def _extract_search_item_divs(soup: BeautifulSoup) -> List[Tag]:
         """Extract the list of div elements contining the different search results."""
-        parent = soup.find('div', class_='row row-cols-1')
+        parent = soup.find('div', class_=['row', 'row-cols-1'])
         return parent.find_all('div', class_='col')
 
-    async def _ema_document_search(self, term: str) -> EMASearchResults:
+    async def _ema_document_search(self, term: str, max_docs_src: int) -> SearchResults:
         """Search the EMA database for PDF documents with a given term."""
 
         # Get initial search results
@@ -373,12 +373,16 @@ class EMAScraper(Scraper):
                     items_from_page = self._extract_search_item_divs(soup=soup)
                     items.extend(items_from_page)
 
+                    if len(items) >= max_docs_src:
+                        self.logger.debug(f'found #items={len(items)} in #pages={i+1}')
+                        break
+
             # Check for extraction mismatch
             if len(items) != count:
                 self.logger.warning(f'mismatch #items={len(items)} and the total count={count}')
         
-        self.logger.debug(f'found #items={len(items)} in #pages={n_pages if n_pages is not None else 0}')
-        return EMASearchResults(count=count, n_pages=n_pages, items=items)
+        self.logger.debug(f'extracted #items={len(items)} in #pages={n_pages}')
+        return SearchResults(count=count, n_pages=n_pages, items=items)
 
     @staticmethod
     def _extract_title(tag: Tag) -> str | None:
@@ -491,7 +495,7 @@ class EMAScraper(Scraper):
         self.logger.debug(f'starting scraping the source={self._source} with term={term}')
 
         # Search for relevant documents with a given term
-        search_results = await self._ema_document_search(term=term)
+        search_results = await self._ema_document_search(term=term, max_docs_src=max_docs_src)
         n_items = len(search_results.items)
         if n_items > max_docs_src:
             self.logger.warning(f'from #items={n_items} only max_docs_src={max_docs_src} will be parsed')
@@ -511,13 +515,6 @@ class EMAScraper(Scraper):
             await queue_out.put(item)
 
         self.logger.info(f'retrieved #docs={len(data)} in source={self._source} for term={term}')
-
-
-@dataclass
-class MHRASearchResults:
-    """Class for storing the search results from the MHRA database."""
-    count: int | None
-    items: List[Tag]
 
 
 class MHRAScraper(Scraper):
@@ -552,7 +549,7 @@ class MHRAScraper(Scraper):
         """Extract the divs containing the search results."""
         return parent.find_all('li', class_='gem-c-document-list__item')
 
-    async def _mhra_document_search(self, term: str) -> MHRASearchResults:
+    async def _mhra_document_search(self, term: str) -> SearchResults:
         """Search the MHRA database for documents with a given term."""
 
         # Get search results and extract divs containing the search results
@@ -560,7 +557,7 @@ class MHRAScraper(Scraper):
         self.logger.debug(f"search mhra's drug safety update database with url={url}")
         content = await self._aiohttp_get_html(url=url)
         soup = BeautifulSoup(content, 'html.parser')
-        parent = soup.find('div', class_='govuk-grid-column-two-thirds js-live-search-results-block filtered-results')
+        parent = soup.find('div', class_=['govuk-grid-column-two-thirds', 'js-live-search-results-block', 'filtered-results'])
 
         # Extract the number of search results
         count = self._extract_search_results_count(parent=parent)
@@ -568,14 +565,14 @@ class MHRAScraper(Scraper):
         # Extract the divs containing the search results
         items = []
         if count is not None and count > 0:
-            items = self._extract_search_item_divs(parent=parent)
+            items = self._extract_search_item_divs(parent=parent)       # For a given search term, the site shows all the results without pagination.
         
             # Check for extraction mismatch
             if len(items) != count:                
                 self.logger.warning(f'mismatch #items={len(items)} and the total count={count}')
 
         self.logger.debug(f'found #items={len(items)}')
-        return MHRASearchResults(count=count, items=items)
+        return SearchResults(count=count, items=items)
     
     def _extract_url(self, link: Tag) -> str | None:
         """Extract the url to the document."""
@@ -677,7 +674,11 @@ class MHRAScraper(Scraper):
 class FDAScraper(Scraper):
     """Class for scraping data from the Food and Drug Administration.
     
-    The scraper uses the 
+    The scraper uses the  the same API as the web interface fo the FDA to search for relevant documents. By default the search applies the following filter:
+        - sorting by highest relevance
+        - filter for results from the Center of Drug Evaluation and Research
+        - filter for English language
+        - filter for Drugs
     """
 
     _source = 'fda'
@@ -686,7 +687,7 @@ class FDAScraper(Scraper):
 
     _search_template = (
         'https://www.fda.gov/search?s={term}'
-        '&items_per_page=100'
+        '&items_per_page=10'
         '&sort_bef_combine=rel_DESC'    # Sort by relevance
         '&f%5B0%5D=center%3A815'        # Filter for the Center for Drug Evaluation and Research
         '&f%5B1%5D=language%3A1404'     # Filter for English language
@@ -694,12 +695,189 @@ class FDAScraper(Scraper):
     )
     _language = 'en'
 
-    def apply(self, args_: Namespace, queue_out: asyncio.Queue) -> None:
-        raise NotImplementedError('FDAScraper.apply() is not implemented yet')
+
+    def _extract_search_results_count(self, soup: BeautifulSoup) -> int | None:
+        """Extract the number of search results from the search info section."""
+        parent = soup.find('div', class_='lcds-search-filters__info')
+        if parent is not None:
+            div = parent.find('div', class_='view-header')
+            match = re.search(r'of (\d+) entr[y|ies]', div.text)
+            if match:
+                return int(match.group(1))
+        self.logger.warning('no search info found')
+        return None
+
+    def _extract_number_of_pages(self, soup: BeautifulSoup) -> int | None:
+        """Extract the number of pages from the search results."""
+        nav = soup.find('nav', class_=['pager-nav', 'text-center'])
+        if nav is not None:
+            last_page = nav.find('li', class_=['pager__item', 'pager__item--last'])
+            a = last_page.find('a')
+            if a and a.has_attr('href'):
+                href = a['href']
+                match = re.search(r'&page=(\d+)', href)
+                if match:
+                    return int(match.group(1)) + 1
+        self.logger.warning('no pager found')
+        return None
+
+    @staticmethod
+    def _extract_search_item_divs(soup: BeautifulSoup) -> List[Tag]:
+        """Extract the divs containing the search results."""
+        parent = soup.find('div', class_='view-content')
+        return parent.find_all('div', recursive=False)
+
+    async def _fda_document_search(self, term: str, max_docs_src: int) -> SearchResults:
+        """Search the FDA database for documents with a given term."""
+
+        # Get search results
+        url = self._search_template.format(term=term)
+        self.logger.debug(f'search fda database with url={url}')
+        content = await self._aiohttp_get_html(url=url)
+        soup = BeautifulSoup(content, 'html.parser')
+
+        # Get the number of search results and the number of pages
+        count = self._extract_search_results_count(soup=soup)
+        n_pages = self._extract_number_of_pages(soup=soup)
+
+        # Extract the divs containing the search results
+        items = []
+        if count is not None and count > 0:
+            # Extract items from page=0
+            items_from_page = self._extract_search_item_divs(soup=soup)
+            items.extend(items_from_page)
+
+            # Extract items from page=1, 2, ...
+            if n_pages is not None and n_pages > 1:
+                for i in range(1, n_pages):
+                    url = f'{url}&page={i}'
+                    content = await self._aiohttp_get_html(url=url)
+                    soup = BeautifulSoup(content, 'html.parser')
+
+                    items_from_page = self._extract_search_item_divs(soup=soup)
+                    items.extend(items_from_page)
+
+                    if len(items) >= max_docs_src:
+                        self.logger.debug(f'found #items={len(items)} in #pages={i+1}')
+                        break
+            
+            # Check for extraction mismatch
+            if len(items) != count:
+                self.logger.warning(f'mismatch #items={len(items)} and the total count={count}')
+        
+        self.logger.debug(f'extracted #items={len(items)} in #pages={n_pages}')
+        return SearchResults(count=count, n_pages=n_pages, items=items)
+
+    @staticmethod
+    def _extract_title(main: Tag) -> str | None:
+        """Extract the title of the document."""
+        header = main.find('header', class_=['row', 'content-header'])
+        if header is not None:
+            h1 = header.find('h1', class_=['content-title', 'text-center'])
+            if h1 is not None:
+                return h1.text
+        return None
+
+    @staticmethod
+    def _extract_text(main: Tag) -> str | None:
+        """Extract the text from the document."""
+        body = main.find('div', attrs={'class': 'col-md-8 col-md-push-2', 'role': 'main'})
+        return body.get_text() if body is not None else None
+
+    @staticmethod
+    def _extract_date(main: Tag) -> datetime | None:
+        """Extract the publication date of the document."""
+        dl = main.find('dl', class_='lcds-description-list--grid')
+        if dl is not None:
+            dd = dl.find('dd', class_='cell-2_2')
+            time_tag = dd.find('time')
+        else:
+            time_tag = main.find('time')
+        if time_tag and time_tag.has_attr('datetime'):
+            return datetime.fromisoformat(time_tag['datetime'])
+        return None
+
+    async def _parse_item_page(self, url: str) -> List[Document]:
+        content = await self._aiohttp_get_html(url=url)
+        soup = BeautifulSoup(content, 'html.parser')
+        main = soup.find('main')
+
+        # Extract the relevant information from the document
+        title = self._extract_title(main=main)
+        text = self._extract_text(main=main)
+        publication_date = self._extract_date(main=main)
+
+        # Split long texts into chunks
+        texts = self.split_text_into_chunks(text=text)
+
+        # Create the Document object(s)
+        data = []
+        for text in texts:
+            document = Document(
+                id_=f'{self._source_url} {title} {text} {publication_date}',
+                text=text,
+                source=self._source,
+                title=title,
+                url=url,
+                source_url=self._source_url,
+                source_favicon_url=self._source_favicon_url,
+                language=self._language,
+                publication_date=publication_date,
+            )
+            data.append(document)
+        return data
+
+    async def _parse_items(self, items: List[Tag]) -> List[Document]:
+        """From a list of divs containing the search results, extract the relevant information and parse it into a list
+        of :class:`Document` objects.
+        """
+        data = []
+        for i, tag in enumerate(items):
+            link = tag.find('a', href=True)
+            if link is None:
+                self.logger.warning(f'no link found for item {i}')
+                continue
+            url = self._source_url + link['href']
+
+            # Create the Document object
+            self.logger.debug(f'parsing item with url={url}')
+            page_data = await self._parse_item_page(url=url)
+            data.extend(page_data)
+        self.logger.debug(f'created #docs={len(data)}')
+        return data
+
+    async def apply(self, args_: Namespace, queue_out: asyncio.Queue) -> None:
+        term = args_.term
+        max_docs_src = args_.max_docs_src
+        self.logger.debug(f'starting scraping the source={self._source} with term={term}')
+
+        # Search for relevant documents with a given term
+        search_results = await self._fda_document_search(term=term, max_docs_src=max_docs_src)
+        n_items = len(search_results.items)
+        if n_items > max_docs_src:
+            self.logger.warning(f'from #items={n_items} only max_docs_src={max_docs_src} will be parsed')
+        items = search_results.items[:max_docs_src]
+
+        # Parse the documents
+        data = await self._parse_items(items=items)
+        n_data = len(data)
+        if n_data > max_docs_src:
+            self.logger.warning(f'the #items={n_items} were chunked into #documents={n_data} from where only max_docs_src={max_docs_src} will be added to the queue')
+        data = data[:max_docs_src]
+
+        # Add documents to the queue
+        for i, doc in enumerate(data):
+            id_ = f'{self._source}_{i}'
+            item = QueueItem(id_=id_, doc=doc)
+            await queue_out.put(item)
+        
+        self.logger.info(f'retrieved #docs={len(data)} in source={self._source} for term={term}')
 
 
-_SCRAPERS = [PubmedScraper, EMAScraper, MHRAScraper]
+_SCRAPERS = [PubmedScraper, EMAScraper, MHRAScraper, FDAScraper]
 _SOURCE_TO_SCRAPER = {src: scr for src, scr in zip(SCRAPING_SOURCES, _SCRAPERS)}
+if not len(_SCRAPERS) == len(SCRAPING_SOURCES):
+    raise ValueError("number of scrapers and sources do not match")
 
 async def _scraping(args_: Namespace, queue_in: asyncio.Queue, queue_out: asyncio.Queue) -> None:
     """Pop a source (str) from the input queue, perform  the scraping task with the given term, and put the results in
