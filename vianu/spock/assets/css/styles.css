@@ -17,12 +17,12 @@ footer {
     background: var(--background-fill-primary);
 }
 
-#logo-title-row {
+.top-row {
     display: flex;
     align-items: center;
 }
 
-#logo-image {
+.top-row .image {
     display: flex;
     justify-content: center;
     align-items: center;
@@ -33,19 +33,25 @@ footer {
     height: 150px;
 }
 
-#title-text {
-    display: flex;
+.top-row .title-desc {
     justify-content: center;
-    align-items: center; 
+    display: block;
     height: 100%; 
-    color: var(--block-title-text-color);
     background: var(--block-title-background-fill);
     border-radius: var(--radius-lg);
     font: var(--font);
-    font-size: var(--text-xxl);
-    font-weight: var(--weight-extrabold);
     text-align: center;
     padding: var(--scale-0)
+}
+
+.top-row .title-desc .title {
+    color: var(--block-title-text-color);
+    font-size: var(--text-xxl);
+    font-weight: var(--weight-extrabold);
+}
+
+.top-row .title-desc .desc {
+    padding: 0px !important;
 }
 
 .search-container {

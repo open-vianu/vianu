@@ -92,16 +92,21 @@ class App(BaseApp):
     # User Interface
     # --------------------------------------------------------------------------
     @staticmethod
-    def _ui_logo_title_row():
-        with gr.Row(elem_id="logo-title-row"):
+    def _ui_top_row():
+        with gr.Row(elem_classes="top-row"):
             with gr.Column(scale=1):
                 gr.Image(
-                    value="vianu/spock/assets/images/spock_logo_circular.png",
+                    value=_ASSETS_PATH / "images" / "spock_logo_circular.png",
                     show_label=False,
-                    elem_id="logo-image",
+                    elem_classes="image",
                 )
             with gr.Column(scale=5):
-                gr.Markdown("<div id='title-text'>SpoCK: Spotting Clinical Knowledge</div>")
+                value = """<div class='top-row title-desc'>
+                  <div class='top-row title-desc title'>SpoCK: Spotting Clinical Knowledge</div>
+                  <div class='top-row title-desc desc'><em>A tool for identifying <b>medicinal products</b> and <b>adverse drug reactions</b> inside publicly available literature</em></div>
+                </div>
+                """
+                gr.Markdown(value=value)
 
     def _ui_corpus_settings(self):
         """Settings column."""
@@ -146,7 +151,7 @@ class App(BaseApp):
                     label='Sources', show_label=False, choices=_UI_SETTINGS_SOURCE_CHOICES, value=SCRAPING_SOURCES, interactive=True
                 )
                 self._components['settings.max_docs_src'] = gr.Number(
-                    label='max_docs_src', show_label=False, info='max number of docs per source', value=MAX_DOCS_SRC, interactive=True
+                    label='max_docs_src', show_label=False, info='max. number of documents per source', value=MAX_DOCS_SRC, interactive=True
                 )
 
     def _ui_corpus_row(self):
@@ -180,7 +185,7 @@ class App(BaseApp):
 
     def setup_ui(self):
         """Set up the user interface."""
-        self._ui_logo_title_row()
+        self._ui_top_row()
         self._ui_corpus_row()
         self._components['timer'] = gr.Timer(value=GRADIO_UPDATE_INTERVAL, active=False, render=True)
 
