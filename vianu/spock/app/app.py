@@ -62,7 +62,7 @@ class SessionState:
 
     # Model config
     model_config: Dict[str, Dict[str, Any]] = field(default_factory=lambda: _MODEL_CONFIG)
-    _connection_is_valid: bool = False
+    connection_is_valid: bool = False
 
     # Indexes
     _index_running_spock: int | None = None
@@ -209,7 +209,7 @@ class App(BaseApp):
     def _show_llm_settings(llm: str, session_state: SessionState) -> Tuple[dict[str, Any], dict[str, Any], SessionState]:
         """Show the settings for the selected LLM model."""
         logger.debug(f'show {llm} model settings')
-        session_state._connection_is_valid = False
+        session_state.connection_is_valid = False
         if llm == 'llama':
             return gr.update(visible=True), gr.update(visible=False), session_state
         elif llm == 'openai':
@@ -223,7 +223,7 @@ class App(BaseApp):
         log_key = '*****' if api_key else 'None'
         logger.debug(f'set openai api_key {log_key}')
         session_state.model_config['openai'] = {'api_key': api_key}
-        session_state._connection_is_valid = False
+        session_state.connection_is_valid = False
         return session_state
     
     @staticmethod
@@ -231,7 +231,7 @@ class App(BaseApp):
         """Setup ollama base_url"""
         logger.debug(f'set ollama base_url={base_url}')
         session_state.model_config['llama'] = {'base_url': base_url}
-        session_state._connection_is_valid = False
+        session_state.connection_is_valid = False
         return session_state
 
     @staticmethod
@@ -242,9 +242,9 @@ class App(BaseApp):
             test_task = asyncio.create_task(ner.test_model_endpoint())
             test_answer = await test_task
             gr.Info(f"connection to model={llm} is valid: '{MODEL_TEST_QUESTION}' was answered with '{test_answer}'")
-            session_state._connection_is_valid = True
+            session_state.connection_is_valid = True
         except Exception as e:
-            session_state._connection_is_valid = False
+            session_state.connection_is_valid = False
             raise gr.Error(f'connection to model={llm} failed: {e}')
         return session_state
 
@@ -288,7 +288,7 @@ class App(BaseApp):
                 raise gr.Error('Ollama base_url is not set')
             
         # Check connection to the model
-        if not session_state._connection_is_valid:
+        if not session_state.connection_is_valid:
             session_state = await self._test_connection(llm=llm, session_state=session_state)
         return session_state
 
@@ -529,7 +529,7 @@ class App(BaseApp):
             fn=self._check_llm_settings,
             inputs=[
                 self._components['settings.llm_radio'],
-                self._session_state
+                self._session_state,
             ],
             outputs=self._session_state,
         ).success(

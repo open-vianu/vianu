@@ -7,7 +7,7 @@ import os
 import re
 from typing import List
 
-from openai import AsyncOpenAI, AuthenticationError
+from openai import AsyncOpenAI
 
 from vianu.spock.src.base import NamedEntity, QueueItem     # noqa: F401
 from vianu.spock.settings import N_CHAR_DOC_ID, LLAMA_MODEL, OPENAI_MODEL, MODEL_TEST_QUESTION
