@@ -1,0 +1,11 @@
+gradio==4.44.1
+pandas==2.0.3
+numpy>=1.22.4,<2.0.0
+requests==2.31.0
+beautifulsoup4==4.12.2
+dateparser==1.1.8
+selenium==4.11.2
+pdfminer.six==20221105
+altair==5.5.0
+sqlitecloud==0.0.83
+plotly==5.24.1
