@@ -12,7 +12,7 @@ GRADIO_MAX_JOBS = 5
 GRADIO_UPDATE_INTERVAL = 2
 
 # Scraping settings
-SCRAPING_SOURCES = ['pubmed', 'ema', 'mhra']
+SCRAPING_SOURCES = ['pubmed', 'ema', 'mhra', 'fda']
 MAX_CHUNK_SIZE = 500
 MAX_DOCS_SRC = 5
 N_SCP_TASKS = 2

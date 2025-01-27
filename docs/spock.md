@@ -4,7 +4,7 @@ layout: home
 ---
 
 # Welcome to **SpoCK** 🚀
-**SpoCK** is a user-friendly [Gradio](https://www.gradio.app/) application designed to search public websites for 
+**SpoCK** is a [Gradio](https://www.gradio.app/) application designed to search public websites for 
 
 `Sp`otting `C`linical `K`nowledge. 
 
@@ -44,17 +44,6 @@ cd vianu
 poetry install
 poetry shell
 ```
-
-**Requirements specific for SpoCK**
-- `aiohttp`
-- `beautifulsoup4`
-- `dacite`
-- `gradio`
-- `numpy`
-- `pymupdf`
-- `python-dotenv`
-- `openai`
-- `defusedxml`
 
 #### Environment Variables
 You can use an `.env` file for defining the following Envornment Variables:

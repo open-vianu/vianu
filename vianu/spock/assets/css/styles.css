@@ -1,9 +1,28 @@
-#logo-title-row {
+/* no footer */
+footer {
+    display: none !important;
+}
+
+/* customize scrollbar in gr.Dataframe */
+::-webkit-scrollbar {
+    background: var(--background-fill-primary);
+}
+::-webkit-scrollbar-thumb {
+    background-color: var(--border-color-primary);
+    border: 4px solid transparent;
+    border-radius: 100px;
+    background-clip: content-box;
+}
+::-webkit-scrollbar-corner {
+    background: var(--background-fill-primary);
+}
+
+.top-row {
     display: flex;
     align-items: center;
 }
 
-#logo-image {
+.top-row .image {
     display: flex;
     justify-content: center;
     align-items: center;
@@ -14,19 +33,25 @@
     height: 150px;
 }
 
-#title-text {
-    display: flex;
+.top-row .title-desc {
     justify-content: center;
-    align-items: center; 
+    display: block;
     height: 100%; 
-    color: var(--block-title-text-color);
     background: var(--block-title-background-fill);
     border-radius: var(--radius-lg);
     font: var(--font);
-    font-size: var(--text-xxl);
-    font-weight: var(--weight-extrabold);
     text-align: center;
     padding: var(--scale-0)
+}
+
+.top-row .title-desc .title {
+    color: var(--block-title-text-color);
+    font-size: var(--text-xxl);
+    font-weight: var(--weight-extrabold);
+}
+
+.top-row .title-desc .desc {
+    padding: 0px !important;
 }
 
 .search-container {
@@ -46,17 +71,16 @@
     border-radius: var(--radius-md);
     font-size: var(--text-xxl);
     font-weight: var(--weight-extrabold);
-    background: var(--color-green-700);
 }
 
 .search-container .button-not-running {
-    background: var(--color-green-700)
+    background: linear-gradient(to right, var(--color-pink-500), var(--button-primary-background-fill));
 }
 .search-container .button-running {
-    background: var(--color-red-600)
+    background: var(--color-red-600);
 }
 .search-container .canceling {
-    background: var(--color-grey-500)
+    background: var(--color-grey-500);
 }
 
 .jobs-container {
