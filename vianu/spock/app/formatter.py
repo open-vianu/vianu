@@ -37,7 +37,7 @@ DETAILS_CONTAINER_ITEM_TEMPLATE = """
 
 
 def _get_details_html_items(data: List[Document]):
-    """Get the HTML items for the details container. Each item contains the favicon, title, and the text with the 
+    """Get the HTML items for the details container. Each item contains the favicon, title, and the text with the
     highlighted named entities.
     """
     items = []
@@ -60,7 +60,11 @@ def get_details_html(data: List[Document]):
     """Get the stacked HTML items for each document."""
     if len(data) == 0:
         return "<div>no results available (yet)</div>"
-    sorted_data = sorted(data, key=lambda x: (len(x.adverse_reactions), len(x.medicinal_products)), reverse=True)
+    sorted_data = sorted(
+        data,
+        key=lambda x: (len(x.adverse_reactions), len(x.medicinal_products)),
+        reverse=True,
+    )
     items = _get_details_html_items(data=sorted_data)
     return DETAILS_CONTAINER_TEMPLATE.format(items=items)
 
@@ -75,7 +79,8 @@ def _get_status_html(status: str) -> str:
         return f"<span class='stopped'>({status.upper()})</span>"
     else:
         logger.error(f"unknown status: {status.upper()})")
-        return '<span>(status unknown)</span>'
+        return "<span>(status unknown)</span>"
+
 
 def get_job_card_html(card_nmbr: int, spock: SpoCK):
     """Get the HTML for the job card."""
