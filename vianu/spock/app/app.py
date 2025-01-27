@@ -10,25 +10,29 @@ from dotenv import load_dotenv
 import gradio as gr
 
 from vianu.spock.settings import LOG_LEVEL, N_SCP_TASKS, N_NER_TASKS
-from vianu.spock.settings import LARGE_LANGUAGE_MODELS, SCRAPING_SOURCES, MAX_DOCS_SRC
+from vianu.spock.settings import LARGE_LANGUAGE_MODELS, SCRAPING_SOURCES, MAX_DOCS_SRC, MODEL_TEST_QUESTION
 from vianu.spock.settings import GRADIO_APP_NAME, GRADIO_SERVER_PORT, GRADIO_MAX_JOBS, GRADIO_UPDATE_INTERVAL
-from vianu.spock.settings import OLLAMA_BASE_URL_ENV_NAME, OPENAI_API_KEY_ENV_NAME
 from vianu.spock.src.base import Setup, SpoCK, SpoCKList, QueueItem         # noqa: F401
 from vianu import BaseApp
-from vianu.spock.__main__ import setup_asyncio_framework
+from vianu.spock.__main__ import get_model_config, setup_asyncio_framework
 import vianu.spock.app.formatter as fmt
+from vianu.spock.src.ner import NERFactory
 
 logger = logging.getLogger(__name__)
 load_dotenv()
 
 # App settings
 _ASSETS_PATH = Path(__file__).parents[1] / "assets"
-_UI_SETTINGS_LLM_CHOICES = [(name, value) for name, value in zip(['Ollama', 'OpenAI'], LARGE_LANGUAGE_MODELS)]
-_UI_SETTINGS_SOURCE_CHOICES = [(name, value) for name, value in zip(['PubMed', 'EMA', 'MHRA', 'FDA'], SCRAPING_SOURCES)]
+
+_UI_SETTINGS_LLM_CHOICES = [(name, value) for name, value in zip(['OpenAI', 'Ollama'], LARGE_LANGUAGE_MODELS)]
 if not len(_UI_SETTINGS_LLM_CHOICES) == len(LARGE_LANGUAGE_MODELS):
     raise ValueError('LARGE_LANGUAGE_MODELS and _UI_SETTINGS_LLM_CHOICES must have the same length')
+
+_UI_SETTINGS_SOURCE_CHOICES = [(name, value) for name, value in zip(['PubMed', 'EMA', 'MHRA', 'FDA'], SCRAPING_SOURCES)]
 if not len(_UI_SETTINGS_SOURCE_CHOICES) == len(SCRAPING_SOURCES):
     raise ValueError('SCRAPING_SOURCES and _UI_SETTINGS_SOURCE_CHOICES must have the same length')
+
+_MODEL_CONFIG = get_model_config()
 
 
 @dataclass
@@ -55,6 +59,12 @@ class SessionState:
     # Data
     is_running: bool = False
     spocks: SpoCKList = field(default_factory=list)
+
+    # Model config
+    model_config: Dict[str, Dict[str, Any]] = field(default_factory=lambda: _MODEL_CONFIG)
+    _connection_is_valid: bool = False
+
+    # Indexes
     _index_running_spock: int | None = None
     _index_active_spock: int | None = None
 
@@ -113,25 +123,11 @@ class App(BaseApp):
         with gr.Column(scale=1):
             with gr.Accordion(label='LLM Endpoint'):
                 self._components['settings.llm_radio'] = gr.Radio(
-                    label='Model', show_label=False, choices=_UI_SETTINGS_LLM_CHOICES, value='llama', interactive=True
+                    label='Model', show_label=False, choices=_UI_SETTINGS_LLM_CHOICES, value='openai', interactive=True
                 )
 
-                # 'llama' specific settings
-                with gr.Group(visible=True) as self._components['settings.ollama_group']:
-                    value = os.environ.get("OLLAMA_BASE_URL")
-                    placeholder = 'base_url of ollama endpoint' if value is None else None
-                    gr.Markdown('---')
-                    self._components['settings.ollama_base_url'] = gr.Textbox(
-                        label='base_url',
-                        show_label=False,
-                        info='base_url',
-                        placeholder=placeholder,
-                        value=value,
-                        interactive=True,
-                    )
-
                 # 'openai' specific settings
-                with gr.Group(visible=False) as self._components['settings.openai_group']:
+                with gr.Group(visible=True) as self._components['settings.openai_group']:
                     value = os.environ.get("OPENAI_API_KEY")
                     placeholder = 'api_key of openai endpoint' if value is None else None
                     logger.debug(f'openai api_key={value}')
@@ -145,6 +141,23 @@ class App(BaseApp):
                         interactive=True,
                         type='password',
                     )
+
+                # 'llama' specific settings
+                with gr.Group(visible=False) as self._components['settings.ollama_group']:
+                    value = os.environ.get("OLLAMA_BASE_URL")
+                    placeholder = 'base_url of ollama endpoint' if value is None else None
+                    gr.Markdown('---')
+                    self._components['settings.ollama_base_url'] = gr.Textbox(
+                        label='base_url',
+                        show_label=False,
+                        info='base_url',
+                        placeholder=placeholder,
+                        value=value,
+                        interactive=True,
+                    )
+                
+                self._components['settings.test_connection_button'] = gr.Button(value='Test connection', interactive=True)
+                
 
             with gr.Accordion(label='Sources', open=True):
                 self._components['settings.source'] = gr.CheckboxGroup(
@@ -193,27 +206,48 @@ class App(BaseApp):
     # Helpers
     # --------------------------------------------------------------------------
     @staticmethod
-    def _show_llm_settings(llm: str) -> Tuple[dict[str, Any], dict[str, Any]]:
+    def _show_llm_settings(llm: str, session_state: SessionState) -> Tuple[dict[str, Any], dict[str, Any], SessionState]:
+        """Show the settings for the selected LLM model."""
         logger.debug(f'show {llm} model settings')
+        session_state._connection_is_valid = False
         if llm == 'llama':
-            return gr.update(visible=True), gr.update(visible=False)
+            return gr.update(visible=True), gr.update(visible=False), session_state
         elif llm == 'openai':
-            return gr.update(visible=False), gr.update(visible=True)
+            return gr.update(visible=False), gr.update(visible=True), session_state
         else:
-            return gr.update(visible=False), gr.update(visible=False)
+            return gr.update(visible=False), gr.update(visible=False), session_state
     
     @staticmethod
-    def _set_ollama_base_url(base_url: str) -> None:
-        """Setup ollama base_url as environment variable."""
-        logger.debug(f'set ollama base_url environment variable ({OLLAMA_BASE_URL_ENV_NAME}={base_url})')
-        os.environ[OLLAMA_BASE_URL_ENV_NAME] = base_url
-    
-    @staticmethod
-    def _set_openai_api_key(api_key: str) -> None:
-        """Setup openai api_key as environment variable."""
+    def _set_openai_api_key(api_key: str, session_state: SessionState) -> SessionState:
+        """Setup openai api_key"""
         log_key = '*****' if api_key else 'None'
-        logger.debug(f'set openai api key (api_key={log_key})')
-        os.environ[OPENAI_API_KEY_ENV_NAME] = api_key
+        logger.debug(f'set openai api_key {log_key}')
+        session_state.model_config['openai'] = {'api_key': api_key}
+        session_state._connection_is_valid = False
+        return session_state
+    
+    @staticmethod
+    def _set_ollama_base_url(base_url: str, session_state: SessionState) -> SessionState:
+        """Setup ollama base_url"""
+        logger.debug(f'set ollama base_url={base_url}')
+        session_state.model_config['llama'] = {'base_url': base_url}
+        session_state._connection_is_valid = False
+        return session_state
+
+    @staticmethod
+    async def _test_connection(llm: str, session_state: SessionState) -> SessionState:
+        logger.debug(f'test connection to model={llm}')
+        try:
+            ner = NERFactory.create(model=llm, config=session_state.model_config)
+            test_task = asyncio.create_task(ner.test_model_endpoint())
+            test_answer = await test_task
+            gr.Info(f"connection to model={llm} is valid: '{MODEL_TEST_QUESTION}' was answered with '{test_answer}'")
+            session_state._connection_is_valid = True
+        except Exception as e:
+            session_state._connection_is_valid = False
+            raise gr.Error(f'connection to model={llm} failed: {e}')
+        return session_state
+
     
     @staticmethod
     def _feed_cards_to_ui(local_state: dict, session_state: SessionState) -> List[dict[str, Any]]:
@@ -243,15 +277,20 @@ class App(BaseApp):
         logger.debug(f'feeding details to UI (len(data)={len(active_spock.data)})')
         return fmt.get_details_html(active_spock.data)
 
-    @staticmethod
-    def _check_llm_settings(llm: str) -> None:
-        """Check if the LLM settings are set."""
-        if llm == 'llama':
-            if os.environ.get(OLLAMA_BASE_URL_ENV_NAME) is None:
-                raise gr.Error('Ollama base_url is not set (submit value with Enter)')
-        elif llm == 'openai':
-            if os.environ.get(OPENAI_API_KEY_ENV_NAME) is None:
-                raise gr.Error('OpenAI api_key is not set (submit value with Enter)')
+    async def _check_llm_settings(self, llm: str, session_state: SessionState) -> SessionState:
+        """Check if the LLM settings are set correcly."""
+        # Check if the settings are set
+        if llm == 'openai':
+            if session_state.model_config.get(llm) is None or session_state.model_config[llm].get('api_key') is None:
+                raise gr.Error('OpenAI api_key is not set')
+        elif llm == 'llama':
+            if session_state.model_config.get(llm) is None or session_state.model_config[llm].get('base_url') is None:
+                raise gr.Error('Ollama base_url is not set')
+            
+        # Check connection to the model
+        if not session_state._connection_is_valid:
+            session_state = await self._test_connection(llm=llm, session_state=session_state)
+        return session_state
 
     @staticmethod
     def _toggle_button(session_state: SessionState) -> Tuple[SessionState, dict[str, Any], dict[str, Any], dict[str, Any]]:
@@ -348,7 +387,7 @@ class App(BaseApp):
 
         # Setup asyncio tasks as in `vianu.spock.__main__`
         args_ = session_state.get_running_spock().setup.to_namespace()
-        ner_queue, scp_tasks, ner_tasks, orc_task = setup_asyncio_framework(args_=args_)
+        ner_queue, scp_tasks, ner_tasks, orc_task = setup_asyncio_framework(args_=args_, model_config=session_state.model_config)
         session_state.ner_queue = ner_queue
         session_state.scp_tasks = scp_tasks
         session_state.ner_tasks = ner_tasks
@@ -442,25 +481,42 @@ class App(BaseApp):
         """Choose LLM model show the correspoding settings."""
         self._components['settings.llm_radio'].change(
             fn=self._show_llm_settings,
-            inputs=self._components['settings.llm_radio'],
+            inputs=[
+                self._components['settings.llm_radio'],
+                self._session_state,
+            ],
             outputs=[
                 self._components['settings.ollama_group'],
                 self._components['settings.openai_group'],
+                self._session_state,
             ],
-        )
-
-    def _event_settings_ollama(self):
-        """Callback of the ollama settings."""
-        self._components['settings.ollama_base_url'].submit(
-            fn=self._set_ollama_base_url,
-            inputs=self._components['settings.ollama_base_url'],
         )
     
     def _event_settings_openai(self):
         """Callback of the openai settings."""
-        self._components['settings.openai_api_key'].submit(
+        self._components['settings.openai_api_key'].change(
             fn=self._set_openai_api_key,
-            inputs=self._components['settings.openai_api_key'],
+            inputs=[self._components['settings.openai_api_key'], self._session_state],
+            outputs=self._session_state,
+        )
+
+    def _event_settings_ollama(self):
+        """Callback of the ollama settings."""
+        self._components['settings.ollama_base_url'].change(
+            fn=self._set_ollama_base_url,
+            inputs=[self._components['settings.ollama_base_url'], self._session_state],
+            outputs=self._session_state,
+        )
+    
+    def _event_test_connection(self):
+        """Test the connection to the LLM model."""
+        self._components['settings.test_connection_button'].click(
+            fn=self._test_connection,
+            inputs=[
+                self._components['settings.llm_radio'],
+                self._session_state,
+            ],
+            outputs=self._session_state,
         )
 
     def _event_start_spock(self) -> None:
@@ -471,7 +527,11 @@ class App(BaseApp):
         gr.on(
             triggers=[search_term.submit, start_button.click],
             fn=self._check_llm_settings,
-            inputs=self._components['settings.llm_radio'],
+            inputs=[
+                self._components['settings.llm_radio'],
+                self._session_state
+            ],
+            outputs=self._session_state,
         ).success(
             fn=self._toggle_button,
             inputs=self._session_state,
@@ -568,6 +628,7 @@ class App(BaseApp):
         self._event_choose_llm()
         self._event_settings_ollama()
         self._event_settings_openai()
+        self._event_test_connection()
 
         # Start/Stop events
         self._event_start_spock()
