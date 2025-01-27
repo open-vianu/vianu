@@ -24,7 +24,7 @@ This is how you install all of our cool ninja moves
 - **Lasa**: A tool for phonetic comparison of novel drug names with authorized ones from different locations.
 - **Spock**: Perform literature research for adverse effects.
 - **Ragulator**: Conduct semantic searches in official guidelines.
-- 
+- **DrugSafetyCompare**: Compare medicinal products safety profiles based on their drug label.
 
 ## Prerequisites
 - Python 3.11 or higher

@@ -407,7 +407,9 @@ class EMAScraper(Scraper):
                     items.extend(items_from_page)
 
                     if len(items) >= max_docs_src:
-                        self.logger.debug(f"found #items={len(items)} in #pages={i+1}")
+                        self.logger.debug(
+                            f"found #items={len(items)} in #pages={i + 1}"
+                        )
                         break
 
             # Check for extraction mismatch
@@ -821,7 +823,9 @@ class FDAScraper(Scraper):
                     items.extend(items_from_page)
 
                     if len(items) >= max_docs_src:
-                        self.logger.debug(f"found #items={len(items)} in #pages={i+1}")
+                        self.logger.debug(
+                            f"found #items={len(items)} in #pages={i + 1}"
+                        )
                         break
 
             # Check for extraction mismatch
