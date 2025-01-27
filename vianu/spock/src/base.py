@@ -15,20 +15,22 @@ from typing import List, Self
 
 logger = logging.getLogger(__name__)
 
+
 @dataclass
 class Serializable:
     """Abstract base class for all dataclasses that can be serialized to a dictionary."""
+
     def to_dict(self) -> dict:
         """Converts the object to a dictionary."""
         return asdict(self)
-    
+
     @classmethod
     def from_dict(cls, dict_: dict) -> Self:
         """Creates an object from a dictionary."""
         return dacite.from_dict(
             data_class=cls,
             data=dict_,
-            config=dacite.Config(type_hooks={datetime: datetime.fromisoformat})
+            config=dacite.Config(type_hooks={datetime: datetime.fromisoformat}),
         )
 
 
@@ -42,7 +44,7 @@ class Identicator(ABC):
 
         This behavior aims to allow:
             SubIdenticator(id_='This is the string that identifies the entity')
-        
+
         and with _id_prefix='sub' it produces an id_ of the form:
             id_ = 'sub_5d41402abc4b2a76b9719d911017c592'
     """
@@ -70,13 +72,14 @@ class Identicator(ABC):
 @dataclass(eq=False)
 class NamedEntity(Identicator, Serializable):
     """Class for all named entities."""
+
     text: str = field(default_factory=str)
     class_: str = field(default_factory=str)
     location: List[int] | None = None
 
     @property
     def _id_prefix(self):
-        return 'ent_'
+        return "ent_"
 
 
 @dataclass(eq=False)
@@ -105,21 +108,22 @@ class Document(Identicator, Serializable):
 
     @property
     def _id_prefix(self):
-        return 'doc_'
-    
+        return "doc_"
+
     def remove_named_entity_by_id(self, id_: str) -> None:
         """Removes a named entity from the document by a given `doc.id_`."""
-        self.medicinal_products = [ne for ne in self.medicinal_products if ne.id_ != id_]
+        self.medicinal_products = [
+            ne for ne in self.medicinal_products if ne.id_ != id_
+        ]
         self.adverse_reactions = [ne for ne in self.adverse_reactions if ne.id_ != id_]
-    
+
     def _get_html_hash(self) -> str:
         """Creates a sha256 hash from the named entities' ids. If the sets of named entities have been modified, this
         function will return a different hash.
         """
         ne_ids = [ne.id_ for ne in self.medicinal_products + self.adverse_reactions]
-        html_hash_str = ' '.join(ne_ids)
+        html_hash_str = " ".join(ne_ids)
         return sha256(html_hash_str.encode()).hexdigest()
-
 
     def _get_html(self) -> str:
         """Creates the HTML representation of the document with highlighted named entities."""
@@ -131,19 +135,18 @@ class Document(Identicator, Serializable):
             text = text.replace(
                 ne.text, mp_template.format(text=ne.text, class_=ne.class_)
             )
-        
+
         # Highlight adverse drug reactions accodring to the css class 'adr'
         adr_template = "<span class='ner adr'>{text} | {class_}</span>"
         for ne in self.adverse_reactions:
             text = text.replace(
                 ne.text, adr_template.format(text=ne.text, class_=ne.class_)
             )
-        
+
         return text
 
-
     def get_html(self) -> str:
-        """Returns the HTML representation of the document with highlighted named entities. This function checks if 
+        """Returns the HTML representation of the document with highlighted named entities. This function checks if
         the set of named entities has been modified and updates the HTML representation if necessary."""
         html_hash = self._get_html_hash()
         if self._html is None or html_hash != self._html_hash:
@@ -180,22 +183,23 @@ class Setup(Identicator, Serializable):
 
     @property
     def _id_prefix(self) -> str:
-        return 'stp_'
-    
+        return "stp_"
+
     def to_namespace(self) -> Namespace:
         """Converts the :class:`Setup` object to a :class:`argparse.Namespace` object."""
         return Namespace(**asdict(self))
-    
+
     @classmethod
     def from_namespace(cls, args_: Namespace) -> Self:
         """Creates a :class:`Setup` object from a :class:`argparse.Namespace` object."""
         args_dict = vars(args_)
-        return cls(id_=str(args_dict), **args_dict) 
+        return cls(id_=str(args_dict), **args_dict)
 
 
 @dataclass
 class QueueItem:
     """Class for the :class:`asyncio.Queue` items"""
+
     id_: str
     doc: Document
 
@@ -203,6 +207,7 @@ class QueueItem:
 @dataclass
 class SpoCK(Identicator, Serializable):
     """Main class for the SpoCK pipeline mainly containing the job definition and the resulting data."""
+
     # Generic fields
     status: str | None = None
     started_at: datetime | None = None
@@ -214,7 +219,7 @@ class SpoCK(Identicator, Serializable):
 
     @property
     def _id_prefix(self) -> str:
-        return 'spk_'
+        return "spk_"
 
     def runtime(self) -> timedelta | None:
         if self.started_at is not None:
@@ -229,6 +234,7 @@ SpoCKList = List[SpoCK]
 
 class JSONEncoder(json.JSONEncoder):
     """Custom JSON encoder for the :class:`Document` class."""
+
     def default(self, obj):
         if isinstance(obj, datetime):
             return obj.isoformat()
@@ -245,33 +251,32 @@ class JSONEncoder(json.JSONEncoder):
 class FileHandler:
     """Reads from and write data to a JSON file under a given file path."""
 
-    _suffix = '.json'
+    _suffix = ".json"
 
     def __init__(self, file_path: Path | str) -> None:
         self._file_path = Path(file_path) if isinstance(file_path, str) else file_path
         if not self._file_path.exists():
             os.makedirs(self._file_path)
 
-
     def read(self, filename: str) -> List[Document]:
         """Reads the data from a JSON file and casts it into a list of :class:`Document` objects."""
         filename = (self._file_path / filename).with_suffix(self._suffix)
 
-        logger.info('reading data from file {filename}')
-        with open(filename.with_suffix(self._suffix), 'r', encoding="utf-8") as dfile:
+        logger.info("reading data from file {filename}")
+        with open(filename.with_suffix(self._suffix), "r", encoding="utf-8") as dfile:
             dict_ = json.load(dfile)
-        
+
         return SpoCK.from_dict(dict_=dict_)
-    
+
     def write(self, file_name: str, spock: SpoCK, add_dt: bool = True) -> None:
         """Writes the data to a JSON file.
-         
+
         If `add_dt=True`, the filename is `{file_name}_%Y%m%d%H%M%S.json`.
         """
         if add_dt:
             file_name = f'{file_name}_{datetime.now().strftime("%Y%m%d%H%M%S")}'
         file_name = (self._file_path / file_name).with_suffix(self._suffix)
 
-        logger.info(f'writing data to file {file_name}')
-        with open(file_name, 'w', encoding="utf-8") as dfile:
+        logger.info(f"writing data to file {file_name}")
+        with open(file_name, "w", encoding="utf-8") as dfile:
             json.dump(spock.to_dict(), dfile, cls=JSONEncoder)

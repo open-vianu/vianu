@@ -23,29 +23,29 @@ load_dotenv()
 def get_model_config() -> Dict[str, Dict[str, Any]]:
     """Get model configuration."""
     return {
-        'openai': {
-            'api_key': os.getenv('OPENAI_API_KEY'),
+        "openai": {
+            "api_key": os.getenv("OPENAI_API_KEY"),
         },
-        'llama': {
-            'base_url': os.getenv('OLLAMA_BASE_URL'),
+        "llama": {
+            "base_url": os.getenv("OLLAMA_BASE_URL"),
         },
     }
 
 
 async def _orchestrator(
-        args_: Namespace,
-        src_queue: asyncio.Queue,
-        scp_queue: asyncio.Queue,
-        ner_queue: asyncio.Queue, 
-        scp_tasks: List[asyncio.Task],
-        ner_tasks: List[asyncio.Task],
-    ) -> None:
+    args_: Namespace,
+    src_queue: asyncio.Queue,
+    scp_queue: asyncio.Queue,
+    ner_queue: asyncio.Queue,
+    scp_tasks: List[asyncio.Task],
+    ner_tasks: List[asyncio.Task],
+) -> None:
     """Orchestrates the scraping and NER tasks.
-    
-    It waits for all scraping tasks to finish, then sends a sentinel to the scp_queue for each ner task (which will 
-    trigger the ner tasks to finish -> cf :func:`vianu.spock.src.ner.apply`). 
+
+    It waits for all scraping tasks to finish, then sends a sentinel to the scp_queue for each ner task (which will
+    trigger the ner tasks to finish -> cf :func:`vianu.spock.src.ner.apply`).
     """
-    logger.debug('setting up orchestrator task')
+    logger.debug("setting up orchestrator task")
 
     # Insert sources into the source queue
     sources = args_.source
@@ -61,9 +61,9 @@ async def _orchestrator(
     try:
         await asyncio.gather(*scp_tasks)
     except asyncio.CancelledError:
-        logger.warning('scraping task(s) have previously been canceled')
+        logger.warning("scraping task(s) have previously been canceled")
     except Exception as e:
-        logger.error(f'scraping task(s) failed with error: {e}')
+        logger.error(f"scraping task(s) failed with error: {e}")
         raise e
     for st in scp_tasks:
         st.cancel()
@@ -71,15 +71,15 @@ async def _orchestrator(
     # Insert sentinel for each NER
     for _ in range(len(ner_tasks)):
         await scp_queue.put(None)
-    
+
     # Wait for NER tasks to process all items and finish
     await scp_queue.join()
-    try: 
+    try:
         await asyncio.gather(*ner_tasks)
     except asyncio.CancelledError:
-        logger.warning('ner task(s) have previously been canceled')
+        logger.warning("ner task(s) have previously been canceled")
     except Exception as e:
-        logger.error(f'ner task(s) failed with error: {e}')
+        logger.error(f"ner task(s) failed with error: {e}")
         raise e
     for nt in ner_tasks:
         nt.cancel()
@@ -88,7 +88,9 @@ async def _orchestrator(
     await ner_queue.put(None)
 
 
-def setup_asyncio_framework(args_: Namespace, model_config: Dict[str, Any]) -> Tuple[asyncio.Queue, List[asyncio.Task], List[asyncio.Task], asyncio.Task]:
+def setup_asyncio_framework(
+    args_: Namespace, model_config: Dict[str, Any]
+) -> Tuple[asyncio.Queue, List[asyncio.Task], List[asyncio.Task], asyncio.Task]:
     """Set up the asyncio framework for the SpoCK application."""
     # Set up arguments
     if args_.source is None:
@@ -101,7 +103,9 @@ def setup_asyncio_framework(args_: Namespace, model_config: Dict[str, Any]) -> T
 
     # Start tasks
     scp_tasks = scp.create_tasks(args_=args_, queue_in=src_queue, queue_out=scp_queue)
-    ner_tasks = ner.create_tasks(args_=args_, queue_in=scp_queue, queue_out=ner_queue, model_config=model_config)
+    ner_tasks = ner.create_tasks(
+        args_=args_, queue_in=scp_queue, queue_out=ner_queue, model_config=model_config
+    )
     orc_task = asyncio.create_task(
         _orchestrator(
             args_=args_,
@@ -129,7 +133,7 @@ async def _collector(ner_queue: asyncio.Queue) -> List[Document]:
         # Append document to data
         data.append(item.doc)
         ner_queue.task_done()
-    
+
     return data
 
 
@@ -137,10 +141,10 @@ async def main(args_: Namespace | None = None, save: bool = True) -> None:
     """Main function for the SpoCK pipeline."""
     started_at = datetime.now()
     if args_ is None:
-        args_= parse_args(sys.argv[1:])
+        args_ = parse_args(sys.argv[1:])
 
     logging.basicConfig(level=args_.log_level.upper(), format=LOG_FMT)
-    logger.info(f'starting SpoCK (args_={args_})')
+    logger.info(f"starting SpoCK (args_={args_})")
 
     # Test availability of NER model
     model = args_.model
@@ -149,9 +153,11 @@ async def main(args_: Namespace | None = None, save: bool = True) -> None:
         _ner = ner.NERFactory.create(model=model, config=model_config)
         test_task = asyncio.create_task(_ner.test_model_endpoint())
         test_answer = await test_task
-        logger.debug(f"test model endpoint of model='{model}': '{MODEL_TEST_QUESTION}' was answered with '{test_answer}'")
+        logger.debug(
+            f"test model endpoint of model='{model}': '{MODEL_TEST_QUESTION}' was answered with '{test_answer}'"
+        )
     except Exception as e:
-        logger.error(f'could not reach model endpoint: {e}')
+        logger.error(f"could not reach model endpoint: {e}")
         raise e
 
     # Set up async structure (scraping queue/tasks, NER queue/tasks, orchestrator task)
@@ -161,7 +167,7 @@ async def main(args_: Namespace | None = None, save: bool = True) -> None:
     # NOTE: if collector task is finished, the orchestrator is also finished (because of the sentinel in `ner_queue`)
     # and therefore so are the scraping and NER tasks
     col_task = asyncio.create_task(_collector(ner_queue))
-    data = await col_task   
+    data = await col_task
     await ner_queue.join()
 
     # Save data
@@ -170,7 +176,7 @@ async def main(args_: Namespace | None = None, save: bool = True) -> None:
         file_path = args_.file_path
         spock = SpoCK(
             id_=str(args_),
-            status='completed',
+            status="completed",
             started_at=started_at,
             finished_at=datetime.now(),
             setup=Setup.from_namespace(args_),
@@ -178,8 +184,8 @@ async def main(args_: Namespace | None = None, save: bool = True) -> None:
         )
         if file_name is not None and file_path is not None:
             FileHandler(file_path=file_path).write(file_name=file_name, spock=spock)
-    logger.info('finished SpoCK')
+    logger.info("finished SpoCK")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     asyncio.run(main())

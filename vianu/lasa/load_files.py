@@ -9,6 +9,7 @@ from config import (
     SWISSMEDIC_FILEPATH,
 )
 
+
 def extract_drug_name(text):
     split_char = ","
     compound_raw = text.split(split_char)[0]
@@ -157,16 +158,16 @@ def read_medicament_file_as_list(chosen_sources: List):
     Return:
     File: read individual file for that specific source.
     """
-    if chosen_sources == 'dummy':
+    if chosen_sources == "dummy":
         filepath = DUMMY_FILEPATH
-        print('dummy')
+        print("dummy")
         print(filepath)
         data = pd.read_csv(filepath, header=None, delimiter="|")
         name = pd.Series(data.iloc[:, [1, 4]].to_numpy().flatten())
         name = name.drop_duplicates()
         name = name.dropna().to_list()
 
-    elif chosen_sources == 'fda':
+    elif chosen_sources == "fda":
         # Read file for comparison
         filepath = FDA_FILEPATH
         data = pd.read_csv(filepath, header=None, delimiter="|")
