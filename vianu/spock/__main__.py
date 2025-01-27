@@ -2,19 +2,34 @@ from argparse import Namespace
 import asyncio
 from datetime import datetime
 import logging
+import os
 import sys
-from typing import List, Tuple
+from typing import List, Tuple, Dict, Any
+
+from dotenv import load_dotenv
 
 from vianu import LOG_FMT
-from vianu.spock.settings import SCRAPING_SOURCES, LOG_LEVEL
+from vianu.spock.settings import SCRAPING_SOURCES, LOG_LEVEL, MODEL_TEST_QUESTION
 from vianu.spock.src.cli import parse_args
 from vianu.spock.src.base import Setup, Document, SpoCK, FileHandler
 from vianu.spock.src import scraping as scp
 from vianu.spock.src import ner
 
-
 logging.basicConfig(format=LOG_FMT, level=LOG_LEVEL)
 logger = logging.getLogger(__name__)
+load_dotenv()
+
+
+def get_model_config() -> Dict[str, Dict[str, Any]]:
+    """Get model configuration."""
+    return {
+        'openai': {
+            'api_key': os.getenv('OPENAI_API_KEY'),
+        },
+        'llama': {
+            'base_url': os.getenv('OLLAMA_BASE_URL'),
+        },
+    }
 
 
 async def _orchestrator(
@@ -73,7 +88,7 @@ async def _orchestrator(
     await ner_queue.put(None)
 
 
-def setup_asyncio_framework(args_: Namespace) -> Tuple[asyncio.Queue, List[asyncio.Task], List[asyncio.Task], asyncio.Task]:
+def setup_asyncio_framework(args_: Namespace, model_config: Dict[str, Any]) -> Tuple[asyncio.Queue, List[asyncio.Task], List[asyncio.Task], asyncio.Task]:
     """Set up the asyncio framework for the SpoCK application."""
     # Set up arguments
     if args_.source is None:
@@ -86,7 +101,7 @@ def setup_asyncio_framework(args_: Namespace) -> Tuple[asyncio.Queue, List[async
 
     # Start tasks
     scp_tasks = scp.create_tasks(args_=args_, queue_in=src_queue, queue_out=scp_queue)
-    ner_tasks = ner.create_tasks(args_=args_, queue_in=scp_queue, queue_out=ner_queue)
+    ner_tasks = ner.create_tasks(args_=args_, queue_in=scp_queue, queue_out=ner_queue, model_config=model_config)
     orc_task = asyncio.create_task(
         _orchestrator(
             args_=args_,
@@ -125,10 +140,22 @@ async def main(args_: Namespace | None = None, save: bool = True) -> None:
         args_= parse_args(sys.argv[1:])
 
     logging.basicConfig(level=args_.log_level.upper(), format=LOG_FMT)
-    logger.info(f'starting SpoCK (args_={args_})')    
+    logger.info(f'starting SpoCK (args_={args_})')
+
+    # Test availability of NER model
+    model = args_.model
+    model_config = get_model_config()
+    try:
+        _ner = ner.NERFactory.create(model=model, config=model_config)
+        test_task = asyncio.create_task(_ner.test_model_endpoint())
+        test_answer = await test_task
+        logger.debug(f"test model endpoint of model='{model}': '{MODEL_TEST_QUESTION}' was answered with '{test_answer}'")
+    except Exception as e:
+        logger.error(f'could not reach model endpoint: {e}')
+        raise e
 
     # Set up async structure (scraping queue/tasks, NER queue/tasks, orchestrator task)
-    ner_queue, _, _, _ = setup_asyncio_framework(args_)
+    ner_queue, _, _, _ = setup_asyncio_framework(args_=args_, model_config=model_config)
 
     # Set up collector task and wait for it to finish
     # NOTE: if collector task is finished, the orchestrator is also finished (because of the sentinel in `ner_queue`)

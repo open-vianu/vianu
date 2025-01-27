@@ -27,7 +27,7 @@ def parse_args(args_: Sequence) -> argparse.Namespace:
 
     # Add NER group
     ner_gp = parser.add_argument_group('ner')
-    ner_gp.add_argument('--model', '-m', type=str, choices=LARGE_LANGUAGE_MODELS, default='llama', help='NER model')
+    ner_gp.add_argument('--model', '-m', type=str, choices=LARGE_LANGUAGE_MODELS, default='openai', help='NER model')
     ner_gp.add_argument('--n-ner-tasks', metavar='', type=int, default=N_NER_TASKS, help='number of async ner tasks')
 
     return parser.parse_args(args_)

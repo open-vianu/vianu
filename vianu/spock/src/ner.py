@@ -7,14 +7,12 @@ import os
 import re
 from typing import List
 
-from dotenv import load_dotenv
 from openai import AsyncOpenAI
 
 from vianu.spock.src.base import NamedEntity, QueueItem     # noqa: F401
-from vianu.spock.settings import N_CHAR_DOC_ID, LLAMA_MODEL, OPENAI_MODEL
+from vianu.spock.settings import N_CHAR_DOC_ID, LLAMA_MODEL, OPENAI_MODEL, MODEL_TEST_QUESTION
 
 logger = logging.getLogger(__name__)
-load_dotenv()
 
 NAMED_ENTITY_PROMPT = """
 You are an expert in Natural Language Processing. Your task is to identify named entities (NER) in a given text.
@@ -89,12 +87,27 @@ class NER(ABC):
                     "content": text,
                 },
             ]
+    
+    @staticmethod
+    def _get_test_messages(text: str) -> List[dict]:
+        return [
+                {
+                    "role": "system",
+                    "content": "Answer very briefly."},
+                {
+                    "role": "user",
+                    "content": text,
+                },
+            ]
 
 
     @abstractmethod
-    async def _get_ner_model_answer(self, text: str) -> str:
+    async def _get_model_answer(self, text: str) -> str:
         raise NotImplementedError('OpenAINER._get_ner_model_answer is not implemented yet')
 
+    @abstractmethod
+    async def test_model_endpoint(self) -> str:
+        pass
 
     async def apply(self, queue_in: asyncio.Queue, queue_out: asyncio.Queue) -> None:
         """Apply NER to a text received from input queue and put the results in an output queue."""
@@ -114,7 +127,7 @@ class NER(ABC):
             self.logger.debug(f'starting ner for item.id_={id_} (doc.id_={doc.id_[:N_CHAR_DOC_ID]})')
             try:
                 text = doc.text
-                content = await self._get_ner_model_answer(text=text)
+                content = await self._get_model_answer(text=text)
             except Exception as e:
                 self.logger.error(f'error during ner for item.id_={item.id_} (doc.id_={doc.id_[:N_CHAR_DOC_ID]}): {e}')
                 queue_in.task_done()
@@ -147,16 +160,38 @@ class NER(ABC):
             # Put the document in the output queue
             await queue_out.put(item)
             queue_in.task_done()
-            self.logger.info(f'finished NER task for item.id_={id_} (doc.id_={doc.id_[:N_CHAR_DOC_ID]})')
+            self.logger.info(f'finished NER task for item.id_={id_} (doc.id_={doc.id_[:N_CHAR_DOC_ID]})')  
+
+
+class OpenAINER(NER):
+
+    def __init__(self, model: str, api_key: str):
+        super().__init__()
+        self._model = model
+        self._client = AsyncOpenAI(api_key=api_key)
+    
+    async def _chat_completion(self, messages: List[dict]) -> str:
+        chat_completion = await self._client.chat.completions.create(
+            messages=messages,
+            model=self._model,
+        )
+        return chat_completion.choices[0].message.content
+
+    async def _get_model_answer(self, text: str) -> str:
+        messages = self._get_messages(text=text)
+        return await self._chat_completion(messages=messages)
+    
+    async def test_model_endpoint(self) -> str:
+        messages = self._get_test_messages(text=MODEL_TEST_QUESTION)
+        return await self._chat_completion(messages=messages)
 
 
 class OllamaNER(NER):
 
-    def __init__(self, base_url: str, model: str):
+    def __init__(self, model: str, base_url: str):
         super().__init__()
-        self._base_url = base_url
         self._model = model
-
+        self._base_url = base_url
 
     def _get_http_data(self, text: str, stream: bool = False) -> dict:
         messages = self._get_messages(text=text)
@@ -166,10 +201,24 @@ class OllamaNER(NER):
             "stream": stream,
         }
         return data
-    
 
-    async def _get_ner_model_answer(self, text: str) -> str:
+    async def _get_model_answer(self, text: str) -> str:
         data = self._get_http_data(text=text)
+        async with aiohttp.ClientSession() as session:
+            url = f'{self._base_url}/api/chat/'
+            async with session.post(url, json=data) as response:
+                response.raise_for_status()
+                resp_json = await response.json()
+                content = resp_json['message']['content']
+        return content
+    
+    async def test_model_endpoint(self) -> str:
+        messages = self._get_test_messages(text=MODEL_TEST_QUESTION)
+        data = {
+            'model': self._model,
+            "messages": messages,
+            'stream': False,
+        }
         async with aiohttp.ClientSession() as session:
             url = f'{self._base_url}/api/chat/'
             async with session.post(url, json=data) as response:
@@ -179,42 +228,40 @@ class OllamaNER(NER):
         return content
 
 
-class OpenAINER(NER):
+class NERFactory:
+    """Factory for NER models."""
 
-    def __init__(self, api_key: str, model: str):
-        super().__init__()
-        self._model = model
-        self._client = AsyncOpenAI(api_key=api_key)
+    @staticmethod
+    def create(model: str, config: dict) -> NER:
+        """Create a NER model from the `model` keyword."""
+
+        # create a :class:`OllamaNER` instance
+        if model == 'openai':
+            api_key = config[model].get('api_key')
+            if api_key is None:
+                api_key = os.environ.get('OPENAI_API_KEY')
+            if api_key is None:
+                raise ValueError("The api_key for the OpenAI client is missing (set it by the OPENAI_API_KEY environment variable or in the settings)")
+            ner = OpenAINER(model=OPENAI_MODEL, api_key=api_key)
+        
+        elif model == 'llama':
+            base_url = config[model].get('base_url')
+            if base_url is None:
+                base_url = os.environ.get('OLLAMA_BASE_URL')
+            if base_url is None:
+                raise ValueError("The base_url for the ollama endpoint is missing")
+            ner = OllamaNER(model=LLAMA_MODEL, base_url=base_url)
+        else:
+            raise ValueError(f"unknown ner model '{model}'")
     
-
-    async def _get_ner_model_answer(self, text: str) -> str:
-        messages = self._get_messages(text=text)
-        chat_completion = await self._client.chat.completions.create(
-            messages=messages,
-            model=self._model,
-        )
-        return chat_completion.choices[0].message.content
+        return ner
 
 
-def create_tasks(args_: Namespace, queue_in: asyncio.Queue, queue_out: asyncio.Queue) -> List[asyncio.Task]:
+def create_tasks(args_: Namespace, queue_in: asyncio.Queue, queue_out: asyncio.Queue, model_config: dict) -> List[asyncio.Task]:
     """Create asyncio NER tasks."""
     n_ner_tasks = args_.n_ner_tasks
     model = args_.model
-    
-    if model == 'llama':
-        base_url = os.environ.get('OLLAMA_BASE_URL')
-        if base_url is None:
-            raise EnvironmentError("The ollama endpoint must be set by the OLLAMA_ENDPOINT environment variable")
-        ner = OllamaNER(base_url=base_url, model=LLAMA_MODEL)
-
-    elif model == 'openai':
-        api_key = os.environ.get('OPENAI_API_KEY')
-        if api_key is None:
-            raise EnvironmentError("The api_key for the OpenAI client must be set by the OPENAI_API_KEY environment variable")
-        ner = OpenAINER(api_key=api_key, model=OPENAI_MODEL)
-
-    else:
-        raise ValueError(f"unknown ner model '{args_.model}'")
+    ner = NERFactory.create(model=model, config=model_config)
     
     logger.info(f'setting up {n_ner_tasks} NER task(s)')
     tasks = [asyncio.create_task(ner.apply(queue_in=queue_in, queue_out=queue_out)) for _ in range(n_ner_tasks)]

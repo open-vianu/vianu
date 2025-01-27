@@ -11,6 +11,7 @@ JOBS_CONTAINER_CARD_TEMPLATE = """
 <div class="card" onclick="cardClickHandler(this)">
   <div class="title">{title} {status}</div>
   <div class="info">Date: {date}</div>
+  <div class="info">Model: {model}</div>
   <div class="info">Sources: {sources}</div>
   <div class="info">#docs: {n_doc} | #adr: {n_adr}</div>
 </div>
@@ -78,13 +79,14 @@ def _get_status_html(status: str) -> str:
 
 def get_job_card_html(card_nmbr: int, spock: SpoCK):
     """Get the HTML for the job card."""
-    job = spock.setup
+    setup = spock.setup
     data = spock.data
 
     title = spock.setup.term
     status = _get_status_html(spock.status)
-    sources = ", ".join(job.source)
-    date = job.submission.strftime(DATE_FORMAT)
+    date = setup.submission.strftime(DATE_FORMAT)
+    model = setup.model
+    sources = ", ".join(setup.source)
     n_doc = len(data)
     n_adr = sum([len(d.adverse_reactions) for d in data])
     return JOBS_CONTAINER_CARD_TEMPLATE.format(
@@ -92,6 +94,7 @@ def get_job_card_html(card_nmbr: int, spock: SpoCK):
         title=title,
         status=status,
         date=date,
+        model=model,
         sources=sources,
         n_doc=n_doc,
         n_adr=n_adr,

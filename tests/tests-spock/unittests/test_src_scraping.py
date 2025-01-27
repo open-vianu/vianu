@@ -26,7 +26,6 @@ def test_get_chunks_one_remaining():
         "8 9 10",
     ]
     chunks = scp.Scraper.split_text_into_chunks(text=text, chunk_size=chunk_size)
-    print(chunks)
     assert chunks == expected_chunks
 
 

@@ -9,7 +9,7 @@ The module contains three main classes:
 from abc import ABC, abstractmethod
 from argparse import Namespace
 import asyncio
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from io import BytesIO
 import logging
@@ -284,9 +284,9 @@ class PubmedScraper(Scraper):
 @dataclass
 class SearchResults:
     """Class for storing the search results from different databases."""
-    count: int | None
-    n_pages: int | None
-    items: List[Tag]
+    count: int | None = None
+    n_pages: int | None = None
+    items: List[Tag] = field(default_factory=list)
 
 
 class EMAScraper(Scraper):
