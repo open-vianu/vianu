@@ -25,12 +25,18 @@ class SoundsAlikeKolner(Comparator):
     def __init__(self, ref: str):
         super().__init__(ref)
         self._encoded_ref = cologne.encode(ref.upper())
-    
+
     def apply(self, term: str) -> float:
         encoded_term = cologne.encode(term.upper())
-        max_ratio = max([SequenceMatcher(a=t[1], b=r[1]).ratio() for t in encoded_term for r in self._encoded_ref])
+        max_ratio = max(
+            [
+                SequenceMatcher(a=t[1], b=r[1]).ratio()
+                for t in encoded_term
+                for r in self._encoded_ref
+            ]
+        )
         return float(round(max_ratio, self._precision))
-    
+
 
 class SoundsAlikeFonem(Comparator):
     """Uses the abydos library to perform phonetic comparison of two strings."""
@@ -38,7 +44,7 @@ class SoundsAlikeFonem(Comparator):
     def __init__(self, ref: str):
         super().__init__(ref)
         self._encoded_ref = fonem(ref.upper())
-    
+
     def apply(self, term: str) -> float:
         encoded_term = fonem(term.upper())
         ratio = SequenceMatcher(a=encoded_term, b=self._encoded_ref).ratio()
@@ -54,11 +60,12 @@ class LooksAlike(Comparator):
     def apply(self, term: str) -> float:
         ratio = SequenceMatcher(a=term.upper(), b=self._ref.upper()).ratio()
         return float(round(ratio, self._precision))
-    
+
 
 @dataclass
 class Match:
     """Match between a term and a reference."""
+
     term: str
     ref: str
     sounds_alike: float
@@ -74,13 +81,13 @@ class Match:
     @property
     def combined(self) -> float:
         return (self.sounds_alike + self.looks_alike) / 2
-    
+
     def to_dict(self) -> dict:
         dict_ = asdict(self)
-        dict_['combined'] = self.combined
+        dict_["combined"] = self.combined
         return dict_
-    
-    
+
+
 class LASA:
     """Look-And-Sound-Alike comparator."""
 
