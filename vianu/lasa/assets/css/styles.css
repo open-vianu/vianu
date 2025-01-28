@@ -1,0 +1,83 @@
+/* no footer */
+footer {
+    display: none !important;
+}
+  
+/* customize scrollbar in gr.Dataframe */
+::-webkit-scrollbar {
+    background: var(--background-fill-primary);
+}
+::-webkit-scrollbar-thumb {
+    background-color: var(--border-color-primary);
+    border: 4px solid transparent;
+    border-radius: 100px;
+    background-clip: content-box;
+}
+::-webkit-scrollbar-corner {
+    background: var(--background-fill-primary);
+}
+
+.top-row {
+    display: flex;
+    align-items: center;
+}
+
+.top-row .image {
+    justify-content: center;
+    background-color: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    width: 100px;
+}
+
+.top-row .title-desc {
+    justify-content: center;
+    display: block;
+    height: 100%;
+    background: var(--block-title-background-fill);
+    border-radius: var(--radius-lg);
+    font: var(--font);
+    text-align: center;
+    padding: var(--scale-0)
+}
+
+.top-row .title-desc .title{
+    color: var(--block-title-text-color);
+    font-size: var(--text-xxl);
+    font-weight: var(--weight-extrabold);
+}
+
+.top-row .title-desc .desc {
+    padding: 0px !important;
+}
+
+.top-row .title-desc .desc em {
+    color: var(--color-grey-400) !important;
+}
+
+.search-container {
+    display: flex;
+    align-items: flex-end;
+}
+
+.search-container .search-start,
+.search-container .search-running {
+    cursor: pointer;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: var(--color-grey-100);
+    border-radius: var(--radius-md);
+    font-size: var(--text-xxl);
+    font-weight: var(--weight-extrabold);
+    background: var(--color-green-700);
+}
+
+.search-container .search-start {
+    background: linear-gradient(to right, var(--color-pink-500), var(--button-primary-background-fill))
+}
+
+.search-container .search-running {
+    background: var(--color-grey-600)
+}
