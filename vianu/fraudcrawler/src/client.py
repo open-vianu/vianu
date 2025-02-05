@@ -1,6 +1,8 @@
+import json
 import pandas as pd
 import logging
 
+from vianu.fraudcrawler.src.utils import transform_df_to_json
 from vianu.fraudcrawler.src.processor import Processor
 from vianu.fraudcrawler.src.serpapi import SerpApiClient
 from vianu.fraudcrawler.src.zyteapi import ZyteApiClient
@@ -24,14 +26,14 @@ class FraudCrawlerClient:
         self.serpapi_token = serpapi_token
         self.zyte_api_key = zyte_api_key
 
-    def search(self, query, location, num_results=10, country_code="ch"):
+    def search(self, query, location, num_results=10):
         """
         Performs the search, gets product details, processes them, and returns a DataFrame.
 
         Args:
             query (str): The search query.
+            location (str): The location of the user
             num_results (int): Number of search results to process.
-            country_code (str): The country code to filter results.
 
         Returns:
             DataFrame: A pandas DataFrame containing the final product data.
@@ -45,7 +47,7 @@ class FraudCrawlerClient:
         # Instantiate clients
         serp_client = SerpApiClient(self.serpapi_token, location)
         zyte_client = ZyteApiClient(self.zyte_api_key)
-        processor = Processor(country_code)
+        processor = Processor(location)
 
         # Perform search
         urls = serp_client.search(query, num_results)
@@ -68,6 +70,20 @@ class FraudCrawlerClient:
         # Flatten the product data
         df = pd.json_normalize(filtered_products)
 
+        # Transform to Json
+        query_info = {
+            "search_term": query,
+            "num_results": num_results,
+            "location": location
+        }
+        print(len(df))
+        products_json = transform_df_to_json(query_info, df)
+
+        # Save to file
+        with open("output.json", "w", encoding="utf-8") as f:
+            json.dump(products_json, f, indent=4)
+        logger.info("JSON file has been successfully created: output.json")
+
         # Log and return the DataFrame
         logger.info("Search completed. Returning flattened DataFrame.")
-        return df
+        return df, products_json

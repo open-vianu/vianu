@@ -1,0 +1,4 @@
+export SERP_API_TOKEN="1234"
+export ZYTE_API_TOKEN="1234"
+export DATAFORSEO_USERNAME="userberto@jimailberto.ch"
+export DATAFORSEO_PASSWORD="1234"
