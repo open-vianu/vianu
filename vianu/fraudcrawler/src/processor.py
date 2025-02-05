@@ -8,14 +8,20 @@ class Processor:
     Processes the product data and applies specific filtering rules.
     """
 
-    def __init__(self, country_code):
+    LOCATION_MAPPING = {
+        "Switzerland": "ch",
+        "Chile": "cl",
+        "Austria": "at",
+    }
+
+    def __init__(self, location):
         """
         Initializes the Processor with the given country code.
 
         Args:
-            country_code (str): The country code to filter results by.
+            location (str): The location associated to the specific user.
         """
-        self.country_code = country_code.lower()
+        self.country_code = self.LOCATION_MAPPING[location].lower()
 
     def process(self, products):
         """
@@ -25,7 +31,7 @@ class Processor:
             products (list): A list of product data dictionaries.
 
         Returns:
-            list: A filtered list of product data dictionaries.
+            filtered_products: A filtered list of product data dictionaries.
         """
         logger.info(
             f"Processing {len(products)} products and filtering by country code: {self.country_code.upper()}"
