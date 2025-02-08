@@ -1,3 +1,4 @@
+import asyncio
 from copy import deepcopy
 import logging
 import requests
@@ -11,6 +12,7 @@ class SerpApiClient:
 
     _endpoint = "https://serpapi.com/search"
     _engine = "google"
+    _request_timeout = 10
 
     def __init__(self, api_key: str, location: str = "Switzerland"):
         """Initializes the SerpApiClient with the given API token.
@@ -43,7 +45,7 @@ class SerpApiClient:
         response = requests.get(
             url=self._endpoint,
             params=params,
-            timeout=10,
+            timeout=self._request_timeout,
         )
 
         status_code = response.status_code
@@ -58,3 +60,13 @@ class SerpApiClient:
                 f"SERP API request failed with status code {status_code}"
             )
             return []
+    
+    async def asearch(self, queue_out: asyncio.Queue, search_term: str, num_results: int=10) -> None:
+        """Performs a search using SERP API and puts the URLs of the results into the output queue.
+
+        Args:
+            queue_out: the output queue to put the search results into
+            search_term: the search term to use
+            num_results: max number of results to return (default: 10)
+        """
+        raise NotImplementedError("SerpAPIClient.asearch is not implemented yet")
