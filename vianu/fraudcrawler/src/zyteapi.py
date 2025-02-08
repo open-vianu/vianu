@@ -8,13 +8,10 @@ logger = logging.getLogger("fraudcrawler_logger")
 
 
 class ZyteApiClient:
-    """
-    A client to interact with the Zyte API for fetching product details.
-    """
+    """A client to interact with the Zyte API for fetching product details."""
 
-    def __init__(self, zyte_api_key, max_retries=1, retry_delay=10):
-        """
-        Initializes the ZyteApiClient with the given API key and retry configurations.
+    def __init__(self, api_key, max_retries=1, retry_delay=10):
+        """Initializes the ZyteApiClient with the given API key and retry configurations.
 
         Args:
             zyte_api_key (str): The API key for Zyte API.
