@@ -5,7 +5,7 @@ import logging
 from vianu.fraudcrawler.src.utils import transform_df_to_json
 from vianu.fraudcrawler.src.processor import Processor
 from vianu.fraudcrawler.src.serpapi import SerpApiClient
-from vianu.fraudcrawler.src.zyteapi import ZyteApiClient
+from vianu.fraudcrawler.src.zyteapi import ZyteAPIClient
 
 logger = logging.getLogger("fraudcrawler_logger")
 
@@ -46,7 +46,7 @@ class FraudCrawlerClient:
 
         # Instantiate clients
         serp_client = SerpApiClient(self.serpapi_token, location)
-        zyte_client = ZyteApiClient(self.zyte_api_key)
+        zyte_client = ZyteAPIClient(self.zyte_api_key)
         processor = Processor(location)
 
         # Perform search
@@ -56,7 +56,7 @@ class FraudCrawlerClient:
             return pd.DataFrame()
 
         # Get product details
-        products = zyte_client.get_product_details(urls)
+        products = zyte_client.get_details(urls)
         if not products:
             logger.error("No product details fetched from Zyte API.")
             return pd.DataFrame()

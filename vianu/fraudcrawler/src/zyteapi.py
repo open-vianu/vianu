@@ -7,25 +7,25 @@ from requests.auth import HTTPBasicAuth
 logger = logging.getLogger("fraudcrawler_logger")
 
 
-class ZyteApiClient:
+class ZyteAPIClient:
     """A client to interact with the Zyte API for fetching product details."""
+    
+    _endpoint = "https://api.zyte.com/v1/extract"
 
-    def __init__(self, api_key, max_retries=1, retry_delay=10):
+    def __init__(self, api_key: str, max_retries: int=3, retry_delay: int=10):
         """Initializes the ZyteApiClient with the given API key and retry configurations.
 
         Args:
-            zyte_api_key (str): The API key for Zyte API.
-            max_retries (int): Maximum number of retries for API calls.
-            retry_delay (int): Delay between retries in seconds.
+            api_key: the API key for Zyte API
+            max_retries: maximum number of retries for API calls
+            retry_delay: delay between retries in seconds
         """
-        self.endpoint = "https://api.zyte.com/v1/extract"
-        self.auth = HTTPBasicAuth(zyte_api_key, "")
+        self.auth = HTTPBasicAuth(api_key, "")
         self.max_retries = max_retries
         self.retry_delay = retry_delay
 
-    def get_product_details(self, urls):
-        """
-        Fetches product details from the given URLs using Zyte API.
+    def get_details(self, urls):
+        """Fetches product details from the given URLs using Zyte API.
 
         Args:
             urls (list): A list of URLs to fetch product details from.
