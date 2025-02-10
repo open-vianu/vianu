@@ -4,7 +4,8 @@ version = "0.1.3"
 description = "Vianu enables developers to access tools applicable to life sciences and healthcare."
 authors = [
     "Nicolas Perez Gonzalez <hello@vianu.org>",
-    "Alexander Horst <hello@vianu.org>"
+    "Alexander Horst <hello@vianu.org>",
+    "Chriguberto Jäggli <hello@vianu.org>"
 ]
 repository = "https://github.com/smc40/vianu"
 license = "MIT"
