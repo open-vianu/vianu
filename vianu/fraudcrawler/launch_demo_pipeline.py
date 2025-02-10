@@ -10,7 +10,7 @@ from vianu.fraudcrawler.src.client import FraudCrawlerClient
 logging.basicConfig(level=LOG_LEVEL.upper(), format=LOG_FMT)
 logger = logging.getLogger(__name__)
 
-
+# Load environment variables
 load_dotenv()
 _SERPAPI_KEY= os.getenv("SERP_API_TOKEN")
 _ZYTEAPI_KEY = os.getenv("ZYTE_API_TOKEN")
@@ -26,4 +26,4 @@ client = FraudCrawlerClient(
 df = client.run("sildenafil", num_results=10)
 
 # Display results
-df
+print(df.head())
