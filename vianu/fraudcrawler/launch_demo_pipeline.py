@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import os
 
@@ -20,11 +21,10 @@ client = FraudCrawlerClient(
     serpapi_key=_SERPAPI_KEY,
     zyteapi_key=_ZYTEAPI_KEY,
     location="Switzerland",
-    execution_mode="async",
 )
 
 # Perform search
-df = client.run("sildenafil", num_results=10)
+# df = client.run("sildenafil", num_results=10) # Sequential
+# print(df.head())
 
-# Display results
-print(df.head())
+asyncio.run(client.async_run("sildenafil", num_results=10))  # Async

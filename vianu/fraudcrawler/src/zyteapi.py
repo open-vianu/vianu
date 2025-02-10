@@ -24,6 +24,7 @@ class ZyteAPIClient:
         "geolocation": "CH",
         "viewport": {"width": 1280, "height": 1080},
         "actions": [],
+        "product": True,
     }
     _requests_timeout = 10
 
@@ -43,6 +44,7 @@ class ZyteAPIClient:
             async_limit_per_host: Maximum number of concurrent requests per host for async calls (default: 5).
         """
         self._auth = HTTPBasicAuth(api_key, "")
+        self._aiohttp_auth = aiohttp.BasicAuth(api_key)
         self._max_retries = max_retries
         self._retry_delay = retry_delay
         self._async_limit_per_host = async_limit_per_host
@@ -58,8 +60,6 @@ class ZyteAPIClient:
             f"fetching product details for {len(urls)} URLs via Zyte API (synchronous)"
         )
 
-        config = deepcopy(self._config)
-        config["product"] = product
         products = []
         with tqdm(total=len(urls)) as pbar:
             for url in urls:
@@ -75,7 +75,7 @@ class ZyteAPIClient:
                             auth=self._auth,
                             json={
                                 "url": url,
-                                **config,
+                                **self._config,
                             },
                             timeout=self._requests_timeout,
                         )
@@ -124,30 +124,20 @@ class ZyteAPIClient:
             queue_in: the input queue containing URLs to fetch product details from
             queue_out: the output queue to put the product details into
         """
-
-        # Drain the input queue into a list of URLs.
-        urls = []
-        while not queue_in.empty():
+        while True:
             url = await queue_in.get()
-            urls.append(url)
+            if url is None:
+                queue_in.task_done()
+                break
 
-        # Use the same configuration as the synchronous version.
-        config = deepcopy(self._config)
-        config["product"] = True
+            product = await self._async_get_details_for_url(url)
+            await queue_out.put(product)
+            queue_in.task_done()
 
-        connector = aiohttp.TCPConnector(limit_per_host=self._async_limit_per_host)
-        async with aiohttp.ClientSession(connector=connector) as session:
-            tasks = [self._aget_details_for_url(session, url, config) for url in urls]
-            results = await asyncio.gather(*tasks, return_exceptions=True)
-            for result in results:
-                if isinstance(result, Exception):
-                    logger.error(f"Error fetching details: {result}")
-                else:
-                    await queue_out.put(result)
-
-    async def _aget_details_for_url(
-        self, session: aiohttp.ClientSession, url: str, config: dict
-    ) -> dict:
+    async def _async_get_details_for_url(
+        self,
+        url: str,
+    ) -> dict | None:
         """Helper coroutine to fetch product details for a single URL using aiohttp.
 
         Args:
@@ -160,35 +150,18 @@ class ZyteAPIClient:
         """
         attempts = 0
         while attempts < self._max_retries:
+            product = None
             try:
                 logger.debug(
                     f"fetch product details for URL {url} (Attempt {attempts + 1})"
                 )
-                async with session.post(
-                    self._endpoint,
-                    json={"url": url, **config},
-                    auth=aiohttp.BasicAuth(self._auth.username, self._auth.password),
-                    timeout=self._requests_timeout,
-                ) as response:
-                    if response.status == 200:
-                        product_data = await response.json()
-                        product_data["url"] = url  # Ensure the URL is included
-                        logger.debug(
-                            f"successfully fetched product details for URL {url}"
-                        )
-                        return product_data
-                    else:
-                        text = await response.text()
-                        logger.error(
-                            f"Zyte API request failed for URL {url} with status code {response.status} "
-                            f"and response: {text}"
-                        )
-                        attempts += 1
-                        if attempts < self._max_retries:
-                            logger.warning(
-                                f"retrying in {self._retry_delay} seconds..."
-                            )
-                            await asyncio.sleep(self._retry_delay)
+                product = await self._aiohttp_post(url)
+                product["url"] = url
+
+                attempts += 1
+                if attempts < self._max_retries:
+                    logger.warning(f"retrying in {self._retry_delay} seconds...")
+                    await asyncio.sleep(self._retry_delay)
             except Exception as e:
                 logger.error(
                     f"exception occurred while fetching product details for URL {url}: {e}"
@@ -197,6 +170,20 @@ class ZyteAPIClient:
                 if attempts < self._max_retries:
                     logger.warning(f"retrying in {self._retry_delay} seconds...")
                     await asyncio.sleep(self._retry_delay)
-        else:
-            logger.error(f"all attempts failed for URL: {url}")
-            return {"url": url, "error": "failed after max retries"}
+        return product
+
+    async def _aiohttp_post(self, url: str, headers=None) -> dict:
+        """Get the content of a given URL by an aiohttp post request."""
+
+        config = deepcopy(self._config)
+        config["url"] = url
+
+        async with aiohttp.ClientSession(headers=headers) as session:
+            async with session.post(
+                url=self._endpoint,
+                json=config,
+                auth=self._aiohttp_auth,
+            ) as response:
+                response.raise_for_status()
+                json_ = await response.json()
+        return json_

@@ -82,4 +82,13 @@ class Processor:
         Args:
             products: A list of product data dictionaries.
         """
-        raise NotImplementedError("Method Processor.aprocess not implemented yet.")
+
+        while True:
+            item = await queue_in.get()
+            if item is None:
+                queue_in.task_done()
+                break
+            if self._keep_product(item):
+                await queue_out.put(item=item)
+
+            queue_in.task_done()

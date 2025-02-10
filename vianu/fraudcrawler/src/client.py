@@ -20,7 +20,6 @@ class FraudCrawlerClient:
         location: str = "Switzerland",
         max_retries: int = 3,
         retry_delay: int = 10,
-        execution_mode: str = "async",
     ):
         """Initializes the Crawler.
 
@@ -30,7 +29,6 @@ class FraudCrawlerClient:
             location: The location to use for the search (default: "Switzerland").
             max_retries: Maximum number of retries for API calls (default: 1).
             retry_delay: Delay between retries in seconds (default: 10).
-            execution_mode: The default execution mode for fetching product details, either "async" or "sequential" (default: "async").
 
         """
         self._serpapi_client = SerpApiClient(api_key=serpapi_key, location=location)
@@ -38,7 +36,6 @@ class FraudCrawlerClient:
             api_key=zyteapi_key, max_retries=max_retries, retry_delay=retry_delay
         )
         self._processor = Processor(location=location)
-        self._execution_mode = execution_mode
 
     def run(self, search_term: str, num_results=10) -> pd.DataFrame:
         """Runs the pipeline steps: search, get product details, processes them, and returns a DataFrame.
@@ -57,27 +54,7 @@ class FraudCrawlerClient:
             return pd.DataFrame()
 
         # Get product details
-        if self._execution_mode == "async":
-            queue_in = asyncio.Queue()
-            queue_out = asyncio.Queue()
-
-            # Put URLs into the input queue
-            for url in urls:
-                queue_in.put_nowait(url)  # Non-blocking put
-
-            # Run the async function and get results
-            asyncio.run(self._zyteapi_client.async_get_details(queue_in, queue_out))
-
-            # Collect the results
-            products = []
-            while not queue_out.empty():
-                products.append(queue_out.get_nowait())  # Non-blocking get
-        elif self._execution_mode == "sequential":
-            products = self._zyteapi_client.get_details(urls=urls)
-        else:
-            NotImplementedError(
-                f"Execution mode {self._execution_mode} not implemented yes."
-            )
+        products = self._zyteapi_client.get_details(urls=urls)
 
         if not products:
             logger.warning("No product details fetched from Zyte API.")
@@ -95,3 +72,92 @@ class FraudCrawlerClient:
         # Log and return the DataFrame
         logger.info("Search completed. Returning flattened DataFrame.")
         return df
+
+    async def collect(self, queue_in: asyncio.Queue) -> None:
+        while True:
+            item = await queue_in.get()
+            if item is None:
+                queue_in.task_done()
+                break
+            logging.info(item)
+            # TODO post to DB
+            queue_in.task_done()
+
+    async def async_run(
+        self,
+        search_term: str,
+        num_results=10,
+        n_zyte_workers: int = 5,
+        n_processor_workers: int = 5,
+    ) -> None:
+        """Runs the pipeline steps: search, get product details, processes them, and returns a DataFrame.
+
+        Args:
+            search_term: The search term for the query.
+            num_results: Max number of search results (default: 10).
+            n_zyte_workers: Number of async workers for zyte (default: 5).
+            n_processor_workers: Number of async workers for the processor (default: 5).
+        """
+        # Perform search
+        urls = self._serpapi_client.search(
+            search_term=search_term,
+            num_results=num_results,
+        )
+        if not urls:
+            logger.warning("No URLs found from SERP API.")
+            return pd.DataFrame()
+
+        queue_urls = asyncio.Queue()
+        queue_products = asyncio.Queue()
+        queue_results = asyncio.Queue()
+
+        # Put URLs into the input queue
+        for url in urls:
+            await queue_urls.put(url)
+
+        # Put n_zyte_workers as stopping creteria (sentinel)
+        for _ in range(n_zyte_workers):
+            await queue_urls.put(None)
+
+        zyte_workers = [
+            asyncio.create_task(
+                self._zyteapi_client.async_get_details(
+                    queue_in=queue_urls, queue_out=queue_products
+                )
+            )
+            for _ in range(n_zyte_workers)
+        ]
+
+        processor_workers = [
+            asyncio.create_task(
+                self._processor.async_process(
+                    queue_in=queue_products, queue_out=queue_results
+                )
+            )
+            for _ in range(n_processor_workers)
+        ]
+
+        collector_worker = asyncio.create_task(self.collect(queue_results))
+
+        # Await that all zyte-workers are finished
+        await asyncio.gather(*zyte_workers)
+        for worker in zyte_workers:
+            worker.cancel()
+
+        # After all zyte workers are finished, put n_processor_workers as stopping cretieria (sentinel)
+        for _ in range(n_processor_workers):
+            await queue_products.put(None)
+
+        # Log all workers are done
+        await asyncio.gather(*processor_workers)
+        for worker in processor_workers:
+            worker.cancel()
+
+        # Put 1 sentinel for results
+        await queue_results.put(None)
+
+        # After the sine collector worker is done, stop him
+        await collector_worker
+        collector_worker.cancel()
+
+        logger.info("All workers have finished and stopped")
