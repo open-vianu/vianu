@@ -18,8 +18,8 @@ class SerpApiClient:
         """Initializes the SerpApiClient with the given API token.
 
         Args:
-            token: the API token for SERP API
-            location: the location to use for the search (default: "Switzerland")
+            api_key: The API key for SERP API.
+            location: The location to use for the search (default: "Switzerland").
         """
         self._api_key = api_key
         self._location = location
@@ -34,10 +34,10 @@ class SerpApiClient:
         """Performs a search using SERP API and returns the URLs of the results.
 
         Args:
-            search_term: the search term to use
-            num_results: max number of results to return (default: 10)
+            search_term: The search term to use for the query.
+            num_results: Max number of results to return (default: 10).
         """
-        logger.info(f'performing SERP API search for search_term="{search_term}"')
+        logger.info(f'Performing SERP API search for search_term "{search_term}".')
         params = deepcopy(self._base_config)
         params["q"] = search_term
         params["num"] = num_results
@@ -57,7 +57,7 @@ class SerpApiClient:
             return urls
         else:
             logger.error(
-                f"SERP API request failed with status code {status_code}"
+                f"SERP API request failed with status code {status_code}."
             )
             return []
     
@@ -65,8 +65,8 @@ class SerpApiClient:
         """Performs a search using SERP API and puts the URLs of the results into the output queue.
 
         Args:
-            queue_out: the output queue to put the search results into
-            search_term: the search term to use
-            num_results: max number of results to return (default: 10)
+            queue_out: The output queue to put the search results into.
+            search_term: The search term to use.
+            num_results: Max number of results to return (default: 10).
         """
-        raise NotImplementedError("SerpAPIClient.asearch is not implemented yet")
+        raise NotImplementedError("Method SerpAPIClient.asearch is not implemented yet")
