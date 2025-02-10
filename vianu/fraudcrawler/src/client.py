@@ -1,89 +1,70 @@
-import json
-import pandas as pd
 import logging
 
-from vianu.fraudcrawler.src.utils import transform_df_to_json
-from vianu.fraudcrawler.src.processor import Processor
-from vianu.fraudcrawler.src.serpapi import SerpApiClient
-from vianu.fraudcrawler.src.zyteapi import ZyteApiClient
+import pandas as pd
 
-logger = logging.getLogger("fraudcrawler_logger")
+from vianu.fraudcrawler.src.serpapi import SerpApiClient
+from vianu.fraudcrawler.src.zyteapi import ZyteAPIClient
+from vianu.fraudcrawler.src.processor import Processor
+
+logger = logging.getLogger(__name__)
 
 
 class FraudCrawlerClient:
-    """
-    The main client that orchestrates the search, data fetching, and processing.
-    """
+    """The main client that orchestrates the search, data fetching, and processing."""
 
-    def __init__(self, serpapi_token=None, zyte_api_key=None):
-        """
-        Initializes the FraudCrawlerClient with optional API tokens.
-
-        Args:
-            serpapi_token (str, optional): The API token for SERP API.
-            zyte_api_key (str, optional): The API key for Zyte API.
-        """
-        self.serpapi_token = serpapi_token
-        self.zyte_api_key = zyte_api_key
-
-    def search(self, query, location, num_results=10):
-        """
-        Performs the search, gets product details, processes them, and returns a DataFrame.
+    def __init__(
+            self,
+            serpapi_key: str,
+            zyteapi_key: str,
+            location: str = "Switzerland",
+            max_retries: int = 3,
+            retry_delay: int = 10,
+        ):
+        """Initializes the Crawler.
 
         Args:
-            query (str): The search query.
-            location (str): The location of the user
-            num_results (int): Number of search results to process.
-
-        Returns:
-            DataFrame: A pandas DataFrame containing the final product data.
+            serpapi_key: The API key for SERP API.
+            zyteapi_key: The API key for Zyte API
+            location: The location to use for the search (default: "Switzerland").
+            max_retries: Maximum number of retries for API calls (default: 1).
+            retry_delay: Delay between retries in seconds (default: 10).
         """
-        # Ensure API tokens are set
-        if not self.serpapi_token:
-            raise ValueError("SERP API token is not set.")
-        if not self.zyte_api_key:
-            raise ValueError("Zyte API key is not set.")
+        self._serpapi_client = SerpApiClient(api_key=serpapi_key, location=location)
+        self._zyteapi_client = ZyteAPIClient(api_key=zyteapi_key, max_retries=max_retries, retry_delay=retry_delay)
+        self._processor = Processor(location=location)
 
-        # Instantiate clients
-        serp_client = SerpApiClient(self.serpapi_token, location)
-        zyte_client = ZyteApiClient(self.zyte_api_key)
-        processor = Processor(location)
+    def run(self, search_term: str, num_results=10) -> pd.DataFrame:
+        """Runs the pipeline steps: search, get product details, processes them, and returns a DataFrame.
 
+        Args:
+            search_term: The search term for the query.
+            num_results: Max number of search results (default: 10).
+        """
         # Perform search
-        urls = serp_client.search(query, num_results)
+        urls = self._serpapi_client.search(
+            search_term=search_term,
+            num_results=num_results,
+        )
         if not urls:
-            logger.error("No URLs found from SERP API.")
+            logger.warning("No URLs found from SERP API.")
             return pd.DataFrame()
 
         # Get product details
-        products = zyte_client.get_product_details(urls)
+        products = self._zyteapi_client.get_details(urls=urls)
         if not products:
-            logger.error("No product details fetched from Zyte API.")
+            logger.warning("No product details fetched from Zyte API.")
             return pd.DataFrame()
 
         # Process products
-        filtered_products = processor.process(products)
-        if not filtered_products:
-            logger.warning("No products left after filtering.")
+        processed = self._processor.process(products=products)
+        if not processed:
+            logger.warning("No products left after processing.")
             return pd.DataFrame()
 
         # Flatten the product data
-        df = pd.json_normalize(filtered_products)
-
-        # Transform to Json
-        query_info = {
-            "search_term": query,
-            "num_results": num_results,
-            "location": location
-        }
-        print(len(df))
-        products_json = transform_df_to_json(query_info, df)
-
-        # Save to file
-        with open("output.json", "w", encoding="utf-8") as f:
-            json.dump(products_json, f, indent=4)
-        logger.info("JSON file has been successfully created: output.json")
+        df = pd.json_normalize(processed)
 
         # Log and return the DataFrame
         logger.info("Search completed. Returning flattened DataFrame.")
-        return df, products_json
+        return df
+    

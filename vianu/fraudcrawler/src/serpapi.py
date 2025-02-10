@@ -1,56 +1,72 @@
-import requests
+import asyncio
+from copy import deepcopy
 import logging
+import requests
+from typing import List
 
-logger = logging.getLogger("fraudcrawler_logger")
+logger = logging.getLogger(__name__)
 
 
 class SerpApiClient:
-    """
-    A client to interact with the SERP API for performing search queries.
-    """
+    """A client to interact with the SERP API for performing searches."""
 
-    def __init__(self, serpapi_token, location):
-        """
-        Initializes the SerpApiClient with the given API token.
+    _endpoint = "https://serpapi.com/search"
+    _engine = "google"
+    _request_timeout = 10
 
-        Args:
-            serpapi_token (str): The API token for SERP API.
-        """
-        self.serpapi_token = serpapi_token
-        self.location = location
-
-    def search(self, query, num_results=10):
-        """
-        Performs a search using SERP API and returns the URLs of the results.
+    def __init__(self, api_key: str, location: str = "Switzerland"):
+        """Initializes the SerpApiClient with the given API token.
 
         Args:
-            query (str): The search query.
-            num_results (int): Number of results to return.
-
-        Returns:
-            list: A list of URLs from the search results.
+            api_key: The API key for SERP API.
+            location: The location to use for the search (default: "Switzerland").
         """
-        logger.info(f"Performing SERP API search for query: {query}")
-
-        params = {
-            "engine": "google",
-            "q": query,
-            "api_key": self.serpapi_token,
-            "num": num_results,
-            "location_requested": self.location,
-            "location_used": self.location,
+        self._api_key = api_key
+        self._location = location
+        self._base_config = {
+            "engine": self._engine,
+            "api_key": api_key,
+            "location_requested": self._location,
+            "location_used": self._location,
         }
 
-        response = requests.get("https://serpapi.com/search", params=params, timeout=10)
+    def search(self, search_term: str, num_results: int=10) -> List[str]:
+        """Performs a search using SERP API and returns the URLs of the results.
 
-        if response.status_code == 200:
+        Args:
+            search_term: The search term to use for the query.
+            num_results: Max number of results to return (default: 10).
+        """
+        logger.info(f'Performing SERP API search for search_term "{search_term}".')
+        params = deepcopy(self._base_config)
+        params["q"] = search_term
+        params["num"] = num_results
+
+        response = requests.get(
+            url=self._endpoint,
+            params=params,
+            timeout=self._request_timeout,
+        )
+
+        status_code = response.status_code
+        if status_code == 200:
             data = response.json()
             search_results = data.get("organic_results", [])
             urls = [result.get("link") for result in search_results]
-            logger.info(f"Found {len(urls)} URLs from SERP API.")
+            logger.info(f"found {len(urls)} URLs from SERP API search")
             return urls
         else:
             logger.error(
-                f"SERP API request failed with status code {response.status_code}"
+                f"SERP API request failed with status code {status_code}."
             )
             return []
+    
+    async def asearch(self, queue_out: asyncio.Queue, search_term: str, num_results: int=10) -> None:
+        """Performs a search using SERP API and puts the URLs of the results into the output queue.
+
+        Args:
+            queue_out: The output queue to put the search results into.
+            search_term: The search term to use.
+            num_results: Max number of results to return (default: 10).
+        """
+        raise NotImplementedError("Method SerpAPIClient.asearch is not implemented yet")
