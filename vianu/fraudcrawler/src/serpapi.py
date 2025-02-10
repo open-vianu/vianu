@@ -30,7 +30,7 @@ class SerpApiClient:
             "location_used": self._location,
         }
 
-    def search(self, search_term: str, num_results: int=10) -> List[str]:
+    def search(self, search_term: str, num_results: int = 10) -> List[str]:
         """Performs a search using SERP API and returns the URLs of the results.
 
         Args:
@@ -56,12 +56,12 @@ class SerpApiClient:
             logger.info(f"found {len(urls)} URLs from SERP API search")
             return urls
         else:
-            logger.error(
-                f"SERP API request failed with status code {status_code}."
-            )
+            logger.error(f"SERP API request failed with status code {status_code}.")
             return []
-    
-    async def asearch(self, queue_out: asyncio.Queue, search_term: str, num_results: int=10) -> None:
+
+    async def async_earch(
+        self, queue_out: asyncio.Queue, search_term: str, num_results: int = 10
+    ) -> None:
         """Performs a search using SERP API and puts the URLs of the results into the output queue.
 
         Args:

@@ -73,8 +73,10 @@ class Processor:
             f"Finished processing with {len(processed)} products after applying country code filter."
         )
         return processed
-    
-    async def aprocess(self, queue_in: asyncio.Queue, queue_out: asyncio.Queue) -> List[dict]:
+
+    async def async_process(
+        self, queue_in: asyncio.Queue, queue_out: asyncio.Queue
+    ) -> List[dict]:
         """Processes the product data and filters based on country code asynchronously.
 
         Args:
