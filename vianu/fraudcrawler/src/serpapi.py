@@ -1,4 +1,3 @@
-import asyncio
 from copy import deepcopy
 import logging
 import requests
@@ -37,17 +36,20 @@ class SerpApiClient:
             search_term: The search term to use for the query.
             num_results: Max number of results to return (default: 10).
         """
+        # Setup the parameters
         logger.info(f'Performing SERP API search for search_term "{search_term}".')
         params = deepcopy(self._base_config)
         params["q"] = search_term
         params["num"] = num_results
 
+        # Perform the request
         response = requests.get(
             url=self._endpoint,
             params=params,
             timeout=self._request_timeout,
         )
 
+        # Handle the response
         status_code = response.status_code
         if status_code == 200:
             data = response.json()
@@ -58,15 +60,3 @@ class SerpApiClient:
         else:
             logger.error(f"SERP API request failed with status code {status_code}.")
             return []
-
-    async def async_earch(
-        self, queue_out: asyncio.Queue, search_term: str, num_results: int = 10
-    ) -> None:
-        """Performs a search using SERP API and puts the URLs of the results into the output queue.
-
-        Args:
-            queue_out: The output queue to put the search results into.
-            search_term: The search term to use.
-            num_results: Max number of results to return (default: 10).
-        """
-        raise NotImplementedError("Method SerpAPIClient.asearch is not implemented yet")
