@@ -1,2 +1,2 @@
 # General settings
-LOG_LEVEL = "DEBUG"
+LOG_LEVEL = "INFO"
