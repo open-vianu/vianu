@@ -35,16 +35,16 @@ class FraudCrawlerClient:
         self._serpapi_client = SerpApiClient(api_key=serpapi_key, location=location)
         self._zyteapi_client = ZyteAPIClient(api_key=zyteapi_key, max_retries=max_retries, retry_delay=retry_delay)
         self._processor = Processor(location=location)
+        self._enricher = KeywordEnricher(serpapi_key=serpapi_key, zyte_api_key=zyteapi_key, location=location)
 
     # allow_enrichment: bool
-    def run(self, search_term: str, num_results=10) -> pd.DataFrame:
+    def run(self, search_term: str, num_results=10, allow_enrichment=True) -> pd.DataFrame:
         """Runs the pipeline steps: search, get product details, processes them, and returns a DataFrame.
 
         Args:
             search_term: The search term for the query.
             num_results: Max number of search results (default: 10).
         """
-        # Perform search
         urls = self._serpapi_client.search(
             search_term=search_term,
             num_results=num_results,
@@ -52,15 +52,13 @@ class FraudCrawlerClient:
         if not urls:
             logger.warning("No URLs found from SERP API.")
             return pd.DataFrame()
-        Enricher = KeywordEnricher(self.serpapi_token, self.zyte_api_key)
 
         # Make enrichment
         if allow_enrichment:
             added_enriched_words = 2
             added_urls_per_kw = 3
-            enhanced_df = Enricher.apply(query,
+            enhanced_df = self._enricher.apply(search_term,
                                          added_enriched_words,
-                                         location,
                                          'German',
                                          added_urls_per_kw)
             urls = urls + enhanced_df["url"].tolist()

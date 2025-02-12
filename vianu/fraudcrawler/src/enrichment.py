@@ -14,17 +14,17 @@ logger = logging.getLogger("fraudcrawler_logger")
 
 
 class KeywordEnricher():
-    def __init__(self, serpapi_token=None, zyte_api_key=None) -> None:
+    def __init__(self, serpapi_key=None, zyte_api_key=None, location='Switzerland') -> None:
         """
         Initializes the KeywordEnricher.
         """
         super().__init__()
-        self.serpapi_token = serpapi_token
+        self.serpapi_token = serpapi_key
         self.zyte_api_key = zyte_api_key
+        self.location = location
 
 
-    def apply(self, keyword: str, number_of_keywords: int, location: str,
-              language: str, added_url_per_kw: int = 10, check_limit: int = 200):
+    def apply(self, keyword: str, number_of_keywords: int, language: str, added_url_per_kw: int = 10, check_limit: int = 200):
         """
         Makes the API call to SerpAPI to enrich the keyword and retrieve search results.
 
@@ -47,7 +47,7 @@ class KeywordEnricher():
             PipelineResult: Contains metadata and enriched search results.
         """
 
-        serp_client = SerpApiClient(self.serpapi_token, location)
+        serp_client = SerpApiClient(self.serpapi_token, self.location)
 
         # Initializes a SUGGESTED_KW and RELATED_KW from the DataforSEO engine.
         # NOTICE:
@@ -60,11 +60,11 @@ class KeywordEnricher():
         dataforseo_api = DataforSeoAPI()
 
         suggested_kw += dataforseo_api.get_keyword_suggestions(
-            keyword, location, language, number_of_keywords
+            keyword, self.location, language, number_of_keywords
         )
 
         related_kw += dataforseo_api.get_related_keywords(
-            keyword, location, language, number_of_keywords
+            keyword, self.location, language, number_of_keywords
         )
 
         enriched_kw = suggested_kw + related_kw

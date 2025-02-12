@@ -7,7 +7,7 @@ from vianu import LOG_FMT
 from vianu.fraudcrawler.settings import LOG_LEVEL
 from vianu.fraudcrawler.src.client import FraudCrawlerClient
 
-logging.basicConfig(level=LOG_LEVEL.upper(), format=LOG_FMT)
+logging.basicConfig(level=LOG_LEVEL.upper(), format=LOG_FMT, datefmt="%Y-%m-%d %H:%M:%S" )
 logger = logging.getLogger(__name__)
 
 # Load environment variables
