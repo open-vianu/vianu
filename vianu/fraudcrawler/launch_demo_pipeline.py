@@ -13,7 +13,11 @@ nc_client.serpapi_token = os.getenv("SERP_API_TOKEN", "YOUR_SERPAPI_TOKEN")
 nc_client.zyte_api_key = os.getenv("ZYTE_API_TOKEN", "YOUR_ZYTE_API_KEY")
 
 # Perform search
-df = nc_client.search("sildenafil", num_results=5, location="Switzerland")
+df = nc_client.search("sildenafil", num_results=2, location="Switzerland", allow_enrichment=True)
 
 # Display results
-df
+print('\nDisplay results')
+print(df)
+
+
+

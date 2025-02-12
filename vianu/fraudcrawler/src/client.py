@@ -1,9 +1,12 @@
 import pandas as pd
 import logging
+import os
 
 from vianu.fraudcrawler.src.processor import Processor
 from vianu.fraudcrawler.src.serpapi import SerpApiClient
+from vianu.fraudcrawler.src.enrichment import KeywordEnricher
 from vianu.fraudcrawler.src.zyteapi import ZyteApiClient
+
 
 logger = logging.getLogger("fraudcrawler_logger")
 
@@ -24,7 +27,7 @@ class FraudCrawlerClient:
         self.serpapi_token = serpapi_token
         self.zyte_api_key = zyte_api_key
 
-    def search(self, query, location, num_results=10, country_code="ch"):
+    def search(self, query, location, allow_enrichment: bool, num_results=10, country_code="ch"):
         """
         Performs the search, gets product details, processes them, and returns a DataFrame.
 
@@ -46,12 +49,24 @@ class FraudCrawlerClient:
         serp_client = SerpApiClient(self.serpapi_token, location)
         zyte_client = ZyteApiClient(self.zyte_api_key)
         processor = Processor(country_code)
+        Enricher = KeywordEnricher(self.serpapi_token, self.zyte_api_key)
 
         # Perform search
         urls = serp_client.search(query, num_results)
         if not urls:
             logger.error("No URLs found from SERP API.")
             return pd.DataFrame()
+
+        # Make enrichment
+        if allow_enrichment:
+            added_enriched_words = 2
+            added_urls_per_kw = 3
+            enhanced_df = Enricher.apply(query,
+                                         added_enriched_words,
+                                         location,
+                                         'German',
+                                         added_urls_per_kw)
+            urls = urls + enhanced_df["url"].tolist()
 
         # Get product details
         products = zyte_client.get_product_details(urls)
