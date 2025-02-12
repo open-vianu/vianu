@@ -23,7 +23,7 @@ client = FraudCrawlerClient(
 )
 
 # Perform search
-df = client.run("sildenafil", num_results=10)
+df = client.run("sildenafil", num_results=10, allow_enrichment=True)
 
 # Display results
 print(df.head())
