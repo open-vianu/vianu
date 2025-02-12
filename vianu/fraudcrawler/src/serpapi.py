@@ -11,10 +11,10 @@ class SerpApiClient:
 
     _endpoint = "https://serpapi.com/search"
     _engine = "google"
-    _request_timeout = 10
+    _requests_timeout = 10
 
     def __init__(self, api_key: str, location: str = "Switzerland"):
-        """Initializes the SerpApiClient with the given API token.
+        """Initializes the SerpApiClient with the given API key.
 
         Args:
             api_key: The API key for SERP API.
@@ -46,7 +46,7 @@ class SerpApiClient:
         response = requests.get(
             url=self._endpoint,
             params=params,
-            timeout=self._request_timeout,
+            timeout=self._requests_timeout,
         )
 
         # Handle the response
@@ -55,7 +55,7 @@ class SerpApiClient:
             data = response.json()
             search_results = data.get("organic_results", [])
             urls = [result.get("link") for result in search_results]
-            logger.info(f"found {len(urls)} URLs from SERP API search")
+            logger.info(f"Found {len(urls)} URLs from SERP API search.")
             return urls
         else:
             logger.error(f"SERP API request failed with status code {status_code}.")

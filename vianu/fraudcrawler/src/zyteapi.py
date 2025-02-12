@@ -40,7 +40,7 @@ class ZyteAPIClient:
         Args:
             api_key: The API key for Zyte API.
             max_retries: Maximum number of retries for API calls (default: 3).
-            retry_delay: Delay between retries in seconds (default: 10).
+            retry_delay: Delay between retries in seconds (default: 5).
             async_limit_per_host: Maximum number of concurrent requests per host for async calls (default: 5).
         """
         self._http_basic_auth = HTTPBasicAuth(api_key, "")
@@ -130,7 +130,7 @@ class ZyteAPIClient:
                 queue_in.task_done()
                 break
 
-            product = await self._async_get_details_for_url(ur=url)
+            product = await self._async_get_details_for_url(url=url)
             await queue_out.put(product)
             queue_in.task_done()
 
@@ -145,17 +145,17 @@ class ZyteAPIClient:
             product = None
             try:
                 logger.debug(
-                    f"fetch product details for URL {url} (Attempt {attempts + 1})"
+                    f"Fetch product details for URL {url} (Attempt {attempts + 1})."
                 )
                 product = await self._aiohttp_api_request(url=url)
                 product["url"] = url
             except Exception as e:
                 logger.error(
-                    f"exception occurred while fetching product details for URL {url}: {e}"
+                    f"Exception occurred while fetching product details for URL {url}: {e}."
                 )
             attempts += 1
             if attempts < self._max_retries:
-                logger.warning(f"retrying in {self._retry_delay} seconds...")
+                logger.warning(f"Retrying in {self._retry_delay} seconds.")
                 await asyncio.sleep(self._retry_delay)
         return product
 

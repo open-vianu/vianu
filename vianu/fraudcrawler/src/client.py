@@ -19,7 +19,7 @@ class FraudCrawlerClient:
         zyteapi_key: str,
         location: str = "Switzerland",
         max_retries: int = 3,
-        retry_delay: int = 10,
+        retry_delay: int = 2,
     ):
         """Initializes the Crawler.
 
@@ -28,7 +28,7 @@ class FraudCrawlerClient:
             zyteapi_key: The API key for Zyte API
             location: The location to use for the search (default: "Switzerland").
             max_retries: Maximum number of retries for API calls (default: 1).
-            retry_delay: Delay between retries in seconds (default: 10).
+            retry_delay: Delay between retries in seconds (default: 2).
 
         """
         self._serpapi_client = SerpApiClient(api_key=serpapi_key, location=location)
@@ -79,8 +79,7 @@ class FraudCrawlerClient:
             if item is None:
                 queue_in.task_done()
                 break
-            logging.info(item)
-            # TODO post to DB
+            logging.info(f"Collected item: {str(item)[:100]}...")
             queue_in.task_done()
 
     async def async_run(

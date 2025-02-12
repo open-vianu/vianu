@@ -15,10 +15,10 @@ class Processor:
     }
 
     def __init__(self, location: str):
-        """Initializes the Processor with the given country code.
+        """Initializes the Processor with the given location.
 
         Args:
-            location: The location associated to the specific user.
+            location: The location used to process the products.
         """
         country_code = self.LOCATION_MAPPING[location].lower()
         if country_code is None:
@@ -29,7 +29,7 @@ class Processor:
         self._country_code = country_code.lower()
 
     def _keep_product(self, product: dict) -> bool:
-        """Determines whether to keep the product based on the filtering criteria.
+        """Determines whether to keep the product based on the coutry_code.
 
         Args:
             product: A product data dictionary.
@@ -42,7 +42,7 @@ class Processor:
         )
 
     def _filter_products(self, products: List[dict]) -> List[dict]:
-        """Filters the products based on the country code.
+        """Filters the products based on the country_code.
 
         Args:
             products: A list of product data dictionaries.
@@ -77,7 +77,7 @@ class Processor:
     async def async_process(
         self, queue_in: asyncio.Queue, queue_out: asyncio.Queue
     ) -> List[dict]:
-        """Processes the product data and filters based on country code asynchronously.
+        """Processes the product data and filters based on country_code asynchronously.
 
         Args:
             products: A list of product data dictionaries.

@@ -13,8 +13,8 @@ logger = logging.getLogger(__name__)
 
 # Load environment variables
 load_dotenv()
-_SERPAPI_KEY = os.getenv("SERP_API_TOKEN")
-_ZYTEAPI_KEY = os.getenv("ZYTE_API_TOKEN")
+_SERPAPI_KEY = os.getenv("SERPAPI_KEY")
+_ZYTEAPI_KEY = os.getenv("ZYTEAPI_KEY")
 
 # Instantiate the client
 client = FraudCrawlerClient(
@@ -23,8 +23,9 @@ client = FraudCrawlerClient(
     location="Switzerland",
 )
 
-# Perform search
+# Perform sequential search
 # df = client.run("sildenafil", num_results=10) # Sequential
 # print(df.head())
 
+# Perform async search
 asyncio.run(client.async_run("sildenafil", num_results=10))  # Async
