@@ -41,7 +41,7 @@ class FraudCrawlerClient:
         self._processor = Processor(location=location)
         self._enricher = KeywordEnricher(serpapi_key=serpapi_key, zyte_api_key=zyteapi_key, location=location)
 
-    def run(self, search_term: str, num_results=10) -> pd.DataFrame:
+    def run(self, search_term: str, num_results = 10, allow_enrichment = True) -> pd.DataFrame:
         """Runs the pipeline steps: search, get product details, processes them, and returns a DataFrame.
 
         Args:
