@@ -20,6 +20,7 @@ client = FraudCrawlerClient(
     serpapi_key=_SERPAPI_KEY,
     zyteapi_key=_ZYTEAPI_KEY,
     location="Switzerland",
+
 )
 
 # Perform search
