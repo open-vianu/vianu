@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import os
 
@@ -12,19 +13,19 @@ logger = logging.getLogger(__name__)
 
 # Load environment variables
 load_dotenv()
-_SERPAPI_KEY= os.getenv("SERP_API_TOKEN")
-_ZYTEAPI_KEY = os.getenv("ZYTE_API_TOKEN")
+_SERPAPI_KEY = os.getenv("SERPAPI_KEY")
+_ZYTEAPI_KEY = os.getenv("ZYTEAPI_KEY")
 
 # Instantiate the client
 client = FraudCrawlerClient(
     serpapi_key=_SERPAPI_KEY,
     zyteapi_key=_ZYTEAPI_KEY,
     location="Switzerland",
-
 )
 
-# Perform search
-df = client.run("sildenafil", num_results=10, allow_enrichment=True)
+# Perform sequential search
+# df = client.run("sildenafil", num_results=10, allow_enrichment=True) # Sequential
+# print(df.head())
 
-# Display results
-print(df.head())
+# Perform async search
+asyncio.run(client.async_run("sildenafil", num_results=10))  # Async
