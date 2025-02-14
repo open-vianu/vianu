@@ -160,7 +160,7 @@ class ZyteAPIClient:
                 err = e
             attempts += 1
             if attempts < self._max_retries:
-                logger.warning(f"Retrying in {self._retry_delay} seconds.")
+                logger.debug(f"Retrying in {self._retry_delay} seconds.")
                 await asyncio.sleep(self._retry_delay)
         if err is not None:
             raise err
