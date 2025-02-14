@@ -1,4 +1,3 @@
-import asyncio
 import logging
 import os
 
@@ -24,8 +23,5 @@ client = FraudCrawlerClient(
 )
 
 # Perform sequential search
-#df = client.run("sildenafil", num_results=10, allow_enrichment=True) # Sequential
-#print(df.head())
-
-# Perform async search
-asyncio.run(client.async_run("sildenafil", num_results=10))  # Async
+df = client.run("sildenafil", num_results=10)
+print(df.head())
