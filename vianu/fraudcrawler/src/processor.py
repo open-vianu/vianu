@@ -91,6 +91,8 @@ class Processor:
             if self._keep_product(item):
                 await queue_out.put(item=item)
             else:
-                logger.debug(f"Product from URL {item.get('url', '')} is ignored by filter criteria.")
+                logger.warning(
+                    f"Ignoring product from URL {item.get('url', '')} by filter criteria."
+                )
 
             queue_in.task_done()
