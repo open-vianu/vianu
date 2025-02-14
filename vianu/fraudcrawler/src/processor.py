@@ -90,5 +90,7 @@ class Processor:
                 break
             if self._keep_product(item):
                 await queue_out.put(item=item)
+            else:
+                logger.debug(f"Product from URL {item.get('url', '')} is ignored by filter criteria.")
 
             queue_in.task_done()
