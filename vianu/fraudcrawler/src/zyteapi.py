@@ -130,8 +130,11 @@ class ZyteAPIClient:
                 queue_in.task_done()
                 break
 
-            product = await self._async_get_details_for_url(url=url)
-            await queue_out.put(product)
+            try:
+                product = await self._async_get_details_for_url(url=url)
+                await queue_out.put(product)
+            except Exception as e:
+                logger.warning(f"Ignoring product from URL {url} due to error: {e}")
             queue_in.task_done()
 
     async def _async_get_details_for_url(self, url: str) -> dict | None:
@@ -151,8 +154,8 @@ class ZyteAPIClient:
                 product["url"] = url
                 return product
             except Exception as e:
-                logger.error(
-                    f"Exception occurred while fetching product details for URL {url} (Attempt {attempts + 1}): {e}."
+                logger.debug(
+                    f"Exception occurred while fetching product details for URL {url} (Attempt {attempts + 1})."
                 )
                 err = e
             attempts += 1
