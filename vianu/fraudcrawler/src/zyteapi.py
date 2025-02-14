@@ -141,23 +141,26 @@ class ZyteAPIClient:
             url: The URL to fetch product details from.
         """
         attempts = 0
+        err = None
         while attempts < self._max_retries:
-            product = None
             try:
                 logger.debug(
                     f"Fetch product details for URL {url} (Attempt {attempts + 1})."
                 )
                 product = await self._aiohttp_api_request(url=url)
                 product["url"] = url
+                return product
             except Exception as e:
                 logger.error(
-                    f"Exception occurred while fetching product details for URL {url}: {e}."
+                    f"Exception occurred while fetching product details for URL {url} (Attempt {attempts + 1}): {e}."
                 )
+                err = e
             attempts += 1
             if attempts < self._max_retries:
                 logger.warning(f"Retrying in {self._retry_delay} seconds.")
                 await asyncio.sleep(self._retry_delay)
-        return product
+        if err is not None:
+            raise err
 
     async def _aiohttp_api_request(self, url: str) -> dict:
         """Get the content of a given URL by an aiohttp post request to Zyte API."""
