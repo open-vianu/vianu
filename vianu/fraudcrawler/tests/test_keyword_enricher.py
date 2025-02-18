@@ -1,7 +1,7 @@
 import unittest
 import pandas as pd
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 from vianu.fraudcrawler.src.enrichment import KeywordEnricher
 
 class TestKeywordEnricher(unittest.TestCase):
@@ -41,26 +41,24 @@ class TestKeywordEnricher(unittest.TestCase):
                     {"url": "https://example.com", "traffic": 200, 'keywordVolume': 4356.0, 'keywordEnriched': 'sildenafil', 'keywordLanguage': 'German', 'keywordLocation': 'Switzerland', 'offerRoot': 'KEYWORD_SUGGESTION'}
                 ]) as mock_estimate:
 
-                    with patch.object(KeywordEnricher, "retrieve_response", return_value={"organic_results": [{"url": "https://example.com"}]}) as mock_retrieve_response:
+                    # Initialize KeywordEnricher with mocked clients
+                    enricher = KeywordEnricher(serpapi_key="fake_key", zyte_api_key="fake_key", location="Switzerland")
 
-                        # Initialize KeywordEnricher with mocked clients
-                        enricher = KeywordEnricher(serpapi_key="fake_key", zyte_api_key="fake_key", location="Switzerland")
+                    # Call the apply method
+                    df = enricher.apply(keyword="sildenafil", number_of_keywords=5, language="en")
 
-                        # Call the apply method
-                        df = enricher.apply(keyword="sildenafil", number_of_keywords=5, language="en")
+                    # Assertions
+                    self.assertIsInstance(df, pd.DataFrame)  # Ensure return type is a DataFrame
+                    self.assertEqual(len(df), 1)  # Expecting one result from mocked data
+                    self.assertIn("url", df.columns)  # Ensure "link" column exists
+                    self.assertEqual(df["url"].iloc[0], "https://example.com")  # Ensure correct mocked URL
 
-                        # Assertions
-                        self.assertIsInstance(df, pd.DataFrame)  # Ensure return type is a DataFrame
-                        self.assertEqual(len(df), 1)  # Expecting one result from mocked data
-                        self.assertIn("url", df.columns)  # Ensure "link" column exists
-                        self.assertEqual(df["url"].iloc[0], "https://example.com")  # Ensure correct mocked URL
-
-                        # Verify mocks were called
-                        mock_dataforseo.get_keyword_suggestions.assert_called_once_with("sildenafil", "Switzerland", "en", 5)
-                        mock_dataforseo.get_related_keywords.assert_called_once_with("sildenafil", "Switzerland", "en", 5)
-                        mock_filter.assert_called()
-                        mock_aggregate.assert_called()
-                        mock_estimate.assert_called()
+                    # Verify mocks were called
+                    mock_dataforseo.get_keyword_suggestions.assert_called_once_with("sildenafil", "Switzerland", "en", 5)
+                    mock_dataforseo.get_related_keywords.assert_called_once_with("sildenafil", "Switzerland", "en", 5)
+                    mock_filter.assert_called()
+                    mock_aggregate.assert_called()
+                    mock_estimate.assert_called()
 
 
 if __name__ == "__main__":

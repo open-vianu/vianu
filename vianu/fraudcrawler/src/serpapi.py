@@ -6,7 +6,7 @@ import hashlib
 import time
 import re
 import json
-from typing import Any, Dict, Callable, List
+from typing import Any, Dict, Callable
 from serpapi.google_search import GoogleSearch
 from typing import Optional
 from requests import Response
@@ -150,7 +150,6 @@ class SerpApiClient:
             Raises:
                 Exception: If all API call attempts fail.
         """
-        data_hash = self._generate_hash(str(params))
 
         attempts = 0
         max_retries = 5

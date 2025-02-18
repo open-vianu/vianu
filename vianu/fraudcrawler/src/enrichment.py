@@ -1,5 +1,5 @@
 from vianu.fraudcrawler.src.serpapi import SerpApiClient
-from typing import Any, Dict, Callable, List, Type
+from typing import Any, Dict, Callable, List
 import pandas as pd
 from json import dumps
 from json import loads
@@ -8,19 +8,19 @@ from base64 import b64encode
 from vianu.fraudcrawler.src import enrichment_utils
 import os
 import logging
+import hashlib
 
 
 logger = logging.getLogger("fraudcrawler_logger")
 
 
 class KeywordEnricher():
-    def __init__(self, serpapi_key=None, zyte_api_key=None, location='Switzerland') -> None:
+    def __init__(self, serpapi_key=None, location='Switzerland') -> None:
         """
         Initializes the KeywordEnricher.
         """
         super().__init__()
         self.serpapi_token = serpapi_key
-        self.zyte_api_key = zyte_api_key
         self.location = location
 
 

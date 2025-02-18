@@ -1,9 +1,7 @@
 import pandas as pd
 import logging
-import os
 import asyncio
 
-import pandas as pd
 
 from vianu.fraudcrawler.src.serpapi import SerpApiClient
 from vianu.fraudcrawler.src.zyteapi import ZyteAPIClient
@@ -38,8 +36,8 @@ class FraudCrawlerClient:
         self._zyteapi_client = ZyteAPIClient(
             api_key=zyteapi_key, max_retries=max_retries, retry_delay=retry_delay
         )
-        self._processor = Processor(location=location)
         self._enricher = KeywordEnricher(serpapi_key=serpapi_key, zyte_api_key=zyteapi_key, location=location)
+        self._processor = Processor(location=location)
 
     def run(self, search_term: str, num_results = 10, allow_enrichment = True) -> pd.DataFrame:
         """Runs the pipeline steps: search, get product details, processes them, and returns a DataFrame.
