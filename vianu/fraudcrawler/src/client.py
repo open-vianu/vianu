@@ -1,11 +1,12 @@
+import pandas as pd
 import logging
 import asyncio
 
-import pandas as pd
 
 from vianu.fraudcrawler.src.serpapi import SerpApiClient
 from vianu.fraudcrawler.src.zyteapi import ZyteAPIClient
 from vianu.fraudcrawler.src.processor import Processor
+from vianu.fraudcrawler.src.enrichment import KeywordEnricher
 
 logger = logging.getLogger(__name__)
 
@@ -35,9 +36,10 @@ class FraudCrawlerClient:
         self._zyteapi_client = ZyteAPIClient(
             api_key=zyteapi_key, max_retries=max_retries, retry_delay=retry_delay
         )
+        self._enricher = KeywordEnricher(serpapi_key=serpapi_key, zyte_api_key=zyteapi_key, location=location)
         self._processor = Processor(location=location)
 
-    def run(self, search_term: str, num_results=10) -> pd.DataFrame:
+    def run(self, search_term: str, num_results = 10, allow_enrichment = True) -> pd.DataFrame:
         """Runs the pipeline steps: search, get product details, processes them, and returns a DataFrame.
 
         Args:
@@ -52,6 +54,16 @@ class FraudCrawlerClient:
         if not urls:
             logger.warning("No URLs found from SERP API.")
             return pd.DataFrame()
+
+        # Make enrichment
+        if allow_enrichment:
+            added_enriched_words = 2
+            added_urls_per_kw = 3
+            enhanced_df = self._enricher.apply(search_term,
+                                         added_enriched_words,
+                                         'German',
+                                         added_urls_per_kw)
+            urls = urls + enhanced_df["url"].tolist()
 
         # Get product details
         products = self._zyteapi_client.get_details(urls=urls)
@@ -160,3 +172,4 @@ class FraudCrawlerClient:
         collector_worker.cancel()
 
         logger.info("All workers have finished and stopped")
+
