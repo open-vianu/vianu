@@ -1,4 +1,3 @@
-import asyncio
 import logging
 from typing import List
 
@@ -73,22 +72,3 @@ class Processor:
             f"Finished processing with {len(processed)} products after applying country code filter."
         )
         return processed
-
-    async def async_process(
-        self, queue_in: asyncio.Queue, queue_out: asyncio.Queue
-    ) -> List[dict]:
-        """Processes the product data and filters based on country_code asynchronously.
-
-        Args:
-            products: A list of product data dictionaries.
-        """
-
-        while True:
-            item = await queue_in.get()
-            if item is None:
-                queue_in.task_done()
-                break
-            if self._keep_product(item):
-                await queue_out.put(item=item)
-
-            queue_in.task_done()
