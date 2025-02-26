@@ -1,12 +1,11 @@
 import pandas as pd
 import logging
 
-
 from vianu.fraudcrawler.src.serpapi import SerpApiClient
 from vianu.fraudcrawler.src.zyteapi import ZyteAPIClient
 from vianu.fraudcrawler.src.processor import Processor
-from vianu.fraudcrawler.src.classify_suspicious_product import ClassifySuspiciousProduct
 from vianu.fraudcrawler.src.enrichment import KeywordEnricher
+from vianu.fraudcrawler.src.classify_suspicious_product import ClassifySuspiciousProduct
 
 logger = logging.getLogger(__name__)
 
