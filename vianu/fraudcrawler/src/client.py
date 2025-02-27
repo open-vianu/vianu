@@ -1,6 +1,6 @@
 import pandas as pd
 import logging
-
+from typing import List
 
 from vianu.fraudcrawler.src.serpapi import SerpApiClient
 from vianu.fraudcrawler.src.zyteapi import ZyteAPIClient
@@ -38,7 +38,7 @@ class FraudCrawlerClient:
         self._enricher = KeywordEnricher(serpapi_key=serpapi_key, zyte_api_key=zyteapi_key, location=location)
         self._processor = Processor(location=location)
 
-    def run(self, search_term: str, num_results = 10, allow_enrichment = True) -> pd.DataFrame:
+    def run(self, search_term: str, num_results = 10, allow_enrichment = True, whitelist: List = []) -> pd.DataFrame:
         """Runs the pipeline steps: search, get product details, processes them, and returns a DataFrame.
 
         Args:
@@ -50,6 +50,10 @@ class FraudCrawlerClient:
             search_term=search_term,
             num_results=num_results,
         )
+
+        # Perform search on whitelist
+        urls = urls.extend(self._serpapi_client.search_whitelist(search_term=search_term, num_results=num_results, whitelist=whitelist))
+
         if not urls:
             logger.warning("No URLs found from SERP API.")
             return pd.DataFrame()

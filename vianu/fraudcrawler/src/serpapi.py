@@ -23,7 +23,7 @@ class SerpApiClient:
     _engine = "google"
     _requests_timeout = 10
 
-    def __init__(self, api_key: str, location: str = "Switzerland"):
+    def __init__(self, api_key: str, location: str = "Switzerland", country_code: str = 'ch'):
         """Initializes the SerpApiClient with the given API key.
 
         Args:
@@ -32,12 +32,31 @@ class SerpApiClient:
         """
         self._api_key = api_key
         self._location = location
+        self._country_code = country_code
+
         self._base_config = {
             "engine": self._engine,
             "api_key": api_key,
             "location_requested": self._location,
             "location_used": self._location,
         }
+
+        self._google_params = {
+            "engine": "google",
+            "location_requested": self._location,
+            "location_used": self._location,
+            "google_domain": f"google.{country_code.lower()}",
+            "tbs": f"ctr:{country_code.upper()}&cr=country{country_code.upper()}",
+            "gl": country_code.lower(),
+            "num": 100,  # this is the maximum allowed size for google, google_marketplaces and google_shopping
+        }
+
+        self._ebay_params = {
+            "engine": "ebay",
+            "ebay_domain": f"ebay.{country_code.lower()}",
+            "_blrs": "spell_auto_correct",
+        }
+
 
     def search(self, search_term: str, num_results: int = 10) -> List[str]:
         """Performs a search using SERP API and returns the URLs of the results.
@@ -70,6 +89,63 @@ class SerpApiClient:
         else:
             logger.error(f"SERP API request failed with status code {status_code}.")
             return []
+
+    def search_whitelist(self, search_term: str, num_results: int = 10, whitelist: List = []) -> List[str]:
+        """Searches using SERP API in the whitelists and returns the URLs of the results.
+
+        Args:
+            search_term: The search term to use for the query.
+            num_results: Max number of results to return (default: 10).
+        """
+        # Setup the parameters
+        logger.info(f'SEARCHING WHITELIST WITH SERP API for search_term "{search_term}".')
+        params = deepcopy(self._base_config)
+        params["q"] = search_term
+        params["num"] = num_results
+
+        print(f'ORIGINAL WHITELIST = {whitelist}')
+        whitelist = [self.extract_hostname(url) for url in whitelist]
+        print(f'CLEANED UP WHITELIST = {whitelist}')
+
+        # Define parameters and labels for different sources
+        sources = [
+            {
+                "params": {**self._google_params, "num": 16},
+                "label": "GOOGLE",
+            },  # set "num":16 only for the plain google search
+            {
+                "params": {**self._google_params, "tbm": "shop"},
+                "label": "GOOGLE_SHOPPING",
+            },
+            {
+                "params": {
+                    **self._google_params,
+                    "q": f"{search_term} site:"
+                         + " OR site:".join(
+                        [entry for entry in whitelist]
+                    ),
+                },
+                "label": "GOOGLE_SITE",
+            },
+            {
+                "params": {
+                    **self._ebay_params,
+                    "_nkw": search_term,
+                    "_ipg": 7,  # this is the maximum without pagination for EBAY
+                },
+                "label": "EBAY",
+            },
+        ]
+
+        # Only if number of results is set, define the "num" parameter
+        if num_results > 0:
+            for elem in sources:
+                elem["params"]["num"] = num_results
+
+        # Log the pretty-printed JSON
+        pretty_sources = json.dumps(sources, indent=4)
+        logger.debug(f"SerpAPI configs:\n{pretty_sources}")
+        print('DONE WHITLISTING')
 
     def _generate_hash(self, data: Any) -> str:
         data_str = str(data)
@@ -129,6 +205,40 @@ class SerpApiClient:
         """
         return results.get("organic_results") or []
 
+
+
+    def extract_hostname(url: str) -> str | None:
+        """
+        Extracts the hostname in the format 'hostname.tld' from a given URL.
+
+        This function ensures the proper URL format by adding a scheme (http://) if missing,
+        parses the URL to extract the hostname, removes common subdomains like 'www.',
+        and validates that the resulting hostname conforms to the 'hostname.tld' format.
+
+        Args:
+            url (str): The input URL or hostname string to be processed.
+
+        Returns:
+            str | None: The extracted hostname in 'hostname.tld' format if valid, or None
+            if the extracted hostname is invalid or doesn't match the required format.
+        """
+        # Add scheme if missing to ensure urlparse works correctly
+        if not url.startswith(("http://", "https://")):
+            url = "http://" + url
+
+        # Parse the URL
+        parsed_url = urlparse(url)
+        hostname = parsed_url.hostname
+
+        # Remove subdomains like 'www'
+        if hostname and hostname.startswith("www."):
+            hostname = hostname[4:]
+
+        # Validate the format 'hostname.tld'
+        if hostname:
+            return hostname
+        else:
+            return None
     def call_serpapi(
                 self,
                 params: Dict[str, Any],
