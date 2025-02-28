@@ -75,11 +75,12 @@ class SerpApiClient:
         data_str = str(data)
         return hashlib.sha256(data_str.encode("utf-8")).hexdigest()
 
-
     def _mask_token_in_string(self, string_to_mask: str, token: str) -> str:
         return re.sub(re.escape(token), f"{re.escape(token[:5])}*****", string_to_mask)
 
-    def convert_request_to_string(self, req: requests.models.PreparedRequest, token_to_mask: Optional[str] = None) -> str:
+    def convert_request_to_string(
+        self, req: requests.models.PreparedRequest, token_to_mask: Optional[str] = None
+    ) -> str:
         result = f"method: {req.method}, url: {req.url}"
         if req.body:
             result += ", body: " + req.body
@@ -87,7 +88,9 @@ class SerpApiClient:
             return result
         return self._mask_token_in_string(result, quote_plus(token_to_mask))
 
-    def convert_response_to_string(self, response: Response, token_to_mask: Optional[str] = None) -> str:
+    def convert_response_to_string(
+        self, response: Response, token_to_mask: Optional[str] = None
+    ) -> str:
         try:
             # Attempt to get json formatted data from response and turn it to CloudWatch-friendly format
             result = json.dumps(response.json())
@@ -130,25 +133,25 @@ class SerpApiClient:
         return results.get("organic_results") or []
 
     def call_serpapi(
-                self,
-                params: Dict[str, Any],
-                log_name: str,
-                force_refresh: bool = False,
-                callback: Callable[int, None] | None = None,
-        ) -> Dict[str, Any]:
+        self,
+        params: Dict[str, Any],
+        log_name: str,
+        force_refresh: bool = False,
+        callback: Callable[int, None] | None = None,
+    ) -> Dict[str, Any]:
         """
-            Calls the SerpAPI and returns the response, with optional caching.
+        Calls the SerpAPI and returns the response, with optional caching.
 
-            Args:
-                params (Dict[str, Any]): Parameters for the API call.
-                log_name (str): The name used for logging.
-                force_refresh (bool): Whether to bypass the cache and force a new API call (default is False).
+        Args:
+            params (Dict[str, Any]): Parameters for the API call.
+            log_name (str): The name used for logging.
+            force_refresh (bool): Whether to bypass the cache and force a new API call (default is False).
 
-            Returns:
-                Dict[str, Any]: The JSON response from the SerpAPI.
+        Returns:
+            Dict[str, Any]: The JSON response from the SerpAPI.
 
-            Raises:
-                Exception: If all API call attempts fail.
+        Raises:
+            Exception: If all API call attempts fail.
         """
 
         attempts = 0

@@ -56,7 +56,7 @@ def filter_keywords(keyword):
     ]
 
     blacklist = (
-            blacklist_german + blacklist_english + blacklist_french + blacklist_italian
+        blacklist_german + blacklist_english + blacklist_french + blacklist_italian
     )
 
     if not any(blacklisted_word in keyword for blacklisted_word in blacklist):
@@ -97,8 +97,9 @@ def aggregate_keywords(keywords):
     return df_agg
 
 
-def estimate_volume_per_url(urls, keyword_search_volume, keyword,
-                            keywordLocation, keywordLanguage, offerRoot):
+def estimate_volume_per_url(
+    urls, keyword_search_volume, keyword, keywordLocation, keywordLanguage, offerRoot
+):
     """Estimate the volume per url based on the rank click shares (
     https://www.advancedwebranking.com/ctrstudy/)
 

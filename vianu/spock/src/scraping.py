@@ -9,6 +9,7 @@ The module contains three main classes:
 from abc import ABC, abstractmethod
 from argparse import Namespace
 import asyncio
+from copy import deepcopy
 from dataclasses import dataclass, field
 from datetime import datetime
 from io import BytesIO
@@ -67,10 +68,12 @@ class Scraper(ABC):
         return chunks
 
     @staticmethod
-    async def _aiohttp_get_html(url: str, headers=None) -> str:
+    async def _aiohttp_get_html(
+        url: str, headers: dict | None = None, params: dict | None = None
+    ) -> str:
         """Get the content of a given URL by an aiohttp GET request."""
         async with aiohttp.ClientSession(headers=headers) as session:
-            async with session.get(url=url) as response:
+            async with session.get(url=url, params=params) as response:
                 response.raise_for_status()
                 text = await response.text()
         return text
@@ -334,12 +337,12 @@ class EMAScraper(Scraper):
     _source_favicon_url = (
         "https://www.ema.europa.eu/themes/custom/ema_theme/favicon.ico"
     )
-
-    _pdf_search_template = (
-        "https://www.ema.europa.eu/en/search?search_api_fulltext={term}"
-        "&f%5B0%5D=ema_search_custom_entity_bundle%3Adocument"  # This part is added to only retrieve PDF documents
-        "&f%5B1%5D=ema_search_entity_is_document%3ADocument"
-    )
+    _search_url = "https://www.ema.europa.eu/en/search"
+    _search_params = {
+        "search_api_fulltext": None,
+        "f[0]": "ema_search_custom_entity_bundle:document",  # This part is added to only retrieve PDF documents
+        "f[1]": "ema_search_entity_is_document:Document",
+    }
     _headers = {
         "user-agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
         "Host": "www.ema.europa.eu",
@@ -371,16 +374,22 @@ class EMAScraper(Scraper):
     @staticmethod
     def _extract_search_item_divs(soup: BeautifulSoup) -> List[Tag]:
         """Extract the list of div elements contining the different search results."""
-        parent = soup.find("div", class_=["row", "row-cols-1"])
+        parent = soup.find("div", class_="bcl-listing--default-1-col")
         return parent.find_all("div", class_="col")
 
     async def _ema_document_search(self, term: str, max_docs_src: int) -> SearchResults:
         """Search the EMA database for PDF documents with a given term."""
 
         # Get initial search results
-        url = self._pdf_search_template.format(term=term)
-        self.logger.debug(f"search ema database with url={url}")
-        content = await self._aiohttp_get_html(url=url, headers=self._headers)
+        params = deepcopy(self._search_params)
+        params["search_api_fulltext"] = term
+        log_url = f"{self._search_url}?" + "&".join(
+            [f"{k}={v}" for k, v in params.items()]
+        )
+        self.logger.debug(f"search ema database with url={log_url}")
+        content = await self._aiohttp_get_html(
+            url=self._search_url, headers=self._headers, params=params
+        )
         soup = BeautifulSoup(content, "html.parser")
 
         # Get the number of search results and number of pages
@@ -395,11 +404,14 @@ class EMAScraper(Scraper):
             items.extend(items_from_page)
 
             # Extract items from page=1, 2, ...
-            if n_pages is not None and n_pages > 1:
+            if len(items) < max_docs_src and n_pages is not None and n_pages > 1:
                 for i in range(1, n_pages):
-                    url = f"{url}&page={i}"
+                    # url = f"{url}&page={i}"
+                    params["page"] = i
                     content = await self._aiohttp_get_html(
-                        url=url, headers=self._headers
+                        url=self._search_url,
+                        headers=self._headers,
+                        params=params,
                     )
                     soup = BeautifulSoup(content, "html.parser")
 
@@ -412,13 +424,7 @@ class EMAScraper(Scraper):
                         )
                         break
 
-            # Check for extraction mismatch
-            if len(items) != count:
-                self.logger.warning(
-                    f"mismatch #items={len(items)} and the total count={count}"
-                )
-
-        self.logger.debug(f"extracted #items={len(items)} in #pages={n_pages}")
+        self.logger.debug(f"extracted #items={len(items)}")
         return SearchResults(count=count, n_pages=n_pages, items=items)
 
     @staticmethod
@@ -579,6 +585,8 @@ class MHRAScraper(Scraper):
     _source_base_url = "https://www.gov.uk"
     _language = "en"
 
+    _robots_txt_url = "https://www.gov.uk/robots.txt"
+
     def _extract_search_results_count(self, parent: Tag) -> int | None:
         """Extract the number of search results."""
         div = parent.find("div", class_="result-info__header")
@@ -604,14 +612,14 @@ class MHRAScraper(Scraper):
         self.logger.debug(f"search mhra's drug safety update database with url={url}")
         content = await self._aiohttp_get_html(url=url)
         soup = BeautifulSoup(content, "html.parser")
-        parent = soup.find(
-            "div",
-            class_=[
-                "govuk-grid-column-two-thirds",
-                "js-live-search-results-block",
-                "filtered-results",
-            ],
+        search_results = soup.select(
+            "div.govuk-grid-column-two-thirds.js-live-search-results-block.filtered-results"
         )
+        if len(search_results) != 1:
+            raise ValueError(
+                f"expected 1 search results block, but found {len(search_results)}"
+            )
+        parent = search_results[0]
 
         # Extract the number of search results
         count = self._extract_search_results_count(parent=parent)
@@ -774,16 +782,16 @@ class FDAScraper(Scraper):
 
     def _extract_number_of_pages(self, soup: BeautifulSoup) -> int | None:
         """Extract the number of pages from the search results."""
-        nav = soup.find("nav", class_=["pager-nav", "text-center"])
+        nav = soup.find("nav", class_="pager-nav")
         if nav is not None:
-            last_page = nav.find("li", class_=["pager__item", "pager__item--last"])
+            last_page = nav.find("li", class_="pager__item--last")
             a = last_page.find("a")
             if a and a.has_attr("href"):
                 href = a["href"]
                 match = re.search(r"&page=(\d+)", href)
                 if match:
                     return int(match.group(1)) + 1
-        self.logger.warning("no pager found")
+        self.logger.debug("no pager found")
         return None
 
     @staticmethod
@@ -840,9 +848,9 @@ class FDAScraper(Scraper):
     @staticmethod
     def _extract_title(main: Tag) -> str | None:
         """Extract the title of the document."""
-        header = main.find("header", class_=["row", "content-header"])
+        header = main.find("header", class_="content-header")
         if header is not None:
-            h1 = header.find("h1", class_=["content-title", "text-center"])
+            h1 = header.find("h1", class_="content-title")
             if h1 is not None:
                 return h1.text
         return None
