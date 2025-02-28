@@ -578,6 +578,8 @@ class MHRAScraper(Scraper):
     _source_base_url = "https://www.gov.uk"
     _language = "en"
 
+    _robots_txt_url = "https://www.gov.uk/robots.txt"
+
     def _extract_search_results_count(self, parent: Tag) -> int | None:
         """Extract the number of search results."""
         div = parent.find("div", class_="result-info__header")
