@@ -2,7 +2,7 @@ import logging
 from typing import List
 
 from vianu.spock.src.base import Document, SpoCK
-from vianu.spock.settings import DATE_FORMAT
+from vianu.spock.settings import DATE_FORMAT, SCRAPING_SOURCES
 
 logger = logging.getLogger(__name__)
 
@@ -56,15 +56,29 @@ def _get_details_html_items(data: List[Document]):
     return "\n".join(items)
 
 
-def get_details_html(data: List[Document]):
+def get_details_html(data: List[Document], sort_by: str = '#adr', sources: List[str] = SCRAPING_SOURCES):
     """Get the stacked HTML items for each document."""
     if len(data) == 0:
         return "<div>no results available (yet)</div>"
-    sorted_data = sorted(
-        data,
-        key=lambda x: (len(x.adverse_reactions), len(x.medicinal_products)),
-        reverse=True,
-    )
+    
+    # Sort the data by number of entities or sources
+    if sort_by == '#adr':
+        sorted_data = sorted(
+            data,
+            key=lambda x: (len(x.adverse_reactions), len(x.medicinal_products)),
+            reverse=True,
+        )
+    elif sort_by == 'sources':
+        sorted_data = sorted(
+            data,
+            key=lambda x: (x.source, len(x.adverse_reactions), len(x.medicinal_products)),
+            reverse=True,
+        )
+
+    # Filter for the selected sources
+    sorted_data = [d for d in sorted_data if d.source in sources]
+
+    # Get the HTML items
     items = _get_details_html_items(data=sorted_data)
     return DETAILS_CONTAINER_TEMPLATE.format(items=items)
 

@@ -192,28 +192,25 @@ class App(BaseApp):
                 self._components["settings.test_connection_button"] = gr.Button(
                     value="Test connection", interactive=True
                 )
-
-            with gr.Accordion(label="Sources", open=True):
-                self._components["settings.source"] = gr.CheckboxGroup(
+            
+            with gr.Accordion(label="Filters", open=True):
+                self._components['filters.sort_by'] = gr.Radio(
+                    label="Sort by",
+                    show_label=False,
+                    info="sort the results",
+                    choices=["sources", '#adr'],
+                    value="#adr",
+                    interactive=True,
+                )
+                self._components["filters.sources"] = gr.CheckboxGroup(
                     label="Sources",
                     show_label=False,
+                    info="filter the results",
                     choices=_UI_SETTINGS_SOURCE_CHOICES,
                     value=SCRAPING_SOURCES,
                     interactive=True,
                 )
-                self._components["settings.max_docs_src"] = gr.Number(
-                    label="max_docs_src",
-                    show_label=False,
-                    info="max. number of documents per source",
-                    value=MAX_DOCS_SRC,
-                    interactive=True,
-                )
 
-    def _ui_corpus_row(self):
-        """Main corpus with settings, search field, job cards, and details"""
-        with gr.Row(elem_classes="bottom-container"):
-            self._ui_corpus_settings()
-            self._ui_corpus_main()
 
     def _ui_corpus_main(self):
         """Search field, job cards, and details."""
@@ -237,6 +234,24 @@ class App(BaseApp):
                     self._components["main.cancel_button"] = gr.HTML(
                         '<div class="canceling">canceling...</div>', visible=False
                     )
+            
+            with gr.Row():
+                with gr.Accordion(label="Search parameters", open=False) as self._components["settings.parameters"]:
+                    self._components["settings.sources"] = gr.CheckboxGroup(
+                        label="Sources",
+                        show_label=False,
+                        info="select the sources to scrape",
+                        choices=_UI_SETTINGS_SOURCE_CHOICES,
+                        value=SCRAPING_SOURCES,
+                        interactive=True,
+                    )
+                    self._components["settings.max_docs_src"] = gr.Number(
+                        label="max_docs_src",
+                        show_label=False,
+                        info="max. number of documents per source",
+                        value=MAX_DOCS_SRC,
+                        interactive=True,
+                    )
 
             # Job summary cards
             with gr.Row(elem_classes="jobs-container"):
@@ -250,6 +265,12 @@ class App(BaseApp):
                 self._components["main.details"] = gr.HTML(
                     '<div class="details-container"></div>'
                 )
+
+    def _ui_corpus_row(self):
+        """Main corpus with settings, search field, job cards, and details"""
+        with gr.Row(elem_classes="bottom-container"):
+            self._ui_corpus_settings()
+            self._ui_corpus_main()
 
     def setup_ui(self):
         """Set up the user interface."""
@@ -310,6 +331,14 @@ class App(BaseApp):
             session_state.connection_is_valid = False
             raise gr.Error(f"connection to endpoint={endpoint} failed: {e}")
         return session_state
+    
+    @staticmethod
+    def _change_filters_sources_texts(session_state: SessionState) -> Dict[str, Any]:
+        """Change sources filter texts."""
+        logger.debug("change sources filter texts according to the found results")
+        data = session_state.get_active_spock().data
+        choices = [(f"{txt} ({len([d for d in data if d.source == src])})", src) for txt, src in _UI_SETTINGS_SOURCE_CHOICES]
+        return gr.update(choices=choices)
 
     @staticmethod
     def _feed_cards_to_ui(
@@ -337,14 +366,14 @@ class App(BaseApp):
         return cds
 
     @staticmethod
-    def _feed_details_to_ui(session_state: SessionState) -> str:
+    def _feed_details_to_ui(session_state: SessionState, sort_by: str = '#adr', sources: List[str] = SCRAPING_SOURCES) -> str:
         """Collect the html texts for the documents of the selected job and feed them to the UI."""
         if len(session_state.spocks) == 0:
             return fmt.get_details_html([])
 
         active_spock = session_state.get_active_spock()
         logger.debug(f"feeding details to UI (len(data)={len(active_spock.data)})")
-        return fmt.get_details_html(active_spock.data)
+        return fmt.get_details_html(active_spock.data, sort_by=sort_by, sources=sources)
 
     async def _check_llm_settings(
         self, endpoint: str, session_state: SessionState
@@ -399,6 +428,11 @@ class App(BaseApp):
                 gr.update(visible=False),
                 gr.update(visible=False),
             )
+    
+    @staticmethod
+    def _close_parameters() -> Dict[str, Any]:
+        """Close the parameters accordion."""
+        return gr.update(open=False)
 
     @staticmethod
     def _show_cancel_button() -> Tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
@@ -584,12 +618,20 @@ class App(BaseApp):
     # --------------------------------------------------------------------------
     def _event_timer(self):
         self._components["timer"].tick(
+            fn=self._change_filters_sources_texts,
+            inputs=self._session_state,
+            outputs=self._components['filters.sources'],
+        ).then(
             fn=self._feed_cards_to_ui,
             inputs=[self._local_state, self._session_state],
             outputs=self._components["main.cards"],
         ).then(
             fn=self._feed_details_to_ui,
-            inputs=[self._session_state],
+            inputs=[
+                self._session_state,
+                self._components['filters.sort_by'],
+                self._components['filters.sources'],
+            ],
             outputs=self._components["main.details"],
         )
 
@@ -634,6 +676,26 @@ class App(BaseApp):
             ],
             outputs=self._session_state,
         )
+    
+    def _event_filters(self):
+        self._components['filters.sort_by'].change(
+            fn=self._feed_details_to_ui,
+            inputs=[
+                self._session_state,
+                self._components['filters.sort_by'],
+                self._components['filters.sources'],
+            ],
+            outputs=self._components["main.details"],
+        )
+        self._components['filters.sources'].change(
+            fn=self._feed_details_to_ui,
+            inputs=[
+                self._session_state,
+                self._components['filters.sort_by'],
+                self._components['filters.sources'],
+            ],
+            outputs=self._components["main.details"],
+        )
 
     def _event_start_spock(self) -> None:
         search_term = self._components["main.search_term"]
@@ -658,11 +720,14 @@ class App(BaseApp):
                 self._components["main.cancel_button"],
             ],
         ).then(
+            fn=self._close_parameters,
+            outputs=self._components["settings.parameters"],
+        ).then(
             fn=self._setup_spock,
             inputs=[
                 search_term,
                 self._components["settings.llm_radio"],
-                self._components["settings.source"],
+                self._components["settings.sources"],
                 self._components["settings.max_docs_src"],
                 self._local_state,
                 self._session_state,
@@ -676,6 +741,10 @@ class App(BaseApp):
             fn=lambda: None,
             outputs=search_term,  # Empty the search term in the UI
         ).then(
+            fn=self._change_filters_sources_texts,
+            inputs=self._session_state,
+            outputs=self._components['filters.sources'],
+        ).then(
             fn=self._feed_cards_to_ui,
             inputs=[self._local_state, self._session_state],
             outputs=self._components["main.cards"],
@@ -684,12 +753,20 @@ class App(BaseApp):
             inputs=self._session_state,
             outputs=self._session_state,
         ).then(
+            fn=self._change_filters_sources_texts,
+            inputs=self._session_state,
+            outputs=self._components['filters.sources'],
+        ).then(
             fn=self._feed_cards_to_ui,
             inputs=[self._local_state, self._session_state],
             outputs=self._components["main.cards"],
         ).then(
             fn=self._feed_details_to_ui,  # called one more time in order to enforce update of the details (regardless of the state of the timer)
-            inputs=[self._session_state],
+            inputs=[
+                self._session_state,
+                self._components['filters.sort_by'],
+                self._components['filters.sources'],
+            ],
             outputs=self._components["main.details"],
         ).then(fn=lambda: gr.update(active=False), outputs=timer).then(
             fn=self._toggle_button,
@@ -727,8 +804,16 @@ class App(BaseApp):
                 inputs=[self._session_state, gr.Number(value=index, visible=False)],
                 outputs=self._session_state,
             ).then(
+                fn=self._change_filters_sources_texts,
+                inputs=self._session_state,
+                outputs=self._components['filters.sources'],
+            ).then(
                 fn=self._feed_details_to_ui,
-                inputs=[self._session_state],
+                inputs=[
+                    self._session_state,
+                    self._components['filters.sort_by'],
+                    self._components['filters.sources'],
+                ],
                 outputs=self._components["main.details"],
             )
 
@@ -742,6 +827,9 @@ class App(BaseApp):
         self._event_settings_ollama()
         self._event_settings_openai()
         self._event_test_connection()
+
+        # Filter events
+        self._event_filters()
 
         # Start/Stop events
         self._event_start_spock()
