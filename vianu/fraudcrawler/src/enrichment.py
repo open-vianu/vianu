@@ -14,8 +14,8 @@ import hashlib
 logger = logging.getLogger("fraudcrawler_logger")
 
 
-class KeywordEnricher():
-    def __init__(self, serpapi_key=None, location='Switzerland') -> None:
+class KeywordEnricher:
+    def __init__(self, serpapi_key=None, location="Switzerland") -> None:
         """
         Initializes the KeywordEnricher.
         """
@@ -23,8 +23,14 @@ class KeywordEnricher():
         self.serpapi_token = serpapi_key
         self.location = location
 
-
-    def apply(self, keyword: str, number_of_keywords: int, language: str, added_url_per_kw: int = 10, check_limit: int = 200):
+    def apply(
+        self,
+        keyword: str,
+        number_of_keywords: int,
+        language: str,
+        added_url_per_kw: int = 10,
+        check_limit: int = 200,
+    ):
         """
         Makes the API call to SerpAPI to enrich the keyword and retrieve search results.
 
@@ -68,7 +74,9 @@ class KeywordEnricher():
         )
 
         enriched_kw = suggested_kw + related_kw
-        logger.info(f"ENRICHMENT: For query {keyword}, total number of additional keywords -> {len(enriched_kw)}")
+        logger.info(
+            f"ENRICHMENT: For query {keyword}, total number of additional keywords -> {len(enriched_kw)}"
+        )
 
         filtered_kw: List[str] = []
 
@@ -76,7 +84,9 @@ class KeywordEnricher():
         for kw in enriched_kw:
             filtered_kw.append(enrichment_utils.filter_keywords(kw["keywordEnriched"]))
 
-        agg_kw = enrichment_utils.aggregate_keywords(enriched_kw).to_dict(orient="records")
+        agg_kw = enrichment_utils.aggregate_keywords(enriched_kw).to_dict(
+            orient="records"
+        )
 
         urls: List[Dict[str, Any]] = []
         for kw in agg_kw:
@@ -105,15 +115,14 @@ class KeywordEnricher():
         return pd.DataFrame(enriched_results)
 
     def retrieve_response(
-                self,
-                keyword: str,
-                client: SerpApiClient,
-                added_url_per_kw: int,
-                offer_root: str = "DEFAULT",
-                callback: Callable[int, None] | None = None,
-                custom_params: Dict[str, Any] = {},
+        self,
+        keyword: str,
+        client: SerpApiClient,
+        added_url_per_kw: int,
+        offer_root: str = "DEFAULT",
+        callback: Callable[int, None] | None = None,
+        custom_params: Dict[str, Any] = {},
     ) -> List:
-
         params = {
             "q": keyword,
             "start": 0,
@@ -121,17 +130,19 @@ class KeywordEnricher():
             "num": added_url_per_kw,
             **(custom_params),
         }
-        logger.info(f"ENRICHMENT: Extracting URLs from SerpAPI for '{keyword}' from '{offer_root}'")
+        logger.info(
+            f"ENRICHMENT: Extracting URLs from SerpAPI for '{keyword}' from '{offer_root}'"
+        )
         return client.call_serpapi(params, log_name="google_regular", callback=callback)
 
 
-class DataforSeoAPI():
+class DataforSeoAPI:
     def __init__(
-            self,
-            cache_name: str = "dataforseoapi",
-            max_retries: int = 3,
-            retry_delay: int = 2,
-            cache_duration: int = 24 * 60 * 60,
+        self,
+        cache_name: str = "dataforseoapi",
+        max_retries: int = 3,
+        retry_delay: int = 2,
+        cache_duration: int = 24 * 60 * 60,
     ):
         """
         Initializes the SerpAPI class.
@@ -168,13 +179,13 @@ class DataforSeoAPI():
         try:
             base64_bytes = b64encode(
                 (
-                        "%s:%s"
-                        % (
-                            os.getenv("DATAFORSEO_USERNAME", "YOUR_DATAFORSEO_USERNAME"),
-                            #self.context.settings.data_for_seo.username,
-                            os.getenv("DATAFORSEO_PASSWORD", "YOUR_DATAFORSEO_PASSWORD"),
-                            #self.context.settings.data_for_seo.password,
-                        )
+                    "%s:%s"
+                    % (
+                        os.getenv("DATAFORSEO_USERNAME", "YOUR_DATAFORSEO_USERNAME"),
+                        # self.context.settings.data_for_seo.username,
+                        os.getenv("DATAFORSEO_PASSWORD", "YOUR_DATAFORSEO_PASSWORD"),
+                        # self.context.settings.data_for_seo.password,
+                    )
                 ).encode("ascii")
             ).decode("ascii")
             headers = {
@@ -292,4 +303,3 @@ class DataforSeoAPI():
                                 )
 
             return keywords
-

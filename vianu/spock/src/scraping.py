@@ -16,7 +16,6 @@ from io import BytesIO
 import logging
 import re
 from typing import List
-import urllib
 import xml.etree.ElementTree as ET  # nosec
 
 import aiohttp
@@ -69,7 +68,9 @@ class Scraper(ABC):
         return chunks
 
     @staticmethod
-    async def _aiohttp_get_html(url: str, headers: dict | None = None, params: dict | None = None) -> str:
+    async def _aiohttp_get_html(
+        url: str, headers: dict | None = None, params: dict | None = None
+    ) -> str:
         """Get the content of a given URL by an aiohttp GET request."""
         async with aiohttp.ClientSession(headers=headers) as session:
             async with session.get(url=url, params=params) as response:
@@ -339,7 +340,7 @@ class EMAScraper(Scraper):
     _search_url = "https://www.ema.europa.eu/en/search"
     _search_params = {
         "search_api_fulltext": None,
-        "f[0]": "ema_search_custom_entity_bundle:document",   # This part is added to only retrieve PDF documents
+        "f[0]": "ema_search_custom_entity_bundle:document",  # This part is added to only retrieve PDF documents
         "f[1]": "ema_search_entity_is_document:Document",
     }
     _headers = {
@@ -382,9 +383,13 @@ class EMAScraper(Scraper):
         # Get initial search results
         params = deepcopy(self._search_params)
         params["search_api_fulltext"] = term
-        log_url = f'{self._search_url}?' + "&".join([f"{k}={v}" for k, v in params.items()])
+        log_url = f"{self._search_url}?" + "&".join(
+            [f"{k}={v}" for k, v in params.items()]
+        )
         self.logger.debug(f"search ema database with url={log_url}")
-        content = await self._aiohttp_get_html(url=self._search_url, headers=self._headers, params=params)
+        content = await self._aiohttp_get_html(
+            url=self._search_url, headers=self._headers, params=params
+        )
         soup = BeautifulSoup(content, "html.parser")
 
         # Get the number of search results and number of pages
@@ -404,7 +409,9 @@ class EMAScraper(Scraper):
                     # url = f"{url}&page={i}"
                     params["page"] = i
                     content = await self._aiohttp_get_html(
-                        url=self._search_url, headers=self._headers, params=params,
+                        url=self._search_url,
+                        headers=self._headers,
+                        params=params,
                     )
                     soup = BeautifulSoup(content, "html.parser")
 
@@ -605,9 +612,13 @@ class MHRAScraper(Scraper):
         self.logger.debug(f"search mhra's drug safety update database with url={url}")
         content = await self._aiohttp_get_html(url=url)
         soup = BeautifulSoup(content, "html.parser")
-        search_results = soup.select('div.govuk-grid-column-two-thirds.js-live-search-results-block.filtered-results')
+        search_results = soup.select(
+            "div.govuk-grid-column-two-thirds.js-live-search-results-block.filtered-results"
+        )
         if len(search_results) != 1:
-            raise ValueError(f"expected 1 search results block, but found {len(search_results)}")
+            raise ValueError(
+                f"expected 1 search results block, but found {len(search_results)}"
+            )
         parent = search_results[0]
 
         # Extract the number of search results
