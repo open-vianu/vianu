@@ -16,7 +16,9 @@ from vianu.spock.src import scraping as scp
 from vianu.spock.src import ner
 
 logging.basicConfig(format=LOG_FMT, level=LOG_LEVEL)
-logger = logging.getLogger(__name__)# Avoid noisy logs from hpack, httpcore, and openai (make it at least logger.INFO)
+logger = logging.getLogger(
+    __name__
+)  # Avoid noisy logs from hpack, httpcore, and openai (make it at least logger.INFO)
 level = max(getattr(logging, LOG_LEVEL), 20)
 logging.getLogger("hpack").setLevel(level=level)
 logging.getLogger("httpcore").setLevel(level=level)

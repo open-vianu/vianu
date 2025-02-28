@@ -192,13 +192,13 @@ class App(BaseApp):
                 self._components["settings.test_connection_button"] = gr.Button(
                     value="Test connection", interactive=True
                 )
-            
+
             with gr.Accordion(label="Filters", open=True):
-                self._components['filters.sort_by'] = gr.Radio(
+                self._components["filters.sort_by"] = gr.Radio(
                     label="Sort by",
                     show_label=False,
                     info="sort the results",
-                    choices=["sources", '#adr'],
+                    choices=["sources", "#adr"],
                     value="#adr",
                     interactive=True,
                 )
@@ -210,7 +210,6 @@ class App(BaseApp):
                     value=SCRAPING_SOURCES,
                     interactive=True,
                 )
-
 
     def _ui_corpus_main(self):
         """Search field, job cards, and details."""
@@ -234,9 +233,11 @@ class App(BaseApp):
                     self._components["main.cancel_button"] = gr.HTML(
                         '<div class="canceling">canceling...</div>', visible=False
                     )
-            
+
             with gr.Row():
-                with gr.Accordion(label="Search parameters", open=False) as self._components["settings.parameters"]:
+                with gr.Accordion(
+                    label="Search parameters", open=False
+                ) as self._components["settings.parameters"]:
                     self._components["settings.sources"] = gr.CheckboxGroup(
                         label="Sources",
                         show_label=False,
@@ -317,10 +318,14 @@ class App(BaseApp):
         return session_state
 
     @staticmethod
-    async def _test_connection(endpoint: str, session_state: SessionState) -> SessionState:
+    async def _test_connection(
+        endpoint: str, session_state: SessionState
+    ) -> SessionState:
         logger.debug(f"test connection to endpoint={endpoint}")
         try:
-            ner = NERFactory.create(endpoint=endpoint, config=session_state.model_config)
+            ner = NERFactory.create(
+                endpoint=endpoint, config=session_state.model_config
+            )
             test_task = asyncio.create_task(ner.test_model_endpoint())
             test_answer = await test_task
             gr.Info(
@@ -331,13 +336,16 @@ class App(BaseApp):
             session_state.connection_is_valid = False
             raise gr.Error(f"connection to endpoint={endpoint} failed: {e}")
         return session_state
-    
+
     @staticmethod
     def _change_filters_sources_texts(session_state: SessionState) -> Dict[str, Any]:
         """Change sources filter texts."""
         logger.debug("change sources filter texts according to the found results")
         data = session_state.get_active_spock().data
-        choices = [(f"{txt} ({len([d for d in data if d.source == src])})", src) for txt, src in _UI_SETTINGS_SOURCE_CHOICES]
+        choices = [
+            (f"{txt} ({len([d for d in data if d.source == src])})", src)
+            for txt, src in _UI_SETTINGS_SOURCE_CHOICES
+        ]
         return gr.update(choices=choices)
 
     @staticmethod
@@ -366,7 +374,11 @@ class App(BaseApp):
         return cds
 
     @staticmethod
-    def _feed_details_to_ui(session_state: SessionState, sort_by: str = '#adr', sources: List[str] = SCRAPING_SOURCES) -> str:
+    def _feed_details_to_ui(
+        session_state: SessionState,
+        sort_by: str = "#adr",
+        sources: List[str] = SCRAPING_SOURCES,
+    ) -> str:
         """Collect the html texts for the documents of the selected job and feed them to the UI."""
         if len(session_state.spocks) == 0:
             return fmt.get_details_html([])
@@ -428,7 +440,7 @@ class App(BaseApp):
                 gr.update(visible=False),
                 gr.update(visible=False),
             )
-    
+
     @staticmethod
     def _close_parameters() -> Dict[str, Any]:
         """Close the parameters accordion."""
@@ -620,7 +632,7 @@ class App(BaseApp):
         self._components["timer"].tick(
             fn=self._change_filters_sources_texts,
             inputs=self._session_state,
-            outputs=self._components['filters.sources'],
+            outputs=self._components["filters.sources"],
         ).then(
             fn=self._feed_cards_to_ui,
             inputs=[self._local_state, self._session_state],
@@ -629,8 +641,8 @@ class App(BaseApp):
             fn=self._feed_details_to_ui,
             inputs=[
                 self._session_state,
-                self._components['filters.sort_by'],
-                self._components['filters.sources'],
+                self._components["filters.sort_by"],
+                self._components["filters.sources"],
             ],
             outputs=self._components["main.details"],
         )
@@ -676,23 +688,23 @@ class App(BaseApp):
             ],
             outputs=self._session_state,
         )
-    
+
     def _event_filters(self):
-        self._components['filters.sort_by'].change(
+        self._components["filters.sort_by"].change(
             fn=self._feed_details_to_ui,
             inputs=[
                 self._session_state,
-                self._components['filters.sort_by'],
-                self._components['filters.sources'],
+                self._components["filters.sort_by"],
+                self._components["filters.sources"],
             ],
             outputs=self._components["main.details"],
         )
-        self._components['filters.sources'].change(
+        self._components["filters.sources"].change(
             fn=self._feed_details_to_ui,
             inputs=[
                 self._session_state,
-                self._components['filters.sort_by'],
-                self._components['filters.sources'],
+                self._components["filters.sort_by"],
+                self._components["filters.sources"],
             ],
             outputs=self._components["main.details"],
         )
@@ -743,7 +755,7 @@ class App(BaseApp):
         ).then(
             fn=self._change_filters_sources_texts,
             inputs=self._session_state,
-            outputs=self._components['filters.sources'],
+            outputs=self._components["filters.sources"],
         ).then(
             fn=self._feed_cards_to_ui,
             inputs=[self._local_state, self._session_state],
@@ -755,7 +767,7 @@ class App(BaseApp):
         ).then(
             fn=self._change_filters_sources_texts,
             inputs=self._session_state,
-            outputs=self._components['filters.sources'],
+            outputs=self._components["filters.sources"],
         ).then(
             fn=self._feed_cards_to_ui,
             inputs=[self._local_state, self._session_state],
@@ -764,8 +776,8 @@ class App(BaseApp):
             fn=self._feed_details_to_ui,  # called one more time in order to enforce update of the details (regardless of the state of the timer)
             inputs=[
                 self._session_state,
-                self._components['filters.sort_by'],
-                self._components['filters.sources'],
+                self._components["filters.sort_by"],
+                self._components["filters.sources"],
             ],
             outputs=self._components["main.details"],
         ).then(fn=lambda: gr.update(active=False), outputs=timer).then(
@@ -806,13 +818,13 @@ class App(BaseApp):
             ).then(
                 fn=self._change_filters_sources_texts,
                 inputs=self._session_state,
-                outputs=self._components['filters.sources'],
+                outputs=self._components["filters.sources"],
             ).then(
                 fn=self._feed_details_to_ui,
                 inputs=[
                     self._session_state,
-                    self._components['filters.sort_by'],
-                    self._components['filters.sources'],
+                    self._components["filters.sort_by"],
+                    self._components["filters.sources"],
                 ],
                 outputs=self._components["main.details"],
             )

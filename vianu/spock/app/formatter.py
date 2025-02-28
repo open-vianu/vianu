@@ -56,22 +56,28 @@ def _get_details_html_items(data: List[Document]):
     return "\n".join(items)
 
 
-def get_details_html(data: List[Document], sort_by: str = '#adr', sources: List[str] = SCRAPING_SOURCES):
+def get_details_html(
+    data: List[Document], sort_by: str = "#adr", sources: List[str] = SCRAPING_SOURCES
+):
     """Get the stacked HTML items for each document."""
     if len(data) == 0:
         return "<div>no results available (yet)</div>"
-    
+
     # Sort the data by number of entities or sources
-    if sort_by == '#adr':
+    if sort_by == "#adr":
         sorted_data = sorted(
             data,
             key=lambda x: (len(x.adverse_reactions), len(x.medicinal_products)),
             reverse=True,
         )
-    elif sort_by == 'sources':
+    elif sort_by == "sources":
         sorted_data = sorted(
             data,
-            key=lambda x: (x.source, len(x.adverse_reactions), len(x.medicinal_products)),
+            key=lambda x: (
+                x.source,
+                len(x.adverse_reactions),
+                len(x.medicinal_products),
+            ),
             reverse=True,
         )
 
