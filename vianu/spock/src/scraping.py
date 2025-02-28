@@ -9,12 +9,14 @@ The module contains three main classes:
 from abc import ABC, abstractmethod
 from argparse import Namespace
 import asyncio
+from copy import deepcopy
 from dataclasses import dataclass, field
 from datetime import datetime
 from io import BytesIO
 import logging
 import re
 from typing import List
+import urllib
 import xml.etree.ElementTree as ET  # nosec
 
 import aiohttp
@@ -67,10 +69,10 @@ class Scraper(ABC):
         return chunks
 
     @staticmethod
-    async def _aiohttp_get_html(url: str, headers=None) -> str:
+    async def _aiohttp_get_html(url: str, headers: dict | None = None, params: dict | None = None) -> str:
         """Get the content of a given URL by an aiohttp GET request."""
         async with aiohttp.ClientSession(headers=headers) as session:
-            async with session.get(url=url) as response:
+            async with session.get(url=url, params=params) as response:
                 response.raise_for_status()
                 text = await response.text()
         return text
@@ -334,12 +336,12 @@ class EMAScraper(Scraper):
     _source_favicon_url = (
         "https://www.ema.europa.eu/themes/custom/ema_theme/favicon.ico"
     )
-
-    _pdf_search_template = (
-        "https://www.ema.europa.eu/en/search?search_api_fulltext={term}"
-        "&f%5B0%5D=ema_search_custom_entity_bundle%3Adocument"  # This part is added to only retrieve PDF documents
-        "&f%5B1%5D=ema_search_entity_is_document%3ADocument"
-    )
+    _search_url = "https://www.ema.europa.eu/en/search"
+    _search_params = {
+        "search_api_fulltext": None,
+        "f[0]": "ema_search_custom_entity_bundle:document",   # This part is added to only retrieve PDF documents
+        "f[1]": "ema_search_entity_is_document:Document",
+    }
     _headers = {
         "user-agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
         "Host": "www.ema.europa.eu",
@@ -378,9 +380,11 @@ class EMAScraper(Scraper):
         """Search the EMA database for PDF documents with a given term."""
 
         # Get initial search results
-        url = self._pdf_search_template.format(term=term)
-        self.logger.debug(f"search ema database with url={url}")
-        content = await self._aiohttp_get_html(url=url, headers=self._headers)
+        params = deepcopy(self._search_params)
+        params["search_api_fulltext"] = term
+        log_url = f'{self._search_url}?' + "&".join([f"{k}={v}" for k, v in params.items()])
+        self.logger.debug(f"search ema database with url={log_url}")
+        content = await self._aiohttp_get_html(url=self._search_url, headers=self._headers, params=params)
         soup = BeautifulSoup(content, "html.parser")
 
         # Get the number of search results and number of pages
@@ -397,9 +401,10 @@ class EMAScraper(Scraper):
             # Extract items from page=1, 2, ...
             if len(items) < max_docs_src and n_pages is not None and n_pages > 1:
                 for i in range(1, n_pages):
-                    url = f"{url}&page={i}"
+                    # url = f"{url}&page={i}"
+                    params["page"] = i
                     content = await self._aiohttp_get_html(
-                        url=url, headers=self._headers
+                        url=self._search_url, headers=self._headers, params=params,
                     )
                     soup = BeautifulSoup(content, "html.parser")
 
