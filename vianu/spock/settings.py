@@ -23,7 +23,7 @@ PUBMED_DB = "pubmed"
 PUBMED_BATCH_SIZE = 20
 
 # NER settings
-LARGE_LANGUAGE_MODELS = ["openai", "llama"]
+LLM_ENDPOINTS = ["openai", "ollama"]
 MAX_TOKENS = 128.000
 LLAMA_MODEL = "llama3.2"
 OPENAI_MODEL = "gpt-4o"

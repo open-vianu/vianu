@@ -11,7 +11,7 @@ import gradio as gr
 
 from vianu.spock.settings import LOG_LEVEL, N_SCP_TASKS, N_NER_TASKS
 from vianu.spock.settings import (
-    LARGE_LANGUAGE_MODELS,
+    LLM_ENDPOINTS,
     SCRAPING_SOURCES,
     MAX_DOCS_SRC,
     MODEL_TEST_QUESTION,
@@ -34,10 +34,10 @@ load_dotenv()
 # App settings
 _ASSETS_PATH = Path(__file__).parents[1] / "assets"
 
-_UI_SETTINGS_LLM_CHOICES = [
-    (name, value) for name, value in zip(["OpenAI", "Ollama"], LARGE_LANGUAGE_MODELS)
+_UI_SETTINGS_LLM_ENDPOINT_CHOICES = [
+    (name, value) for name, value in zip(["OpenAI", "Ollama"], LLM_ENDPOINTS)
 ]
-if not len(_UI_SETTINGS_LLM_CHOICES) == len(LARGE_LANGUAGE_MODELS):
+if not len(_UI_SETTINGS_LLM_ENDPOINT_CHOICES) == len(LLM_ENDPOINTS):
     raise ValueError(
         "LARGE_LANGUAGE_MODELS and _UI_SETTINGS_LLM_CHOICES must have the same length"
     )
@@ -146,7 +146,7 @@ class App(BaseApp):
                 self._components["settings.llm_radio"] = gr.Radio(
                     label="Model",
                     show_label=False,
-                    choices=_UI_SETTINGS_LLM_CHOICES,
+                    choices=_UI_SETTINGS_LLM_ENDPOINT_CHOICES,
                     value="openai",
                     interactive=True,
                 )
@@ -171,7 +171,7 @@ class App(BaseApp):
                         type="password",
                     )
 
-                # 'llama' specific settings
+                # ollama specific settings
                 with gr.Group(visible=False) as self._components[
                     "settings.ollama_group"
                 ]:
@@ -264,14 +264,14 @@ class App(BaseApp):
     # --------------------------------------------------------------------------
     @staticmethod
     def _show_llm_settings(
-        llm: str, session_state: SessionState
+        endpoint: str, session_state: SessionState
     ) -> Tuple[dict[str, Any], dict[str, Any], SessionState]:
         """Show the settings for the selected LLM model."""
-        logger.debug(f"show {llm} model settings")
+        logger.debug(f"show endpoint={endpoint} settings")
         session_state.connection_is_valid = False
-        if llm == "llama":
+        if endpoint == "ollama":
             return gr.update(visible=True), gr.update(visible=False), session_state
-        elif llm == "openai":
+        elif endpoint == "openai":
             return gr.update(visible=False), gr.update(visible=True), session_state
         else:
             return gr.update(visible=False), gr.update(visible=False), session_state
@@ -291,24 +291,24 @@ class App(BaseApp):
     ) -> SessionState:
         """Setup ollama base_url"""
         logger.debug(f"set ollama base_url={base_url}")
-        session_state.model_config["llama"] = {"base_url": base_url}
+        session_state.model_config["ollama"] = {"base_url": base_url}
         session_state.connection_is_valid = False
         return session_state
 
     @staticmethod
-    async def _test_connection(llm: str, session_state: SessionState) -> SessionState:
-        logger.debug(f"test connection to model={llm}")
+    async def _test_connection(endpoint: str, session_state: SessionState) -> SessionState:
+        logger.debug(f"test connection to endpoint={endpoint}")
         try:
-            ner = NERFactory.create(model=llm, config=session_state.model_config)
+            ner = NERFactory.create(endpoint=endpoint, config=session_state.model_config)
             test_task = asyncio.create_task(ner.test_model_endpoint())
             test_answer = await test_task
             gr.Info(
-                f"connection to model={llm} is valid: '{MODEL_TEST_QUESTION}' was answered with '{test_answer}'"
+                f"connection to endpoint={endpoint} is valid: '{MODEL_TEST_QUESTION}' was answered with '{test_answer}'"
             )
             session_state.connection_is_valid = True
         except Exception as e:
             session_state.connection_is_valid = False
-            raise gr.Error(f"connection to model={llm} failed: {e}")
+            raise gr.Error(f"connection to endpoint={endpoint} failed: {e}")
         return session_state
 
     @staticmethod
@@ -347,27 +347,27 @@ class App(BaseApp):
         return fmt.get_details_html(active_spock.data)
 
     async def _check_llm_settings(
-        self, llm: str, session_state: SessionState
+        self, endpoint: str, session_state: SessionState
     ) -> SessionState:
         """Check if the LLM settings are set correcly."""
         # Check if the settings are set
-        if llm == "openai":
+        if endpoint == "openai":
             if (
-                session_state.model_config.get(llm) is None
-                or session_state.model_config[llm].get("api_key") is None
+                session_state.model_config.get(endpoint) is None
+                or session_state.model_config[endpoint].get("api_key") is None
             ):
                 raise gr.Error("OpenAI api_key is not set")
-        elif llm == "llama":
+        elif endpoint == "ollama":
             if (
-                session_state.model_config.get(llm) is None
-                or session_state.model_config[llm].get("base_url") is None
+                session_state.model_config.get(endpoint) is None
+                or session_state.model_config[endpoint].get("base_url") is None
             ):
                 raise gr.Error("Ollama base_url is not set")
 
         # Check connection to the model
         if not session_state.connection_is_valid:
             session_state = await self._test_connection(
-                llm=llm, session_state=session_state
+                endpoint=endpoint, session_state=session_state
             )
         return session_state
 
@@ -413,7 +413,7 @@ class App(BaseApp):
     @staticmethod
     def _setup_spock(
         term: str,
-        model: str,
+        endpoint: str,
         source: List[str],
         max_docs_src: int,
         local_state: dict,
@@ -437,9 +437,9 @@ class App(BaseApp):
 
         # Create new SpoCK object
         setup = Setup(
-            id_=f"{term} {source} {model}",
+            id_=f"{term} {source} {endpoint}",
             term=term,
-            model=model,
+            endpoint=endpoint,
             source=source,
             max_docs_src=max_docs_src,
             log_level=local_state["log_level"],

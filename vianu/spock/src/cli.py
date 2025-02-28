@@ -5,7 +5,7 @@ from typing import Sequence
 
 from vianu.spock.settings import LOG_LEVEL, FILE_NAME, FILE_PATH, MAX_DOCS_SRC
 from vianu.spock.settings import SCRAPING_SOURCES, N_SCP_TASKS
-from vianu.spock.settings import N_NER_TASKS, LARGE_LANGUAGE_MODELS
+from vianu.spock.settings import N_NER_TASKS, LLM_ENDPOINTS
 
 
 def parse_args(args_: Sequence) -> argparse.Namespace:
@@ -62,12 +62,12 @@ def parse_args(args_: Sequence) -> argparse.Namespace:
     # Add NER group
     ner_gp = parser.add_argument_group("ner")
     ner_gp.add_argument(
-        "--model",
-        "-m",
+        "--endpoint",
+        "-e",
         type=str,
-        choices=LARGE_LANGUAGE_MODELS,
+        choices=LLM_ENDPOINTS,
         default="openai",
-        help="NER model",
+        help="LLM endpoint",
     )
     ner_gp.add_argument(
         "--n-ner-tasks",

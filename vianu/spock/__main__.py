@@ -16,7 +16,11 @@ from vianu.spock.src import scraping as scp
 from vianu.spock.src import ner
 
 logging.basicConfig(format=LOG_FMT, level=LOG_LEVEL)
-logger = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)# Avoid noisy logs from hpack, httpcore, and openai (make it at least logger.INFO)
+level = max(getattr(logging, LOG_LEVEL), 20)
+logging.getLogger("hpack").setLevel(level=level)
+logging.getLogger("httpcore").setLevel(level=level)
+logging.getLogger("openai").setLevel(level=level)
 load_dotenv()
 
 
@@ -26,7 +30,7 @@ def get_model_config() -> Dict[str, Dict[str, Any]]:
         "openai": {
             "api_key": os.getenv("OPENAI_API_KEY"),
         },
-        "llama": {
+        "ollama": {
             "base_url": os.getenv("OLLAMA_BASE_URL"),
         },
     }
@@ -147,14 +151,14 @@ async def main(args_: Namespace | None = None, save: bool = True) -> None:
     logger.info(f"starting SpoCK (args_={args_})")
 
     # Test availability of NER model
-    model = args_.model
+    endpoint = args_.endpoint
     model_config = get_model_config()
     try:
-        _ner = ner.NERFactory.create(model=model, config=model_config)
+        _ner = ner.NERFactory.create(endpoint=endpoint, config=model_config)
         test_task = asyncio.create_task(_ner.test_model_endpoint())
         test_answer = await test_task
         logger.debug(
-            f"test model endpoint of model='{model}': '{MODEL_TEST_QUESTION}' was answered with '{test_answer}'"
+            f"test model endpoint '{endpoint}': '{MODEL_TEST_QUESTION}' was answered with '{test_answer}'"
         )
     except Exception as e:
         logger.error(f"could not reach model endpoint: {e}")

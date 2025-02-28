@@ -64,7 +64,7 @@ python vianu/spock/launch_demo_app.py
 
 ### CLI
 ```bash
-python -m vianu.spock --term dafalgan --model llama --data-path "/tmp/spock" --data-file "spock_data" --log-level DEBUG
+python -m vianu.spock --term dafalgan --endpoint llama --data-path "/tmp/spock" --data-file "spock_data" --log-level DEBUG
 ```
 
 ### Disclaimer

@@ -169,7 +169,7 @@ class Setup(Identicator, Serializable):
     n_scp_tasks: int
 
     # NER options
-    model: str
+    endpoint: str
     n_ner_tasks: int
 
     # optional fields

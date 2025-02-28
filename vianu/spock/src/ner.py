@@ -246,12 +246,12 @@ class NERFactory:
     """Factory for NER models."""
 
     @staticmethod
-    def create(model: str, config: dict) -> NER:
+    def create(endpoint: str, config: dict) -> NER:
         """Create a NER model from the `model` keyword."""
 
-        # create a :class:`OllamaNER` instance
-        if model == "openai":
-            api_key = config[model].get("api_key")
+        # create a :class:`OpenAINER` instance
+        if endpoint == "openai":
+            api_key = config[endpoint].get("api_key")
             if api_key is None:
                 api_key = os.environ.get("OPENAI_API_KEY")
             if api_key is None:
@@ -260,15 +260,16 @@ class NERFactory:
                 )
             ner = OpenAINER(model=OPENAI_MODEL, api_key=api_key)
 
-        elif model == "llama":
-            base_url = config[model].get("base_url")
+        # create a :class:`OllamaNER` instance
+        elif endpoint == "ollama":
+            base_url = config[endpoint].get("base_url")
             if base_url is None:
                 base_url = os.environ.get("OLLAMA_BASE_URL")
             if base_url is None:
                 raise ValueError("The base_url for the ollama endpoint is missing")
             ner = OllamaNER(model=LLAMA_MODEL, base_url=base_url)
         else:
-            raise ValueError(f"unknown ner model '{model}'")
+            raise ValueError(f"unknown ner model '{endpoint}'")
 
         return ner
 
@@ -281,8 +282,8 @@ def create_tasks(
 ) -> List[asyncio.Task]:
     """Create asyncio NER tasks."""
     n_ner_tasks = args_.n_ner_tasks
-    model = args_.model
-    ner = NERFactory.create(model=model, config=model_config)
+    endpoint = args_.endpoint
+    ner = NERFactory.create(endpoint=endpoint, config=model_config)
 
     logger.info(f"setting up {n_ner_tasks} NER task(s)")
     tasks = [
