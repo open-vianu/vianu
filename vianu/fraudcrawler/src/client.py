@@ -1,11 +1,11 @@
 import pandas as pd
 import logging
 
-
 from vianu.fraudcrawler.src.serpapi import SerpApiClient
 from vianu.fraudcrawler.src.zyteapi import ZyteAPIClient
 from vianu.fraudcrawler.src.processor import Processor
 from vianu.fraudcrawler.src.enrichment import KeywordEnricher
+from vianu.fraudcrawler.src.classify_suspicious_product import ClassifySuspiciousProduct
 
 logger = logging.getLogger(__name__)
 
@@ -17,6 +17,7 @@ class FraudCrawlerClient:
         self,
         serpapi_key: str,
         zyteapi_key: str,
+        openai_api_key: str,
         location: str = "Switzerland",
         max_retries: int = 3,
         retry_delay: int = 2,
@@ -39,6 +40,7 @@ class FraudCrawlerClient:
             serpapi_key=serpapi_key, zyte_api_key=zyteapi_key, location=location
         )
         self._processor = Processor(location=location)
+        self._classifier_suspiciousness= ClassifySuspiciousProduct(openai_api_key=openai_api_key)
 
     def run(
         self, search_term: str, num_results=10, allow_enrichment=True
@@ -79,6 +81,9 @@ class FraudCrawlerClient:
         if not processed:
             logger.warning("No products left after processing.")
             return pd.DataFrame()
+
+        # Analyze Relevance
+        processed = self._classifier_suspiciousness.classify_suspicious_products(processed)
 
         # Flatten the product data
         df = pd.json_normalize(processed)
