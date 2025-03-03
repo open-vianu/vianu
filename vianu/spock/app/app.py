@@ -1,4 +1,5 @@
 import asyncio
+from collections import Counter
 from dataclasses import dataclass, field
 from datetime import datetime
 import logging
@@ -268,7 +269,6 @@ class App(BaseApp):
                     show_label=False,
                     info="filter the results",
                     choices=_UI_SETTINGS_SOURCE_CHOICES,
-                    value=SCRAPING_SOURCES,
                     interactive=True,
                 )
                 self._components['filters.selected_adr'] = gr.Dropdown(
@@ -440,15 +440,24 @@ class App(BaseApp):
         return session_state
 
     @staticmethod
-    def _change_filters_sources_texts(session_state: SessionState) -> Dict[str, Any]:
-        """Change sources filter texts."""
+    def _update_filters(session_state: SessionState) -> Dict[str, Any]:
+        """Update filter according to running spock."""
         logger.debug("change sources filter texts according to the found results")
-        data = session_state.get_active_spock().data
-        choices = [
+        spock = session_state.get_active_spock()
+        data = spock.data
+
+        # Update the text and selection of the sources
+        src_txt = [
             (f"{txt} ({len([d for d in data if d.source == src])})", src)
             for txt, src in _UI_SETTINGS_SOURCE_CHOICES
         ]
-        return gr.update(choices=choices)
+        value = spock.setup.source
+
+        # Update the detected ADRs
+        adrs = [ne.text.upper() for d in data for ne in d.adverse_reactions]
+        counter = Counter(adrs)
+        adr_txt = sorted([f"{adr} ({count})" for adr, count in counter.items()])
+        return gr.update(choices=src_txt, value=value), gr.update(choices=adr_txt)
 
     @staticmethod
     def _feed_cards_to_ui(
@@ -736,9 +745,12 @@ class App(BaseApp):
     # --------------------------------------------------------------------------
     def _event_timer(self):
         self._components["timer"].tick(
-            fn=self._change_filters_sources_texts,
+            fn=self._update_filters,
             inputs=self._session_state,
-            outputs=self._components["filters.sources"],
+            outputs=[
+                self._components["filters.sources"],
+                self._components["filters.selected_adr"],
+            ],
         ).then(
             fn=self._feed_cards_to_ui,
             inputs=[self._local_state, self._session_state],
@@ -891,9 +903,12 @@ class App(BaseApp):
             fn=lambda: None,
             outputs=search_term,  # Empty the search term in the UI
         ).then(
-            fn=self._change_filters_sources_texts,
+            fn=self._update_filters,
             inputs=self._session_state,
-            outputs=self._components["filters.sources"],
+            outputs=[
+                self._components["filters.sources"],
+                self._components["filters.selected_adr"],
+            ],
         ).then(
             fn=self._feed_cards_to_ui,
             inputs=[self._local_state, self._session_state],
@@ -903,9 +918,12 @@ class App(BaseApp):
             inputs=self._session_state,
             outputs=self._session_state,
         ).then(
-            fn=self._change_filters_sources_texts,
+            fn=self._update_filters,
             inputs=self._session_state,
-            outputs=self._components["filters.sources"],
+            outputs=[
+                self._components["filters.sources"],
+                self._components["filters.selected_adr"],
+            ],
         ).then(
             fn=self._feed_cards_to_ui,
             inputs=[self._local_state, self._session_state],
@@ -954,9 +972,12 @@ class App(BaseApp):
                 inputs=[self._session_state, gr.Number(value=index, visible=False)],
                 outputs=self._session_state,
             ).then(
-                fn=self._change_filters_sources_texts,
+                fn=self._update_filters,
                 inputs=self._session_state,
-                outputs=self._components["filters.sources"],
+                outputs=[
+                self._components["filters.sources"],
+                self._components["filters.selected_adr"],
+            ],
             ).then(
                 fn=self._feed_details_to_ui,
                 inputs=[
