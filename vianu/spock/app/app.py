@@ -25,7 +25,7 @@ from vianu.spock.settings import (
     GRADIO_MAX_JOBS,
     GRADIO_UPDATE_INTERVAL,
 )
-from vianu.spock.src.base import Setup, SpoCK, SpoCKList, QueueItem  # noqa: F401
+from vianu.spock.src.base import Document, Setup, SpoCK, SpoCKList, QueueItem  # noqa: F401
 from vianu import BaseApp
 from vianu.spock.__main__ import get_scraper_config, get_model_config, setup_asyncio_framework
 import vianu.spock.app.formatter as fmt
@@ -260,11 +260,11 @@ class App(BaseApp):
                     label="Sort by",
                     show_label=False,
                     info="sort the results",
-                    choices=["sources", "#adr"],
+                    choices=["source", "#adr"],
                     value="#adr",
                     interactive=True,
                 )
-                self._components["filters.sources"] = gr.CheckboxGroup(
+                self._components["filters.source"] = gr.CheckboxGroup(
                     label="Sources",
                     show_label=False,
                     info="filter the results",
@@ -308,7 +308,7 @@ class App(BaseApp):
                 with gr.Accordion(
                     label="Search parameters", open=False
                 ) as self._components["settings.parameters"]:
-                    self._components["settings.sources"] = gr.CheckboxGroup(
+                    self._components["settings.source"] = gr.CheckboxGroup(
                         label="Sources",
                         show_label=False,
                         info="select the sources to scrape",
@@ -438,26 +438,69 @@ class App(BaseApp):
             session_state.connection_is_valid = False
             raise gr.Error(f"connection to endpoint={endpoint} failed: {e}")
         return session_state
-
+    
     @staticmethod
-    def _update_filters(session_state: SessionState) -> Dict[str, Any]:
-        """Update filter according to running spock."""
-        logger.debug("change sources filter texts according to the found results")
+    def _get_adr_multiselect_data(
+        data: List[Document],
+        source: List[str],
+        selected_adr: List[str] | None,
+    ) -> Tuple[Tuple[List[str], List[str]], List[str]]:
+        """Get the adr choices and value for the multiselect field."""
+
+        # Get the ADRs, count them and build the corresponding choices
+        data = [d for d in data if d.source in source]
+        adrs = [ne.text.upper() for d in data for ne in d.adverse_reactions]
+        counter = Counter(adrs)
+        counter = sorted(counter.items(), key=lambda x: x[0])
+        choices = [(f"{adr} ({count})", adr) for adr, count in counter]
+
+        # Reduce the selected ADRs to the ones that are present in the choices
+        if selected_adr is not None and len(selected_adr) > 0:
+            poss_vals = [v for _, v in choices]
+            value = [a for a in selected_adr if a in poss_vals]
+        else:
+            value = None
+        return choices, value
+
+    def _update_filters(
+        self,
+        source: List[str],
+        selected_adr: List[str] | None,
+        session_state: SessionState
+    ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+        """Update source and multisleect according to running spock."""
+        logger.debug(f"update filters with source={source} and selected_adr={selected_adr}")
         spock = session_state.get_active_spock()
         data = spock.data
 
         # Update the text and selection of the sources
-        src_txt = [
+        src_chc = [
             (f"{txt} ({len([d for d in data if d.source == src])})", src)
             for txt, src in _UI_SETTINGS_SOURCE_CHOICES
         ]
         value = spock.setup.source
 
         # Update the detected ADRs
-        adrs = [ne.text.upper() for d in data for ne in d.adverse_reactions]
-        counter = Counter(adrs)
-        adr_txt = sorted([f"{adr} ({count})" for adr, count in counter.items()])
-        return gr.update(choices=src_txt, value=value), gr.update(choices=adr_txt)
+        adr_chc, adr_val = self._get_adr_multiselect_data(
+            data=data,
+            source=source,
+            selected_adr=selected_adr,
+        )
+        return gr.update(choices=src_chc, value=value), gr.update(choices=adr_chc, value=adr_val)
+
+    def _update_adr_multiselect(
+        self,
+        source: List[str],
+        selecte_adr: List[str] | None,
+        session_state: SessionState
+    ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+        data = session_state.get_active_spock().data
+        choices, value = self._get_adr_multiselect_data(
+            data=data,
+            source=source,
+            selected_adr=selecte_adr,
+        )
+        return gr.update(choices=choices, value=value)
 
     @staticmethod
     def _feed_cards_to_ui(
@@ -488,15 +531,21 @@ class App(BaseApp):
     def _feed_details_to_ui(
         session_state: SessionState,
         sort_by: str = "#adr",
-        sources: List[str] = SCRAPING_SOURCES,
+        source: List[str] = SCRAPING_SOURCES,
+        selected_adr: List[str] | None = None,
     ) -> str:
         """Collect the html texts for the documents of the selected job and feed them to the UI."""
         if len(session_state.spocks) == 0:
             return fmt.get_details_html([])
 
-        active_spock = session_state.get_active_spock()
-        logger.debug(f"feeding details to UI (len(data)={len(active_spock.data)})")
-        return fmt.get_details_html(active_spock.data, sort_by=sort_by, sources=sources)
+        # Select and filter the data
+        data = session_state.get_active_spock().data
+        data = [d for d in data if d.source in source]
+        if selected_adr is not None and len(selected_adr) > 0:
+            data = [d for d in data if any([ne.text.upper() in selected_adr for ne in d.adverse_reactions])]
+
+        logger.debug(f"feeding details to UI (len(data)={len(data)})")
+        return fmt.get_details_html(data, sort_by=sort_by, source=source)
 
     async def _check_llm_settings(
         self, endpoint: str, session_state: SessionState
@@ -746,9 +795,13 @@ class App(BaseApp):
     def _event_timer(self):
         self._components["timer"].tick(
             fn=self._update_filters,
-            inputs=self._session_state,
+            inputs=[
+                self._components["filters.source"],
+                self._components["filters.selected_adr"],
+                self._session_state,
+            ],
             outputs=[
-                self._components["filters.sources"],
+                self._components["filters.source"],
                 self._components["filters.selected_adr"],
             ],
         ).then(
@@ -760,7 +813,8 @@ class App(BaseApp):
             inputs=[
                 self._session_state,
                 self._components["filters.sort_by"],
-                self._components["filters.sources"],
+                self._components["filters.source"],
+                self._components["filters.selected_adr"],
             ],
             outputs=self._components["main.details"],
         )
@@ -844,16 +898,38 @@ class App(BaseApp):
             inputs=[
                 self._session_state,
                 self._components["filters.sort_by"],
-                self._components["filters.sources"],
+                self._components["filters.source"],
+                self._components["filters.selected_adr"],
             ],
             outputs=self._components["main.details"],
         )
-        self._components["filters.sources"].change(
+        self._components["filters.source"].change(
+            fn=self._update_adr_multiselect,
+            inputs=[
+                self._components["filters.source"],
+                self._components["filters.selected_adr"],
+                self._session_state,
+            ],
+            outputs=[
+                self._components["filters.selected_adr"],
+            ],
+        ).then(
             fn=self._feed_details_to_ui,
             inputs=[
                 self._session_state,
                 self._components["filters.sort_by"],
-                self._components["filters.sources"],
+                self._components["filters.source"],
+                self._components["filters.selected_adr"],
+            ],
+            outputs=self._components["main.details"],
+        )
+        self._components["filters.selected_adr"].change(
+            fn=self._feed_details_to_ui,
+            inputs=[
+                self._session_state,
+                self._components["filters.sort_by"],
+                self._components["filters.source"],
+                self._components["filters.selected_adr"],
             ],
             outputs=self._components["main.details"],
         )
@@ -889,7 +965,7 @@ class App(BaseApp):
                 search_term,
                 self._components["settings.scraping_radio"],
                 self._components["settings.llm_radio"],
-                self._components["settings.sources"],
+                self._components["settings.source"],
                 self._components["settings.max_docs_src"],
                 self._local_state,
                 self._session_state,
@@ -904,9 +980,13 @@ class App(BaseApp):
             outputs=search_term,  # Empty the search term in the UI
         ).then(
             fn=self._update_filters,
-            inputs=self._session_state,
+            inputs=[
+                self._components["filters.source"],
+                self._components["filters.selected_adr"],
+                self._session_state,
+            ],
             outputs=[
-                self._components["filters.sources"],
+                self._components["filters.source"],
                 self._components["filters.selected_adr"],
             ],
         ).then(
@@ -919,9 +999,13 @@ class App(BaseApp):
             outputs=self._session_state,
         ).then(
             fn=self._update_filters,
-            inputs=self._session_state,
+            inputs=[
+                self._components["filters.source"],
+                self._components["filters.selected_adr"],
+                self._session_state,
+            ],
             outputs=[
-                self._components["filters.sources"],
+                self._components["filters.source"],
                 self._components["filters.selected_adr"],
             ],
         ).then(
@@ -933,7 +1017,8 @@ class App(BaseApp):
             inputs=[
                 self._session_state,
                 self._components["filters.sort_by"],
-                self._components["filters.sources"],
+                self._components["filters.source"],
+                self._components["filters.selected_adr"],
             ],
             outputs=self._components["main.details"],
         ).then(fn=lambda: gr.update(active=False), outputs=timer).then(
@@ -973,9 +1058,13 @@ class App(BaseApp):
                 outputs=self._session_state,
             ).then(
                 fn=self._update_filters,
-                inputs=self._session_state,
+                inputs=[
+                    self._components["filters.source"],
+                    self._components["filters.selected_adr"],
+                    self._session_state,
+                ],
                 outputs=[
-                self._components["filters.sources"],
+                self._components["filters.source"],
                 self._components["filters.selected_adr"],
             ],
             ).then(
@@ -983,7 +1072,8 @@ class App(BaseApp):
                 inputs=[
                     self._session_state,
                     self._components["filters.sort_by"],
-                    self._components["filters.sources"],
+                    self._components["filters.source"],
+                    self._components["filters.selected_adr"],
                 ],
                 outputs=self._components["main.details"],
             )

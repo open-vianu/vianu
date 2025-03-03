@@ -18,6 +18,7 @@ JOBS_CONTAINER_CARD_TEMPLATE = """
 """
 
 DETAILS_CONTAINER_TEMPLATE = """
+<div>Documents ({ndata})</div>
 <div id='details' class='details-container'>
   <div class='items'>{items}</div>
 </div>
@@ -57,11 +58,11 @@ def _get_details_html_items(data: List[Document]):
 
 
 def get_details_html(
-    data: List[Document], sort_by: str = "#adr", sources: List[str] = SCRAPING_SOURCES
+    data: List[Document], sort_by: str = "#adr", source: List[str] = SCRAPING_SOURCES
 ):
     """Get the stacked HTML items for each document."""
     if len(data) == 0:
-        return "<div>no results available (yet)</div>"
+        return "<div>Documents (0)</div>"
 
     # Sort the data by number of entities or sources
     if sort_by == "#adr":
@@ -82,11 +83,11 @@ def get_details_html(
         )
 
     # Filter for the selected sources
-    sorted_data = [d for d in sorted_data if d.source in sources]
+    sorted_data = [d for d in sorted_data if d.source in source]
 
     # Get the HTML items
     items = _get_details_html_items(data=sorted_data)
-    return DETAILS_CONTAINER_TEMPLATE.format(items=items)
+    return DETAILS_CONTAINER_TEMPLATE.format(ndata=len(sorted_data), items=items)
 
 
 def _get_status_html(status: str) -> str:
