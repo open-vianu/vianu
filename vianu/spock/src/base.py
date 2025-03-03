@@ -166,6 +166,7 @@ class Setup(Identicator, Serializable):
     # scraping options
     term: str
     source: List[str]
+    service: str
     n_scp_tasks: int
 
     # NER options

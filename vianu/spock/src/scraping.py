@@ -15,7 +15,8 @@ from datetime import datetime
 from io import BytesIO
 import logging
 import re
-from typing import List
+import requests
+from typing import Any, Dict, List
 import xml.etree.ElementTree as ET  # nosec
 
 import aiohttp
@@ -26,7 +27,7 @@ import numpy as np
 import pymupdf
 
 from vianu.spock.src.base import Document, QueueItem  # noqa: F401
-from vianu.spock.settings import MAX_CHUNK_SIZE, SCRAPING_SOURCES
+from vianu.spock.settings import MAX_CHUNK_SIZE
 from vianu.spock.settings import (
     PUBMED_ESEARCH_URL,
     PUBMED_DB,
@@ -38,7 +39,9 @@ logger = logging.getLogger(__name__)
 
 
 class Scraper(ABC):
-    def __init__(self):
+    def __init__(self, config: Dict[str, Any] | None = None):
+        """Initialize the Scraper object."""
+        self._config = config
         self.logger = logging.getLogger(self.__class__.__name__)
 
     @abstractmethod
@@ -67,16 +70,40 @@ class Scraper(ABC):
         ]
         return chunks
 
-    @staticmethod
     async def _aiohttp_get_html(
-        url: str, headers: dict | None = None, params: dict | None = None
+        self, url: str, headers: dict | None = None, params: dict | None = None
     ) -> str:
         """Get the content of a given URL by an aiohttp GET request."""
+
+        self.logger.debug(f"search ema database using aiohttp with url={url} and params={params}")
         async with aiohttp.ClientSession(headers=headers) as session:
             async with session.get(url=url, params=params) as response:
                 response.raise_for_status()
                 text = await response.text()
         return text
+    
+    def _service_get_html(
+        self, url: str, params: dict | None = None
+    ) -> str:
+        """Scrape the content of a given URL by a scraping service."""
+        if self._config is None:
+            raise ValueError("no configuration found")
+        service = self._config.get("service")
+        if params is not None:
+            url = f'{url}?' + '&'.join([f'{k}={v}' for k, v in params.items()])
+
+        self.logger.debug(f"search ema database using service={service} with url={url}")
+        if service == 'scraperapi':
+            api_key = self._config.get("api_key")
+            base_url = self._config.get("base_url")
+            payload = {
+                'api_key': api_key,
+                'url': url,
+            }
+            response = requests.get(base_url, params=payload)
+            return response.text
+        else:
+            raise ValueError(f"service={service} is not supported")
 
 
 @dataclass
@@ -107,6 +134,9 @@ class PubmedScraper(Scraper):
 
     _robots_txt_url = "https://www.ncbi.nlm.nih.gov/robots.txt"
 
+    def __init__(self, config: Dict[str, Any] | None = None):
+        super().__init__(config=config)
+
     @staticmethod
     def _get_entrez_history_params(text: str) -> PubmedEntrezHistoryParams:
         """Retrieving the entrez history parameters for optimized search when requesting large numbers of documents.
@@ -121,7 +151,6 @@ class PubmedScraper(Scraper):
     async def _pubmed_esearch(self, term: str) -> str:
         """Search the Pubmed database with a given term and POST the results to entrez history server."""
         url = f"{PUBMED_ESEARCH_URL}?db={PUBMED_DB}&term={term}&usehistory=y"
-        self.logger.debug(f"search pubmed database with url={url}")
         esearch = await self._aiohttp_get_html(url=url)
         return esearch
 
@@ -146,7 +175,6 @@ class PubmedScraper(Scraper):
             # Prepare URL for retrieving next batch of documents but stop if the maximum number is reached
             retmax = min(max_docs_src - len(batches) * batch_size, batch_size)
             url = f"{PUBMED_EFETCH_URL}?db={PUBMED_DB}&WebEnv={params.web}&query_key={params.key}&retstart={retstart}&retmax={retmax}"
-            self.logger.debug(f"fetch documents with url={url}")
 
             # Fetch the documents
             efetch = await self._aiohttp_get_html(url=url)
@@ -350,6 +378,9 @@ class EMAScraper(Scraper):
 
     _robots_txt_url = "https://www.ema.europa.eu/robots.txt"
 
+    def __init__(self, config: Dict[str, Any] | None = None):
+        super().__init__(config=config)
+
     def _extract_search_results_count(self, soup: BeautifulSoup) -> int | None:
         """Extract the number of search results."""
         span = soup.find("span", class_="source-summary-count")
@@ -383,13 +414,17 @@ class EMAScraper(Scraper):
         # Get initial search results
         params = deepcopy(self._search_params)
         params["search_api_fulltext"] = term
-        log_url = f"{self._search_url}?" + "&".join(
-            [f"{k}={v}" for k, v in params.items()]
-        )
-        self.logger.debug(f"search ema database with url={log_url}")
-        content = await self._aiohttp_get_html(
-            url=self._search_url, headers=self._headers, params=params
-        )
+        if self._config is None:
+            content = await self._aiohttp_get_html(
+                url=self._search_url,
+                headers=self._headers,
+                params=params,
+            )
+        else:
+            content = self._service_get_html(
+                url=self._search_url,
+                params=params,
+            )
         soup = BeautifulSoup(content, "html.parser")
 
         # Get the number of search results and number of pages
@@ -587,6 +622,9 @@ class MHRAScraper(Scraper):
 
     _robots_txt_url = "https://www.gov.uk/robots.txt"
 
+    def __init__(self, config: Dict[str, Any] | None = None):
+        super().__init__(config=config)
+
     def _extract_search_results_count(self, parent: Tag) -> int | None:
         """Extract the number of search results."""
         div = parent.find("div", class_="result-info__header")
@@ -609,7 +647,6 @@ class MHRAScraper(Scraper):
 
         # Get search results and extract divs containing the search results
         url = self._search_template.format(term=term)
-        self.logger.debug(f"search mhra's drug safety update database with url={url}")
         content = await self._aiohttp_get_html(url=url)
         soup = BeautifulSoup(content, "html.parser")
         search_results = soup.select(
@@ -769,6 +806,9 @@ class FDAScraper(Scraper):
     )
     _language = "en"
 
+    def __init__(self, config: Dict[str, Any] | None = None):
+        super().__init__(config=config)
+
     def _extract_search_results_count(self, soup: BeautifulSoup) -> int | None:
         """Extract the number of search results from the search info section."""
         parent = soup.find("div", class_="lcds-search-filters__info")
@@ -805,8 +845,10 @@ class FDAScraper(Scraper):
 
         # Get search results
         url = self._search_template.format(term=term)
-        self.logger.debug(f"search fda database with url={url}")
-        content = await self._aiohttp_get_html(url=url)
+        if self._config is None:
+            content = await self._aiohttp_get_html(url=url)
+        else:
+            content = self._service_get_html(url=url)
         soup = BeautifulSoup(content, "html.parser")
 
         # Get the number of search results and the number of pages
@@ -963,14 +1005,35 @@ class FDAScraper(Scraper):
         )
 
 
-_SCRAPERS = [PubmedScraper, EMAScraper, MHRAScraper, FDAScraper]
-_SOURCE_TO_SCRAPER = {src: scr for src, scr in zip(SCRAPING_SOURCES, _SCRAPERS)}
-if not len(_SCRAPERS) == len(SCRAPING_SOURCES):
-    raise ValueError("number of scrapers and sources do not match")
+class ScraperFactory:
+    """Factory for Scraper Objects."""
+    def __init__(self, config: Dict[str, Any]) -> None:
+        self._config = config
+
+    def create(self, source: str) -> Scraper | None:
+        """Create a Scraper object for the given source."""
+
+        if source == 'pubmed':
+            scraper = PubmedScraper
+
+        elif source == 'ema':
+            scraper = EMAScraper
+
+        elif source == 'mhra':
+            scraper = MHRAScraper
+
+        elif source == 'fda':
+            scraper = FDAScraper
+
+        else:
+            return None
+        
+        config = self._config.get(source)
+        return scraper(config=config)
 
 
 async def _scraping(
-    args_: Namespace, queue_in: asyncio.Queue, queue_out: asyncio.Queue
+    args_: Namespace, queue_in: asyncio.Queue, queue_out: asyncio.Queue, scraper_config: Dict[str, Any]
 ) -> None:
     """Pop a source (str) from the input queue, perform  the scraping task with the given term, and put the results in
     the output queue until the input queue is empty.
@@ -980,6 +1043,7 @@ async def _scraping(
         - queue_in: the input queue containing the sources to scrape
         - queue_out: the output queue for the scraped data
     """
+    factory = ScraperFactory(config=scraper_config)
 
     while True:
         # Get source from input queue
@@ -991,14 +1055,14 @@ async def _scraping(
             break
 
         # Get the scraper and apply it to the term
-        scraper = _SOURCE_TO_SCRAPER.get(source)  # type: type[Scraper]
+        scraper = factory.create(source=source)
         if scraper is None:
-            logger.error(f"unknown source={source}")
+            logger.error(f"unknown source={source}, source is ignored")
             queue_in.task_done()
-            break
+            continue
 
         try:
-            await scraper().apply(args_=args_, queue_out=queue_out)
+            await scraper.apply(args_=args_, queue_out=queue_out)
         except Exception as e:
             logger.error(
                 f"error during scraping for source={source} and term={args_.term}: {e}"
@@ -1009,14 +1073,14 @@ async def _scraping(
 
 
 def create_tasks(
-    args_: Namespace, queue_in: asyncio.Queue, queue_out: asyncio.Queue
+    args_: Namespace, queue_in: asyncio.Queue, queue_out: asyncio.Queue, scraper_config: Dict[str, Any]
 ) -> List[asyncio.Task]:
     """Create the asyncio scraping tasks."""
     n_tasks = args_.n_scp_tasks
     logger.info(f"setting up {n_tasks} scraping task(s) for source(s)={args_.source}")
     tasks = [
         asyncio.create_task(
-            _scraping(args_=args_, queue_in=queue_in, queue_out=queue_out)
+            _scraping(args_=args_, queue_in=queue_in, queue_out=queue_out, scraper_config=scraper_config)
         )
         for _ in range(n_tasks)
     ]

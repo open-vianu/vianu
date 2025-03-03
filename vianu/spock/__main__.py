@@ -9,7 +9,7 @@ from typing import List, Tuple, Dict, Any
 from dotenv import load_dotenv
 
 from vianu import LOG_FMT
-from vianu.spock.settings import SCRAPING_SOURCES, LOG_LEVEL, MODEL_TEST_QUESTION
+from vianu.spock.settings import SCRAPING_SOURCES, LOG_LEVEL, MODEL_TEST_QUESTION, SCRAPERAPI_BASE_URL
 from vianu.spock.src.cli import parse_args
 from vianu.spock.src.base import Setup, Document, SpoCK, FileHandler
 from vianu.spock.src import scraping as scp
@@ -24,6 +24,25 @@ logging.getLogger("hpack").setLevel(level=level)
 logging.getLogger("httpcore").setLevel(level=level)
 logging.getLogger("openai").setLevel(level=level)
 load_dotenv()
+
+
+def get_scraper_config(service: str | None = None) -> Dict[str, Dict[str, Any]]:
+    """Get scraper configuration."""
+    config = None
+    
+    if service == "scraperapi":
+        config = {
+            "service": "scraperapi",
+            "api_key": os.getenv("SCRAPERAPI_KEY"),
+            "base_url": SCRAPERAPI_BASE_URL,
+        }
+    elif service == "scrapingfish":
+        raise ValueError("ScrapingFish is not supported yet")
+
+    return {
+        "fda": config,
+        "ema": config,
+    }
 
 
 def get_model_config() -> Dict[str, Dict[str, Any]]:
@@ -95,7 +114,9 @@ async def _orchestrator(
 
 
 def setup_asyncio_framework(
-    args_: Namespace, model_config: Dict[str, Any]
+    args_: Namespace,
+    scraper_config: Dict[str, Any],
+    model_config: Dict[str, Any]
 ) -> Tuple[asyncio.Queue, List[asyncio.Task], List[asyncio.Task], asyncio.Task]:
     """Set up the asyncio framework for the SpoCK application."""
     # Set up arguments
@@ -108,9 +129,17 @@ def setup_asyncio_framework(
     ner_queue = asyncio.Queue()
 
     # Start tasks
-    scp_tasks = scp.create_tasks(args_=args_, queue_in=src_queue, queue_out=scp_queue)
+    scp_tasks = scp.create_tasks(
+        args_=args_,
+        queue_in=src_queue,
+        queue_out=scp_queue,
+        scraper_config=scraper_config,
+    )
     ner_tasks = ner.create_tasks(
-        args_=args_, queue_in=scp_queue, queue_out=ner_queue, model_config=model_config
+        args_=args_,
+        queue_in=scp_queue,
+        queue_out=ner_queue,
+        model_config=model_config,
     )
     orc_task = asyncio.create_task(
         _orchestrator(
@@ -153,6 +182,8 @@ async def main(args_: Namespace | None = None, save: bool = True) -> None:
     logger.info(f"starting SpoCK (args_={args_})")
 
     # Test availability of NER model
+    service = args_.service
+    scraper_config = get_scraper_config(service=service)
     endpoint = args_.endpoint
     model_config = get_model_config()
     try:
@@ -167,7 +198,7 @@ async def main(args_: Namespace | None = None, save: bool = True) -> None:
         raise e
 
     # Set up async structure (scraping queue/tasks, NER queue/tasks, orchestrator task)
-    ner_queue, _, _, _ = setup_asyncio_framework(args_=args_, model_config=model_config)
+    ner_queue, _, _, _ = setup_asyncio_framework(args_=args_, scraper_config=scraper_config, model_config=model_config)
 
     # Set up collector task and wait for it to finish
     # NOTE: if collector task is finished, the orchestrator is also finished (because of the sentinel in `ner_queue`)

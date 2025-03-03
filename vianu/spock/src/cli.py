@@ -58,6 +58,14 @@ def parse_args(args_: Sequence) -> argparse.Namespace:
         default=N_SCP_TASKS,
         help="number of async scraping tasks",
     )
+    scp_gp.add_argument(
+        "--service",
+        "-c",
+        metavar="",
+        type=str,
+        choices=["scraperapi", "scrapingfish"],
+        help="scraping service to use",
+    )
 
     # Add NER group
     ner_gp = parser.add_argument_group("ner")
