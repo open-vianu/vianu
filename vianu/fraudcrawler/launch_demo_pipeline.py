@@ -22,6 +22,8 @@ client = FraudCrawlerClient(
     location="Switzerland",
 )
 
+whitelist = ['www.ricardo.ch', 'https://www.tutti.ch/de']
+
 # Perform sequential search
-df = client.run("sildenafil", num_results=10, allow_enrichment=False, whitelist=['www.ricardo.ch']) # Sequential
+df = client.run("sildenafil", num_results=1, allow_enrichment=False, whitelist=whitelist) # Sequential
 print(df.head())

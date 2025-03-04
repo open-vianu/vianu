@@ -35,7 +35,7 @@ class FraudCrawlerClient:
         self._zyteapi_client = ZyteAPIClient(
             api_key=zyteapi_key, max_retries=max_retries, retry_delay=retry_delay
         )
-        self._enricher = KeywordEnricher(serpapi_key=serpapi_key, zyte_api_key=zyteapi_key, location=location)
+        self._enricher = KeywordEnricher(serpapi_key=serpapi_key, location=location)
         self._processor = Processor(location=location)
 
     def run(self, search_term: str, num_results = 10, allow_enrichment = True, whitelist: List = []) -> pd.DataFrame:
@@ -52,7 +52,10 @@ class FraudCrawlerClient:
         )
 
         # Perform search on whitelist
-        urls = urls.extend(self._serpapi_client.search_whitelist(search_term=search_term, num_results=num_results, whitelist=whitelist))
+        print(f'\nURLS before whitelisting search: {urls}')
+        (urls := urls or []).extend(self._serpapi_client.search_whitelist(search_term=search_term, num_results=num_results, whitelist=whitelist) or [])
+        print(f'URLS after whitelisting search: {urls}')
+        # urls = urls.extend(self._serpapi_client.search_whitelist(search_term=search_term, num_results=num_results, whitelist=whitelist))
 
         if not urls:
             logger.warning("No URLs found from SERP API.")

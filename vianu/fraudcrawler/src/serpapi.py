@@ -10,8 +10,7 @@ from typing import Any, Dict, Callable
 from serpapi.google_search import GoogleSearch
 from typing import Optional
 from requests import Response
-from urllib.parse import quote_plus
-
+from urllib.parse import quote_plus, urlparse
 
 logger = logging.getLogger(__name__)
 
@@ -90,6 +89,7 @@ class SerpApiClient:
             logger.error(f"SERP API request failed with status code {status_code}.")
             return []
 
+
     def search_whitelist(self, search_term: str, num_results: int = 10, whitelist: List = []) -> List[str]:
         """Searches using SERP API in the whitelists and returns the URLs of the results.
 
@@ -144,8 +144,32 @@ class SerpApiClient:
 
         # Log the pretty-printed JSON
         pretty_sources = json.dumps(sources, indent=4)
+        print(f'\n\n{pretty_sources}')
         logger.debug(f"SerpAPI configs:\n{pretty_sources}")
         print('DONE WHITLISTING')
+
+        # Collecting and structuring all results
+        all_results = []
+        for source in sources:
+            response = self.retrieve_response(
+                keyword=keyword,
+                client=client,
+                custom_params=source["params"],
+                offer_root=source["label"],
+                callback=callback,
+            )
+            structured_results = self.structure_results(
+                keyword=keyword,
+                response=response,
+                client=client,
+                proxy=proxy,
+                offer_root=source["label"],
+                number_of_results=number_of_results,
+            )
+            all_results.extend(structured_results)
+
+        logger.debug(f"A total of {len(all_results)} serpapi results were stored.")
+        return all_results
 
     def _generate_hash(self, data: Any) -> str:
         data_str = str(data)
@@ -205,8 +229,7 @@ class SerpApiClient:
         """
         return results.get("organic_results") or []
 
-
-
+    @staticmethod
     def extract_hostname(url: str) -> str | None:
         """
         Extracts the hostname in the format 'hostname.tld' from a given URL.
@@ -239,6 +262,7 @@ class SerpApiClient:
             return hostname
         else:
             return None
+
     def call_serpapi(
                 self,
                 params: Dict[str, Any],
