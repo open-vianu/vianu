@@ -13,9 +13,9 @@ GRADIO_UPDATE_INTERVAL = 2
 
 # Scraping settings
 SCRAPING_SOURCES = ["pubmed", "ema", "mhra", "fda"]
-SCRAPING_SERVICE = 'ScraperAPI'
-USE_SCRAPING_SERVICE_FOR = ['fda', 'ema']
-SCRAPERAPI_BASE_URL = 'https://api.scraperapi.com/'
+SCRAPING_SERVICE = "ScraperAPI"
+USE_SCRAPING_SERVICE_FOR = ["fda", "ema"]
+SCRAPERAPI_BASE_URL = "https://api.scraperapi.com/"
 SCRAPINGFISH_BASE_URL = "https://scraping.narf.ai/api/v1/"
 MAX_CHUNK_SIZE = 500
 MAX_DOCS_SRC = 10
@@ -25,6 +25,7 @@ MAX_DOCS = {
     "deep": 80,
 }
 N_SCP_TASKS = 4
+REQUEST_TIMEOUT = 5
 
 PUBMED_ESEARCH_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
 PUBMED_EFETCH_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"

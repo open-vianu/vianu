@@ -26,10 +26,11 @@ import pymupdf
 
 from vianu.spock.src.base import Document, Setup, QueueItem  # noqa: F401
 from vianu.spock.settings import (
-    MAX_CHUNK_SIZE, 
+    MAX_CHUNK_SIZE,
     SCRAPING_SERVICE,
     USE_SCRAPING_SERVICE_FOR,
     SCRAPERAPI_BASE_URL,
+    REQUEST_TIMEOUT,
 )
 from vianu.spock.settings import (
     PUBMED_ESEARCH_URL,
@@ -42,8 +43,8 @@ logger = logging.getLogger(__name__)
 
 
 class Scraper(ABC):
-
     _source = None
+    _timeout = REQUEST_TIMEOUT
 
     def __init__(self, api_key: str | None = None):
         """Initialize the Scraper object."""
@@ -76,7 +77,7 @@ class Scraper(ABC):
             separator.join(words[start:stop]) for start, stop in zip(bnd[:-1], bnd[1:])
         ]
         return chunks
-    
+
     async def _get_html(self, url: str, headers: dict | None = None):
         if self._use_api_service:
             return self._service_get_html(url=url)
@@ -92,18 +93,20 @@ class Scraper(ABC):
                 response.raise_for_status()
                 text = await response.text()
         return text
-    
+
     def _service_get_html(self, url: str) -> str:
         """Scrape the content of a given URL by a scraping api service."""
 
-        self.logger.debug(f"search {self._source} using service={SCRAPING_SERVICE} with url={url}")
+        self.logger.debug(
+            f"search {self._source} using service={SCRAPING_SERVICE} with url={url}"
+        )
         api_key = self._api_key
         base_url = SCRAPERAPI_BASE_URL
         payload = {
-            'api_key': api_key,
-            'url': url,
+            "api_key": api_key,
+            "url": url,
         }
-        response = requests.get(base_url, params=payload)
+        response = requests.get(base_url, params=payload, timeout=self._timeout)
         response.raise_for_status()
         text = response.text
         return text
@@ -370,9 +373,9 @@ class EMAScraper(Scraper):
     )
     _search_url = "https://www.ema.europa.eu/en/search"
     _search_params = (
-        'search_api_fulltext={term}'
-        '&f%5B0%5D=ema_search_custom_entity_bundle%3Adocument'    # This part is added to only retrieve PDF documents
-        '&f%5B1%5D=ema_search_entity_is_document%3ADocument'
+        "search_api_fulltext={term}"
+        "&f%5B0%5D=ema_search_custom_entity_bundle%3Adocument"  # This part is added to only retrieve PDF documents
+        "&f%5B1%5D=ema_search_entity_is_document%3ADocument"
     )
     _headers = {
         "user-agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
@@ -416,7 +419,7 @@ class EMAScraper(Scraper):
 
         # Get initial search results
         params = self._search_params.format(term=term)
-        url = f'{self._search_url}?{params}'
+        url = f"{self._search_url}?{params}"
         content = await self._get_html(url=url, headers=self._headers)
         soup = BeautifulSoup(content, "html.parser")
 
@@ -998,6 +1001,7 @@ class FDAScraper(Scraper):
 
 class ScraperFactory:
     """Factory for Scraper Objects."""
+
     def __init__(self, setup: Setup) -> None:
         self._setup = setup
         self._use_service_for = USE_SCRAPING_SERVICE_FOR
@@ -1005,18 +1009,22 @@ class ScraperFactory:
     def create(self, source: str) -> Scraper:
         """Create a Scraper object for the given source."""
 
-        if source == 'pubmed':
+        if source == "pubmed":
             scraper = PubmedScraper
-        elif source == 'ema':
+        elif source == "ema":
             scraper = EMAScraper
-        elif source == 'mhra':
+        elif source == "mhra":
             scraper = MHRAScraper
-        elif source == 'fda':
+        elif source == "fda":
             scraper = FDAScraper
         else:
             raise ValueError(f"unknown source={source}")
-        
-        api_key = self._setup.scraperapi_key if self._setup.service and source in self._use_service_for else None
+
+        api_key = (
+            self._setup.scraperapi_key
+            if self._setup.service and source in self._use_service_for
+            else None
+        )
         return scraper(api_key=api_key)
 
 

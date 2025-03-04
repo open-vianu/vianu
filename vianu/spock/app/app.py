@@ -12,8 +12,6 @@ import gradio as gr
 
 from vianu.spock.settings import LOG_LEVEL, N_SCP_TASKS, N_NER_TASKS
 from vianu.spock.settings import (
-    USE_SCRAPING_SERVICE_FOR,
-    SCRAPERAPI_BASE_URL,
     LLM_ENDPOINTS,
     SCRAPING_SOURCES,
     MAX_DOCS,
@@ -151,19 +149,21 @@ class App(BaseApp):
     def _ui_corpus_settings(self):
         """Settings column."""
         with gr.Column(scale=1):
-            with gr.Accordion(label="Scraping Endpoint", open=True) as self._components["settings.scraping.accordion"]:
-                self._components['settings.scraper_service_usage'] = gr.Checkbox(
+            with gr.Accordion(label="Scraping Endpoint", open=True) as self._components[
+                "settings.scraping.accordion"
+            ]:
+                self._components["settings.scraper_service_usage"] = gr.Checkbox(
                     label="use scraping service",
                     show_label=False,
                     interactive=True,
                 )
 
                 # 'scraperapi' specific settings
-                with gr.Group(visible=False) as self._components["settings.scraper_service_group"]:
+                with gr.Group(visible=False) as self._components[
+                    "settings.scraper_service_group"
+                ]:
                     value = os.environ.get("SCRAPERAPI_KEY")
-                    placeholder = (
-                        "api_key of scraperapi" if value is None else None
-                    )
+                    placeholder = "api_key of scraperapi" if value is None else None
                     gr.Markdown("---")
                     self._components["settings.scraperapi_key"] = gr.Textbox(
                         label="api_key",
@@ -175,7 +175,9 @@ class App(BaseApp):
                         type="password",
                     )
 
-            with gr.Accordion(label="LLM Endpoint", open=True) as self._components["settings.llm.accordion"]:
+            with gr.Accordion(label="LLM Endpoint", open=True) as self._components[
+                "settings.llm.accordion"
+            ]:
                 self._components["settings.llm_radio"] = gr.Radio(
                     label="Model",
                     show_label=False,
@@ -226,7 +228,9 @@ class App(BaseApp):
                     value="Test connection", interactive=True
                 )
 
-            with gr.Accordion(label="Filters", open=True, visible=False) as self._components['filters.accordion']:
+            with gr.Accordion(
+                label="Filters", open=True, visible=False
+            ) as self._components["filters.accordion"]:
                 self._components["filters.sort_by"] = gr.Radio(
                     label="Sort by",
                     show_label=False,
@@ -242,7 +246,7 @@ class App(BaseApp):
                     choices=_UI_SETTINGS_SOURCE_CHOICES,
                     interactive=True,
                 )
-                self._components['filters.selected_adr'] = gr.Dropdown(
+                self._components["filters.selected_adr"] = gr.Dropdown(
                     label="SelectedADR",
                     show_label=False,
                     info="reduce to selected ADR",
@@ -291,7 +295,7 @@ class App(BaseApp):
                         label="Search type",
                         show_label=False,
                         info="search type",
-                        choices=["fast", "balanced", 'deep'],
+                        choices=["fast", "balanced", "deep"],
                         value="fast",
                         interactive=True,
                     )
@@ -327,7 +331,9 @@ class App(BaseApp):
     # Helpers
     # --------------------------------------------------------------------------
     @staticmethod
-    def _show_scraper_service_settings(service_usage: bool, session_state: SessionState) -> Tuple[dict[str, Any], dict[str, Any], SessionState]:
+    def _show_scraper_service_settings(
+        service_usage: bool, session_state: SessionState
+    ) -> Tuple[dict[str, Any], dict[str, Any], SessionState]:
         """Show the settings for the selected scraper service."""
         session_state.use_scraper_service = service_usage
         if service_usage:
@@ -395,7 +401,7 @@ class App(BaseApp):
             session_state.connection_is_valid = False
             raise gr.Error(f"connection to endpoint={endpoint} failed: {e}")
         return session_state
-    
+
     @staticmethod
     def _get_adr_multiselect_data(
         data: List[Document],
@@ -423,10 +429,12 @@ class App(BaseApp):
         self,
         source: List[str],
         selected_adr: List[str] | None,
-        session_state: SessionState
+        session_state: SessionState,
     ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         """Update source and multisleect according to running spock."""
-        logger.debug(f"update filters with source={source} and selected_adr={selected_adr}")
+        logger.debug(
+            f"update filters with source={source} and selected_adr={selected_adr}"
+        )
         spock = session_state.get_active_spock()
         data = spock.data
 
@@ -443,13 +451,15 @@ class App(BaseApp):
             source=source,
             selected_adr=selected_adr,
         )
-        return gr.update(choices=src_chc, value=value), gr.update(choices=adr_chc, value=adr_val)
+        return gr.update(choices=src_chc, value=value), gr.update(
+            choices=adr_chc, value=adr_val
+        )
 
     def _update_adr_multiselect(
         self,
         source: List[str],
         selecte_adr: List[str] | None,
-        session_state: SessionState
+        session_state: SessionState,
     ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         data = session_state.get_active_spock().data
         choices, value = self._get_adr_multiselect_data(
@@ -499,15 +509,21 @@ class App(BaseApp):
         data = session_state.get_active_spock().data
         data = [d for d in data if d.source in source]
         if selected_adr is not None and len(selected_adr) > 0:
-            data = [d for d in data if any([ne.text.upper() in selected_adr for ne in d.adverse_reactions])]
+            data = [
+                d
+                for d in data
+                if any([ne.text.upper() in selected_adr for ne in d.adverse_reactions])
+            ]
 
         logger.debug(f"feeding details to UI (len(data)={len(data)})")
         return fmt.get_details_html(data, sort_by=sort_by, source=source)
 
-    async def _check_settings(self, service_usage: bool, session_state: SessionState) -> SessionState:
+    async def _check_settings(
+        self, service_usage: bool, session_state: SessionState
+    ) -> SessionState:
         """Check if the settings correct."""
         setup = session_state.get_running_spock().setup
-        
+
         # Check the scraper settings
         if service_usage:
             if session_state.scraperapi_key is None:
@@ -557,10 +573,10 @@ class App(BaseApp):
     @staticmethod
     def _set_accordion_visibilities() -> Dict[str, Any]:
         """Set open/close of accordions:
-            settings.parameters: False
-            settings.scraping.accordion: False
-            settings.llm.accordion: False
-            filters.accordion: True
+        settings.parameters: False
+        settings.scraping.accordion: False
+        settings.llm.accordion: False
+        filters.accordion: True
         """
         return (
             gr.update(open=False),
@@ -781,7 +797,7 @@ class App(BaseApp):
             ],
             outputs=self._components["main.details"],
         )
-    
+
     def _event_use_scraper_service(self):
         """Use scraper service and show the corresponding settings."""
         self._components["settings.scraper_service_usage"].change(
@@ -795,7 +811,7 @@ class App(BaseApp):
                 self._session_state,
             ],
         )
-    
+
     def _event_settings_scraperapi(self):
         """Callback of the scraperapi settings."""
         self._components["settings.scraperapi_key"].change(
@@ -893,7 +909,7 @@ class App(BaseApp):
         gr.on(
             triggers=[search_term.submit, start_button.click],
             # Setup the running spock for having the :class:`Setup` object
-            fn=self._setup_spock,   
+            fn=self._setup_spock,
             inputs=[
                 search_term,
                 self._components["settings.scraper_service_usage"],
@@ -924,9 +940,9 @@ class App(BaseApp):
             fn=self._set_accordion_visibilities,
             outputs=[
                 self._components["settings.parameters"],
-                self._components['settings.scraping.accordion'],
-                self._components['settings.llm.accordion'],
-                self._components['filters.accordion'],
+                self._components["settings.scraping.accordion"],
+                self._components["settings.llm.accordion"],
+                self._components["filters.accordion"],
             ],
         ).then(
             fn=self._setup_asyncio_framework,
@@ -938,7 +954,7 @@ class App(BaseApp):
         ).then(
             # Empty the search term in the UI
             fn=lambda: None,
-            outputs=search_term,  
+            outputs=search_term,
         ).then(
             fn=self._update_filters,
             inputs=[
@@ -976,7 +992,7 @@ class App(BaseApp):
             inputs=[self._local_state, self._session_state],
             outputs=self._components["main.cards"],
         ).then(
-            fn=self._feed_details_to_ui,  
+            fn=self._feed_details_to_ui,
             inputs=[
                 self._session_state,
                 self._components["filters.sort_by"],
@@ -986,7 +1002,8 @@ class App(BaseApp):
             outputs=self._components["main.details"],
         ).then(
             # Turn off the timer
-            fn=lambda: gr.update(active=False), outputs=timer
+            fn=lambda: gr.update(active=False),
+            outputs=timer,
         ).then(
             fn=self._toggle_button,
             inputs=self._session_state,
@@ -1030,9 +1047,9 @@ class App(BaseApp):
                     self._session_state,
                 ],
                 outputs=[
-                self._components["filters.source"],
-                self._components["filters.selected_adr"],
-            ],
+                    self._components["filters.source"],
+                    self._components["filters.selected_adr"],
+                ],
             ).then(
                 fn=self._feed_details_to_ui,
                 inputs=[

@@ -2,9 +2,8 @@ from argparse import Namespace
 import asyncio
 from datetime import datetime
 import logging
-import os
 import sys
-from typing import List, Tuple, Dict, Any
+from typing import List, Tuple
 
 from dotenv import load_dotenv
 
@@ -24,6 +23,7 @@ logging.getLogger("hpack").setLevel(level=level)
 logging.getLogger("httpcore").setLevel(level=level)
 logging.getLogger("openai").setLevel(level=level)
 load_dotenv()
+
 
 async def _orchestrator(
     setup: Setup,
@@ -81,7 +81,9 @@ async def _orchestrator(
     await ner_queue.put(None)
 
 
-def setup_asyncio_framework(setup: Setup) -> Tuple[asyncio.Queue, List[asyncio.Task], List[asyncio.Task], asyncio.Task]:
+def setup_asyncio_framework(
+    setup: Setup,
+) -> Tuple[asyncio.Queue, List[asyncio.Task], List[asyncio.Task], asyncio.Task]:
     """Set up the asyncio framework for the SpoCK application."""
 
     # Set up queues
