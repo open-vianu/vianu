@@ -19,6 +19,11 @@ SCRAPERAPI_BASE_URL = 'https://api.scraperapi.com/'
 SCRAPINGFISH_BASE_URL = "https://scraping.narf.ai/api/v1/"
 MAX_CHUNK_SIZE = 500
 MAX_DOCS_SRC = 10
+MAX_DOCS = {
+    "fast": 20,
+    "balanced": 40,
+    "deep": 80,
+}
 N_SCP_TASKS = 4
 
 PUBMED_ESEARCH_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"

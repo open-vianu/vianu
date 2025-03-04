@@ -177,6 +177,8 @@ class Setup(Identicator, Serializable):
     submission: datetime | None = None
     file_path: str | None = None
     file_name: str | None = None
+
+    # Following fields are set by the environment variables or as session state
     scraperapi_key: str | None = None
     openai_api_key: str | None = None
     llama_base_url: str | None = None
