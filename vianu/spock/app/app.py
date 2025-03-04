@@ -160,7 +160,7 @@ class App(BaseApp):
     def _ui_corpus_settings(self):
         """Settings column."""
         with gr.Column(scale=1):
-            with gr.Accordion(label="Scraping Endpoint", open=False):
+            with gr.Accordion(label="Scraping Endpoint", open=True) as self._components["settings.scraping.accordion"]:
                 self._components['settings.scraping_radio'] = gr.Radio(
                     label="Scraper API",
                     show_label=False,
@@ -204,7 +204,7 @@ class App(BaseApp):
                     )
 
 
-            with gr.Accordion(label="LLM Endpoint", open=False):
+            with gr.Accordion(label="LLM Endpoint", open=True) as self._components["settings.llm.accordion"]:
                 self._components["settings.llm_radio"] = gr.Radio(
                     label="Model",
                     show_label=False,
@@ -255,7 +255,7 @@ class App(BaseApp):
                     value="Test connection", interactive=True
                 )
 
-            with gr.Accordion(label="Filters", open=True):
+            with gr.Accordion(label="Filters", open=True, visible=False) as self._components['filters.accordion']:
                 self._components["filters.sort_by"] = gr.Radio(
                     label="Sort by",
                     show_label=False,
@@ -978,6 +978,13 @@ class App(BaseApp):
         ).then(
             fn=lambda: None,
             outputs=search_term,  # Empty the search term in the UI
+        ).then(
+            fn=lambda: (gr.update(open=False), gr.update(open=False), gr.update(visible=True, open=True)),
+            outputs=[
+                self._components['settings.scraping.accordion'],
+                self._components['settings.llm.accordion'],
+                self._components['filters.accordion'],
+            ],
         ).then(
             fn=self._update_filters,
             inputs=[
