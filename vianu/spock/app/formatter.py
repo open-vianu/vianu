@@ -2,7 +2,7 @@ import logging
 from typing import List
 
 from vianu.spock.src.base import Document, SpoCK
-from vianu.spock.settings import DATE_FORMAT
+from vianu.spock.settings import DATE_FORMAT, SCRAPING_SOURCES
 
 logger = logging.getLogger(__name__)
 
@@ -11,13 +11,14 @@ JOBS_CONTAINER_CARD_TEMPLATE = """
 <div class="card" onclick="cardClickHandler(this)">
   <div class="title">{title} {status}</div>
   <div class="info">Date: {date}</div>
-  <div class="info">Model: {model}</div>
+  <div class="info">Endpoint: {endpoint}</div>
   <div class="info">Sources: {sources}</div>
   <div class="info">#docs: {n_doc} | #adr: {n_adr}</div>
 </div>
 """
 
 DETAILS_CONTAINER_TEMPLATE = """
+<div>Documents ({ndata})</div>
 <div id='details' class='details-container'>
   <div class='items'>{items}</div>
 </div>
@@ -56,17 +57,37 @@ def _get_details_html_items(data: List[Document]):
     return "\n".join(items)
 
 
-def get_details_html(data: List[Document]):
+def get_details_html(
+    data: List[Document], sort_by: str = "#adr", source: List[str] = SCRAPING_SOURCES
+):
     """Get the stacked HTML items for each document."""
     if len(data) == 0:
-        return "<div>no results available (yet)</div>"
-    sorted_data = sorted(
-        data,
-        key=lambda x: (len(x.adverse_reactions), len(x.medicinal_products)),
-        reverse=True,
-    )
+        return "<div>Documents (0)</div>"
+
+    # Sort the data by number of entities or sources
+    if sort_by == "#adr":
+        sorted_data = sorted(
+            data,
+            key=lambda x: (len(x.adverse_reactions), len(x.medicinal_products)),
+            reverse=True,
+        )
+    elif sort_by == "sources":
+        sorted_data = sorted(
+            data,
+            key=lambda x: (
+                x.source,
+                len(x.adverse_reactions),
+                len(x.medicinal_products),
+            ),
+            reverse=True,
+        )
+
+    # Filter for the selected sources
+    sorted_data = [d for d in sorted_data if d.source in source]
+
+    # Get the HTML items
     items = _get_details_html_items(data=sorted_data)
-    return DETAILS_CONTAINER_TEMPLATE.format(items=items)
+    return DETAILS_CONTAINER_TEMPLATE.format(ndata=len(sorted_data), items=items)
 
 
 def _get_status_html(status: str) -> str:
@@ -90,7 +111,7 @@ def get_job_card_html(card_nmbr: int, spock: SpoCK):
     title = spock.setup.term
     status = _get_status_html(spock.status)
     date = setup.submission.strftime(DATE_FORMAT)
-    model = setup.model
+    endpoint = setup.endpoint
     sources = ", ".join(setup.source)
     n_doc = len(data)
     n_adr = sum([len(d.adverse_reactions) for d in data])
@@ -99,7 +120,7 @@ def get_job_card_html(card_nmbr: int, spock: SpoCK):
         title=title,
         status=status,
         date=date,
-        model=model,
+        endpoint=endpoint,
         sources=sources,
         n_doc=n_doc,
         n_adr=n_adr,

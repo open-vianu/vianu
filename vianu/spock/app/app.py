@@ -1,4 +1,5 @@
 import asyncio
+from collections import Counter
 from dataclasses import dataclass, field
 from datetime import datetime
 import logging
@@ -11,9 +12,9 @@ import gradio as gr
 
 from vianu.spock.settings import LOG_LEVEL, N_SCP_TASKS, N_NER_TASKS
 from vianu.spock.settings import (
-    LARGE_LANGUAGE_MODELS,
+    LLM_ENDPOINTS,
     SCRAPING_SOURCES,
-    MAX_DOCS_SRC,
+    MAX_DOCS,
     MODEL_TEST_QUESTION,
 )
 from vianu.spock.settings import (
@@ -22,9 +23,9 @@ from vianu.spock.settings import (
     GRADIO_MAX_JOBS,
     GRADIO_UPDATE_INTERVAL,
 )
-from vianu.spock.src.base import Setup, SpoCK, SpoCKList, QueueItem  # noqa: F401
+from vianu.spock.src.base import Document, Setup, SpoCK, SpoCKList, QueueItem  # noqa: F401
 from vianu import BaseApp
-from vianu.spock.__main__ import get_model_config, setup_asyncio_framework
+from vianu.spock.__main__ import setup_asyncio_framework
 import vianu.spock.app.formatter as fmt
 from vianu.spock.src.ner import NERFactory
 
@@ -34,12 +35,12 @@ load_dotenv()
 # App settings
 _ASSETS_PATH = Path(__file__).parents[1] / "assets"
 
-_UI_SETTINGS_LLM_CHOICES = [
-    (name, value) for name, value in zip(["OpenAI", "Ollama"], LARGE_LANGUAGE_MODELS)
+_UI_SETTINGS_LLM_ENDPOINT_CHOICES = [
+    (name, value) for name, value in zip(["OpenAI", "Ollama"], LLM_ENDPOINTS)
 ]
-if not len(_UI_SETTINGS_LLM_CHOICES) == len(LARGE_LANGUAGE_MODELS):
+if not len(_UI_SETTINGS_LLM_ENDPOINT_CHOICES) == len(LLM_ENDPOINTS):
     raise ValueError(
-        "LARGE_LANGUAGE_MODELS and _UI_SETTINGS_LLM_CHOICES must have the same length"
+        "LARGE_LANGUAGE_MODELS and _UI_SETTINGS_LLM_ENDPOINT_CHOICES must have the same length"
     )
 
 _UI_SETTINGS_SOURCE_CHOICES = [
@@ -50,8 +51,6 @@ if not len(_UI_SETTINGS_SOURCE_CHOICES) == len(SCRAPING_SOURCES):
     raise ValueError(
         "SCRAPING_SOURCES and _UI_SETTINGS_SOURCE_CHOICES must have the same length"
     )
-
-_MODEL_CONFIG = get_model_config()
 
 
 @dataclass
@@ -80,9 +79,17 @@ class SessionState:
     is_running: bool = False
     spocks: SpoCKList = field(default_factory=list)
 
-    # Model config
-    model_config: Dict[str, Dict[str, Any]] = field(
-        default_factory=lambda: _MODEL_CONFIG
+    # Scraper settings
+    scraperapi_key: str | None = field(
+        default_factory=lambda: os.environ.get("SCRAPERAPI_KEY")
+    )
+
+    # LLM settings
+    openai_api_key: str | None = field(
+        default_factory=lambda: os.environ.get("OPENAI_API_KEY")
+    )
+    ollama_base_url: str | None = field(
+        default_factory=lambda: os.environ.get("OLLAMA_BASE_URL")
     )
     connection_is_valid: bool = False
 
@@ -142,11 +149,39 @@ class App(BaseApp):
     def _ui_corpus_settings(self):
         """Settings column."""
         with gr.Column(scale=1):
-            with gr.Accordion(label="LLM Endpoint"):
+            with gr.Accordion(label="Scraping Endpoint", open=True) as self._components[
+                "settings.scraping.accordion"
+            ]:
+                self._components["settings.scraper_service_usage"] = gr.Checkbox(
+                    label="use scraping service",
+                    show_label=False,
+                    interactive=True,
+                )
+
+                # 'scraperapi' specific settings
+                with gr.Group(visible=False) as self._components[
+                    "settings.scraper_service_group"
+                ]:
+                    value = os.environ.get("SCRAPERAPI_KEY")
+                    placeholder = "api_key of scraperapi" if value is None else None
+                    gr.Markdown("---")
+                    self._components["settings.scraperapi_key"] = gr.Textbox(
+                        label="api_key",
+                        show_label=False,
+                        info="api_key",
+                        placeholder=placeholder,
+                        value=value,
+                        interactive=True,
+                        type="password",
+                    )
+
+            with gr.Accordion(label="LLM Endpoint", open=True) as self._components[
+                "settings.llm.accordion"
+            ]:
                 self._components["settings.llm_radio"] = gr.Radio(
                     label="Model",
                     show_label=False,
-                    choices=_UI_SETTINGS_LLM_CHOICES,
+                    choices=_UI_SETTINGS_LLM_ENDPOINT_CHOICES,
                     value="openai",
                     interactive=True,
                 )
@@ -171,7 +206,7 @@ class App(BaseApp):
                         type="password",
                     )
 
-                # 'llama' specific settings
+                # ollama specific settings
                 with gr.Group(visible=False) as self._components[
                     "settings.ollama_group"
                 ]:
@@ -193,27 +228,33 @@ class App(BaseApp):
                     value="Test connection", interactive=True
                 )
 
-            with gr.Accordion(label="Sources", open=True):
-                self._components["settings.source"] = gr.CheckboxGroup(
+            with gr.Accordion(
+                label="Filters", open=True, visible=False
+            ) as self._components["filters.accordion"]:
+                self._components["filters.sort_by"] = gr.Radio(
+                    label="Sort by",
+                    show_label=False,
+                    info="sort the results",
+                    choices=["source", "#adr"],
+                    value="#adr",
+                    interactive=True,
+                )
+                self._components["filters.source"] = gr.CheckboxGroup(
                     label="Sources",
                     show_label=False,
+                    info="filter the results",
                     choices=_UI_SETTINGS_SOURCE_CHOICES,
-                    value=SCRAPING_SOURCES,
                     interactive=True,
                 )
-                self._components["settings.max_docs_src"] = gr.Number(
-                    label="max_docs_src",
+                self._components["filters.selected_adr"] = gr.Dropdown(
+                    label="SelectedADR",
                     show_label=False,
-                    info="max. number of documents per source",
-                    value=MAX_DOCS_SRC,
+                    info="reduce to selected ADR",
+                    choices=["adr1", "adr2", "adr3"],
+                    value=None,
                     interactive=True,
+                    multiselect=True,
                 )
-
-    def _ui_corpus_row(self):
-        """Main corpus with settings, search field, job cards, and details"""
-        with gr.Row(elem_classes="bottom-container"):
-            self._ui_corpus_settings()
-            self._ui_corpus_main()
 
     def _ui_corpus_main(self):
         """Search field, job cards, and details."""
@@ -238,6 +279,27 @@ class App(BaseApp):
                         '<div class="canceling">canceling...</div>', visible=False
                     )
 
+            with gr.Row():
+                with gr.Accordion(
+                    label="Search parameters", open=False
+                ) as self._components["settings.parameters"]:
+                    self._components["settings.source"] = gr.CheckboxGroup(
+                        label="Sources",
+                        show_label=False,
+                        info="select the sources to scrape",
+                        choices=_UI_SETTINGS_SOURCE_CHOICES,
+                        value=SCRAPING_SOURCES,
+                        interactive=True,
+                    )
+                    self._components["settings.search_type"] = gr.Radio(
+                        label="Search type",
+                        show_label=False,
+                        info="search type",
+                        choices=["fast", "balanced", "deep"],
+                        value="fast",
+                        interactive=True,
+                    )
+
             # Job summary cards
             with gr.Row(elem_classes="jobs-container"):
                 self._components["main.cards"] = [
@@ -251,6 +313,12 @@ class App(BaseApp):
                     '<div class="details-container"></div>'
                 )
 
+    def _ui_corpus_row(self):
+        """Main corpus with settings, search field, job cards, and details"""
+        with gr.Row(elem_classes="bottom-container"):
+            self._ui_corpus_settings()
+            self._ui_corpus_main()
+
     def setup_ui(self):
         """Set up the user interface."""
         self._ui_top_row()
@@ -263,15 +331,35 @@ class App(BaseApp):
     # Helpers
     # --------------------------------------------------------------------------
     @staticmethod
+    def _show_scraper_service_settings(
+        service_usage: bool, session_state: SessionState
+    ) -> Tuple[dict[str, Any], dict[str, Any], SessionState]:
+        """Show the settings for the selected scraper service."""
+        session_state.use_scraper_service = service_usage
+        if service_usage:
+            logger.debug("show scraper service settings")
+            return gr.update(visible=True), session_state
+        else:
+            logger.debug("hide scraper service settings")
+            return gr.update(visible=False), session_state
+
+    @staticmethod
+    def _set_scraperapi_key(api_key: str, session_state: SessionState) -> SessionState:
+        """Setup scraperapi api_key"""
+        log_key = "*****" if api_key else "None"
+        logger.debug(f"set scraperapi api_key {log_key}")
+        session_state.scraperapi_key = api_key
+
+    @staticmethod
     def _show_llm_settings(
-        llm: str, session_state: SessionState
+        endpoint: str, session_state: SessionState
     ) -> Tuple[dict[str, Any], dict[str, Any], SessionState]:
         """Show the settings for the selected LLM model."""
-        logger.debug(f"show {llm} model settings")
+        logger.debug(f"show endpoint={endpoint} settings")
         session_state.connection_is_valid = False
-        if llm == "llama":
+        if endpoint == "ollama":
             return gr.update(visible=True), gr.update(visible=False), session_state
-        elif llm == "openai":
+        elif endpoint == "openai":
             return gr.update(visible=False), gr.update(visible=True), session_state
         else:
             return gr.update(visible=False), gr.update(visible=False), session_state
@@ -281,7 +369,7 @@ class App(BaseApp):
         """Setup openai api_key"""
         log_key = "*****" if api_key else "None"
         logger.debug(f"set openai api_key {log_key}")
-        session_state.model_config["openai"] = {"api_key": api_key}
+        session_state.openai_api_key = api_key
         session_state.connection_is_valid = False
         return session_state
 
@@ -291,25 +379,95 @@ class App(BaseApp):
     ) -> SessionState:
         """Setup ollama base_url"""
         logger.debug(f"set ollama base_url={base_url}")
-        session_state.model_config["llama"] = {"base_url": base_url}
+        session_state.ollama_base_url = base_url
         session_state.connection_is_valid = False
         return session_state
 
     @staticmethod
-    async def _test_connection(llm: str, session_state: SessionState) -> SessionState:
-        logger.debug(f"test connection to model={llm}")
+    async def _test_connection(session_state: SessionState) -> SessionState:
+        """Test the connection to the LLM model."""
+        setup = session_state.get_running_spock().setup
+        endpoint = setup.endpoint
+        logger.debug(f"test connection to endpoint={endpoint}")
         try:
-            ner = NERFactory.create(model=llm, config=session_state.model_config)
+            ner = NERFactory.create(setup=setup)
             test_task = asyncio.create_task(ner.test_model_endpoint())
             test_answer = await test_task
             gr.Info(
-                f"connection to model={llm} is valid: '{MODEL_TEST_QUESTION}' was answered with '{test_answer}'"
+                f"connection to endpoint={endpoint} is valid: '{MODEL_TEST_QUESTION}' was answered with '{test_answer}'"
             )
             session_state.connection_is_valid = True
         except Exception as e:
             session_state.connection_is_valid = False
-            raise gr.Error(f"connection to model={llm} failed: {e}")
+            raise gr.Error(f"connection to endpoint={endpoint} failed: {e}")
         return session_state
+
+    @staticmethod
+    def _get_adr_multiselect_data(
+        data: List[Document],
+        source: List[str],
+        selected_adr: List[str] | None,
+    ) -> Tuple[Tuple[List[str], List[str]], List[str]]:
+        """Get the adr choices and value for the multiselect field."""
+
+        # Get the ADRs, count them and build the corresponding choices
+        data = [d for d in data if d.source in source]
+        adrs = [ne.text.upper() for d in data for ne in d.adverse_reactions]
+        counter = Counter(adrs)
+        counter = sorted(counter.items(), key=lambda x: x[0])
+        choices = [(f"{adr} ({count})", adr) for adr, count in counter]
+
+        # Reduce the selected ADRs to the ones that are present in the choices
+        if selected_adr is not None and len(selected_adr) > 0:
+            poss_vals = [v for _, v in choices]
+            value = [a for a in selected_adr if a in poss_vals]
+        else:
+            value = None
+        return choices, value
+
+    def _update_filters(
+        self,
+        source: List[str],
+        selected_adr: List[str] | None,
+        session_state: SessionState,
+    ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+        """Update source and multisleect according to running spock."""
+        logger.debug(
+            f"update filters with source={source} and selected_adr={selected_adr}"
+        )
+        spock = session_state.get_active_spock()
+        data = spock.data
+
+        # Update the text and selection of the sources
+        src_chc = [
+            (f"{txt} ({len([d for d in data if d.source == src])})", src)
+            for txt, src in _UI_SETTINGS_SOURCE_CHOICES
+        ]
+        value = spock.setup.source
+
+        # Update the detected ADRs
+        adr_chc, adr_val = self._get_adr_multiselect_data(
+            data=data,
+            source=source,
+            selected_adr=selected_adr,
+        )
+        return gr.update(choices=src_chc, value=value), gr.update(
+            choices=adr_chc, value=adr_val
+        )
+
+    def _update_adr_multiselect(
+        self,
+        source: List[str],
+        selecte_adr: List[str] | None,
+        session_state: SessionState,
+    ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+        data = session_state.get_active_spock().data
+        choices, value = self._get_adr_multiselect_data(
+            data=data,
+            source=source,
+            selected_adr=selecte_adr,
+        )
+        return gr.update(choices=choices, value=value)
 
     @staticmethod
     def _feed_cards_to_ui(
@@ -337,38 +495,50 @@ class App(BaseApp):
         return cds
 
     @staticmethod
-    def _feed_details_to_ui(session_state: SessionState) -> str:
+    def _feed_details_to_ui(
+        session_state: SessionState,
+        sort_by: str = "#adr",
+        source: List[str] = SCRAPING_SOURCES,
+        selected_adr: List[str] | None = None,
+    ) -> str:
         """Collect the html texts for the documents of the selected job and feed them to the UI."""
         if len(session_state.spocks) == 0:
             return fmt.get_details_html([])
 
-        active_spock = session_state.get_active_spock()
-        logger.debug(f"feeding details to UI (len(data)={len(active_spock.data)})")
-        return fmt.get_details_html(active_spock.data)
+        # Select and filter the data
+        data = session_state.get_active_spock().data
+        data = [d for d in data if d.source in source]
+        if selected_adr is not None and len(selected_adr) > 0:
+            data = [
+                d
+                for d in data
+                if any([ne.text.upper() in selected_adr for ne in d.adverse_reactions])
+            ]
 
-    async def _check_llm_settings(
-        self, llm: str, session_state: SessionState
+        logger.debug(f"feeding details to UI (len(data)={len(data)})")
+        return fmt.get_details_html(data, sort_by=sort_by, source=source)
+
+    async def _check_settings(
+        self, service_usage: bool, session_state: SessionState
     ) -> SessionState:
-        """Check if the LLM settings are set correcly."""
-        # Check if the settings are set
-        if llm == "openai":
-            if (
-                session_state.model_config.get(llm) is None
-                or session_state.model_config[llm].get("api_key") is None
-            ):
-                raise gr.Error("OpenAI api_key is not set")
-        elif llm == "llama":
-            if (
-                session_state.model_config.get(llm) is None
-                or session_state.model_config[llm].get("base_url") is None
-            ):
-                raise gr.Error("Ollama base_url is not set")
+        """Check if the settings correct."""
+        setup = session_state.get_running_spock().setup
+
+        # Check the scraper settings
+        if service_usage:
+            if session_state.scraperapi_key is None:
+                raise gr.Error("scraping service' api_key is not set")
+
+        # Check the LLM settings
+        endpoint = setup.endpoint
+        if endpoint == "openai" and session_state.openai_api_key is None:
+            raise gr.Error("OpenAI api_key is not set")
+        elif endpoint == "ollama" and session_state.ollama_base_url is None:
+            raise gr.Error("Ollama base_url is not set")
 
         # Check connection to the model
         if not session_state.connection_is_valid:
-            session_state = await self._test_connection(
-                llm=llm, session_state=session_state
-            )
+            session_state = await self._test_connection(session_state=session_state)
         return session_state
 
     @staticmethod
@@ -401,6 +571,21 @@ class App(BaseApp):
             )
 
     @staticmethod
+    def _set_accordion_visibilities() -> Dict[str, Any]:
+        """Set open/close of accordions:
+        settings.parameters: False
+        settings.scraping.accordion: False
+        settings.llm.accordion: False
+        filters.accordion: True
+        """
+        return (
+            gr.update(open=False),
+            gr.update(open=False),
+            gr.update(open=False),
+            gr.update(visible=True, open=True),
+        )
+
+    @staticmethod
     def _show_cancel_button() -> Tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
         """Shows the cancel button and hides the start and stop button."""
         logger.debug("show cancel button")
@@ -413,9 +598,10 @@ class App(BaseApp):
     @staticmethod
     def _setup_spock(
         term: str,
-        model: str,
+        service_usage: bool,
+        endpoint: str,
         source: List[str],
-        max_docs_src: int,
+        search_type: str,
         local_state: dict,
         session_state: SessionState,
     ) -> SessionState:
@@ -436,15 +622,20 @@ class App(BaseApp):
         logger.info(msg)
 
         # Create new SpoCK object
+        max_docs_src = int(MAX_DOCS[search_type] / len(source))
         setup = Setup(
-            id_=f"{term} {source} {model}",
+            id_=f"{term} {source} {endpoint}",
             term=term,
-            model=model,
+            service=service_usage,
+            endpoint=endpoint,
             source=source,
             max_docs_src=max_docs_src,
             log_level=local_state["log_level"],
             n_scp_tasks=local_state["n_scp_tasks"],
             n_ner_tasks=local_state["n_ner_tasks"],
+            scraperapi_key=session_state.scraperapi_key,
+            openai_api_key=session_state.openai_api_key,
+            llama_base_url=session_state.ollama_base_url,
         )
         spock = SpoCK(
             id_=setup.id_,
@@ -478,7 +669,7 @@ class App(BaseApp):
             ner_queue.task_done()
 
     async def _setup_asyncio_framework(
-        self, session_state: SessionState
+        self, service_usage: bool, session_state: SessionState
     ) -> SessionState:
         """ "Start the SpoCK processes by setting up the asyncio framework and starting the asyncio tasks.
 
@@ -492,10 +683,8 @@ class App(BaseApp):
         logger.info("setting up asyncio framework")
 
         # Setup asyncio tasks as in `vianu.spock.__main__`
-        args_ = session_state.get_running_spock().setup.to_namespace()
-        ner_queue, scp_tasks, ner_tasks, orc_task = setup_asyncio_framework(
-            args_=args_, model_config=session_state.model_config
-        )
+        setup = session_state.get_running_spock().setup
+        ner_queue, scp_tasks, ner_tasks, orc_task = setup_asyncio_framework(setup=setup)
         session_state.ner_queue = ner_queue
         session_state.scp_tasks = scp_tasks
         session_state.ner_tasks = ner_tasks
@@ -584,13 +773,51 @@ class App(BaseApp):
     # --------------------------------------------------------------------------
     def _event_timer(self):
         self._components["timer"].tick(
+            fn=self._update_filters,
+            inputs=[
+                self._components["filters.source"],
+                self._components["filters.selected_adr"],
+                self._session_state,
+            ],
+            outputs=[
+                self._components["filters.source"],
+                self._components["filters.selected_adr"],
+            ],
+        ).then(
             fn=self._feed_cards_to_ui,
             inputs=[self._local_state, self._session_state],
             outputs=self._components["main.cards"],
         ).then(
             fn=self._feed_details_to_ui,
-            inputs=[self._session_state],
+            inputs=[
+                self._session_state,
+                self._components["filters.sort_by"],
+                self._components["filters.source"],
+                self._components["filters.selected_adr"],
+            ],
             outputs=self._components["main.details"],
+        )
+
+    def _event_use_scraper_service(self):
+        """Use scraper service and show the corresponding settings."""
+        self._components["settings.scraper_service_usage"].change(
+            fn=self._show_scraper_service_settings,
+            inputs=[
+                self._components["settings.scraper_service_usage"],
+                self._session_state,
+            ],
+            outputs=[
+                self._components["settings.scraper_service_group"],
+                self._session_state,
+            ],
+        )
+
+    def _event_settings_scraperapi(self):
+        """Callback of the scraperapi settings."""
+        self._components["settings.scraperapi_key"].change(
+            fn=self._set_scraperapi_key,
+            inputs=[self._components["settings.scraperapi_key"], self._session_state],
+            outputs=self._session_state,
         )
 
     def _event_choose_llm(self):
@@ -628,11 +855,50 @@ class App(BaseApp):
         """Test the connection to the LLM model."""
         self._components["settings.test_connection_button"].click(
             fn=self._test_connection,
+            inputs=self._session_state,
+            outputs=self._session_state,
+        )
+
+    def _event_filters(self):
+        self._components["filters.sort_by"].change(
+            fn=self._feed_details_to_ui,
             inputs=[
-                self._components["settings.llm_radio"],
+                self._session_state,
+                self._components["filters.sort_by"],
+                self._components["filters.source"],
+                self._components["filters.selected_adr"],
+            ],
+            outputs=self._components["main.details"],
+        )
+        self._components["filters.source"].change(
+            fn=self._update_adr_multiselect,
+            inputs=[
+                self._components["filters.source"],
+                self._components["filters.selected_adr"],
                 self._session_state,
             ],
-            outputs=self._session_state,
+            outputs=[
+                self._components["filters.selected_adr"],
+            ],
+        ).then(
+            fn=self._feed_details_to_ui,
+            inputs=[
+                self._session_state,
+                self._components["filters.sort_by"],
+                self._components["filters.source"],
+                self._components["filters.selected_adr"],
+            ],
+            outputs=self._components["main.details"],
+        )
+        self._components["filters.selected_adr"].change(
+            fn=self._feed_details_to_ui,
+            inputs=[
+                self._session_state,
+                self._components["filters.sort_by"],
+                self._components["filters.source"],
+                self._components["filters.selected_adr"],
+            ],
+            outputs=self._components["main.details"],
         )
 
     def _event_start_spock(self) -> None:
@@ -642,9 +908,22 @@ class App(BaseApp):
 
         gr.on(
             triggers=[search_term.submit, start_button.click],
-            fn=self._check_llm_settings,
+            # Setup the running spock for having the :class:`Setup` object
+            fn=self._setup_spock,
             inputs=[
+                search_term,
+                self._components["settings.scraper_service_usage"],
                 self._components["settings.llm_radio"],
+                self._components["settings.source"],
+                self._components["settings.search_type"],
+                self._local_state,
+                self._session_state,
+            ],
+            outputs=self._session_state,
+        ).then(
+            fn=self._check_settings,
+            inputs=[
+                self._components["settings.scraper_service_usage"],
                 self._session_state,
             ],
             outputs=self._session_state,
@@ -658,23 +937,35 @@ class App(BaseApp):
                 self._components["main.cancel_button"],
             ],
         ).then(
-            fn=self._setup_spock,
+            fn=self._set_accordion_visibilities,
+            outputs=[
+                self._components["settings.parameters"],
+                self._components["settings.scraping.accordion"],
+                self._components["settings.llm.accordion"],
+                self._components["filters.accordion"],
+            ],
+        ).then(
+            fn=self._setup_asyncio_framework,
             inputs=[
-                search_term,
-                self._components["settings.llm_radio"],
-                self._components["settings.source"],
-                self._components["settings.max_docs_src"],
-                self._local_state,
+                self._components["settings.scraper_service_usage"],
                 self._session_state,
             ],
             outputs=self._session_state,
         ).then(
-            fn=self._setup_asyncio_framework,
-            inputs=self._session_state,
-            outputs=self._session_state,
-        ).then(
+            # Empty the search term in the UI
             fn=lambda: None,
-            outputs=search_term,  # Empty the search term in the UI
+            outputs=search_term,
+        ).then(
+            fn=self._update_filters,
+            inputs=[
+                self._components["filters.source"],
+                self._components["filters.selected_adr"],
+                self._session_state,
+            ],
+            outputs=[
+                self._components["filters.source"],
+                self._components["filters.selected_adr"],
+            ],
         ).then(
             fn=self._feed_cards_to_ui,
             inputs=[self._local_state, self._session_state],
@@ -684,14 +975,36 @@ class App(BaseApp):
             inputs=self._session_state,
             outputs=self._session_state,
         ).then(
+            # filters, cards and ui is updated one more time
+            # in order to not depend on the state of the timer
+            fn=self._update_filters,
+            inputs=[
+                self._components["filters.source"],
+                self._components["filters.selected_adr"],
+                self._session_state,
+            ],
+            outputs=[
+                self._components["filters.source"],
+                self._components["filters.selected_adr"],
+            ],
+        ).then(
             fn=self._feed_cards_to_ui,
             inputs=[self._local_state, self._session_state],
             outputs=self._components["main.cards"],
         ).then(
-            fn=self._feed_details_to_ui,  # called one more time in order to enforce update of the details (regardless of the state of the timer)
-            inputs=[self._session_state],
+            fn=self._feed_details_to_ui,
+            inputs=[
+                self._session_state,
+                self._components["filters.sort_by"],
+                self._components["filters.source"],
+                self._components["filters.selected_adr"],
+            ],
             outputs=self._components["main.details"],
-        ).then(fn=lambda: gr.update(active=False), outputs=timer).then(
+        ).then(
+            # Turn off the timer
+            fn=lambda: gr.update(active=False),
+            outputs=timer,
+        ).then(
             fn=self._toggle_button,
             inputs=self._session_state,
             outputs=[
@@ -727,8 +1040,24 @@ class App(BaseApp):
                 inputs=[self._session_state, gr.Number(value=index, visible=False)],
                 outputs=self._session_state,
             ).then(
+                fn=self._update_filters,
+                inputs=[
+                    self._components["filters.source"],
+                    self._components["filters.selected_adr"],
+                    self._session_state,
+                ],
+                outputs=[
+                    self._components["filters.source"],
+                    self._components["filters.selected_adr"],
+                ],
+            ).then(
                 fn=self._feed_details_to_ui,
-                inputs=[self._session_state],
+                inputs=[
+                    self._session_state,
+                    self._components["filters.sort_by"],
+                    self._components["filters.source"],
+                    self._components["filters.selected_adr"],
+                ],
                 outputs=self._components["main.details"],
             )
 
@@ -738,10 +1067,15 @@ class App(BaseApp):
         self._event_timer()
 
         # Settings events
+        self._event_use_scraper_service()
+        self._event_settings_scraperapi()
         self._event_choose_llm()
         self._event_settings_ollama()
         self._event_settings_openai()
         self._event_test_connection()
+
+        # Filter events
+        self._event_filters()
 
         # Start/Stop events
         self._event_start_spock()
