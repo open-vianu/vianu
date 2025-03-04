@@ -26,6 +26,6 @@ client = FraudCrawlerClient(
     location="Switzerland",
 )
 
-# Perform sequential search
-df = client.run("sildenafil", num_results=10)
+# Perform sequential search - Examples: IMFINZI (much harder to find relevant cases), SILDENAFIL, STI selbsttest
+df = client.run("sildenafil", num_results=50, allow_enrichment=False)
 print(df.head())

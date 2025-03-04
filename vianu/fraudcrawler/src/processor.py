@@ -55,6 +55,29 @@ class Processor:
         )
         return filtered
 
+    def _filter_zyte_probability(self, products: List[dict], threshold: float=0.1) -> List[dict]:
+        """Filters the products based on the zyte probability.
+
+        Args:
+            products: A list of product data dictionaries.
+        """
+        for product in products:
+            try:
+                prob = product['product']['metadata']['probability']
+                logger.info(f"This product IS KEPT: {product['url']} with Zyte probability: {prob}" if prob > threshold else f"This product is discarded: {product['url']} with Zyte probability: {prob}")
+            except KeyError as e:
+                logger.error(f"Missing key: {e} in product: {product}")
+
+        try:
+            prob_filtered = [elem for elem in products if elem['product']['metadata']['probability'] > threshold]
+        except KeyError as e:
+            logger.error(f"Missing key: {e} in one of the products")
+            prob_filtered = []  # Fallback to an empty list in case of error
+
+        logger.info(f'FILTER ZYTE PROBABILITY - Total results is: {len(prob_filtered)}')
+
+        return prob_filtered
+
     def process(self, products: List[dict]) -> List[dict]:
         """Processes the product data and filters based on country code.
 
@@ -62,13 +85,20 @@ class Processor:
             products: A list of product data dictionaries.
         """
         logger.info(
-            f"Processing {len(products)} products and filtering by country code: {self._country_code.upper()}"
+            f"PROCESSOR: Processing {len(products)} products and filtering by country code: {self._country_code.upper()}"
         )
 
         # Filter products based on country code
-        processed = self._filter_products(products)
+        filtered_country_code = self._filter_products(products)
 
         logger.info(
-            f"Finished processing with {len(processed)} products after applying country code filter."
+            f"PROCESSOR: Finished processing with {len(filtered_country_code)} products after applying country code filter."
         )
+
+        # Filter products based on Zyte probability
+        processed = self._filter_zyte_probability(filtered_country_code)
+        logger.info(
+            f"PROCESSOR: {len(processed)} products after filtering by Zyte probability."
+        )
+
         return processed
