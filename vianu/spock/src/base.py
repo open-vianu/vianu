@@ -177,6 +177,9 @@ class Setup(Identicator, Serializable):
     submission: datetime | None = None
     file_path: str | None = None
     file_name: str | None = None
+    scraperapi_key: str | None = None
+    openai_api_key: str | None = None
+    llama_base_url: str | None = None
 
     def __post_init__(self) -> None:
         super().__post_init__()
@@ -194,6 +197,9 @@ class Setup(Identicator, Serializable):
     def from_namespace(cls, args_: Namespace) -> Self:
         """Creates a :class:`Setup` object from a :class:`argparse.Namespace` object."""
         args_dict = vars(args_)
+        args_dict['scraperapi_key'] = os.getenv('SCRAPERAPI_KEY')
+        args_dict['openai_api_key'] = os.getenv('OPENAI_API_KEY')
+        args_dict['llama_base_url'] = os.getenv('OLLAMA_BASE_URL')
         return cls(id_=str(args_dict), **args_dict)
 
 

@@ -12,7 +12,7 @@ import gradio as gr
 
 from vianu.spock.settings import LOG_LEVEL, N_SCP_TASKS, N_NER_TASKS
 from vianu.spock.settings import (
-    SCRAPING_ENDPOINTS,
+    USE_SCRAPING_SERVICE_FOR,
     SCRAPERAPI_BASE_URL,
     LLM_ENDPOINTS,
     SCRAPING_SOURCES,
@@ -36,15 +36,6 @@ load_dotenv()
 
 # App settings
 _ASSETS_PATH = Path(__file__).parents[1] / "assets"
-
-_UI_SETTINGS_SCRAPING_ENDPOINT_CHOICES = [
-    (name, value) for name, value in zip(["ScraperAPI"], SCRAPING_ENDPOINTS)
-    # (name, value) for name, value in zip(["ScraperAPI", "ScrapingFish"], SCRAPING_ENDPOINTS)
-]
-if not len(_UI_SETTINGS_SCRAPING_ENDPOINT_CHOICES) == len(SCRAPING_ENDPOINTS):
-    raise ValueError(
-        "SCRAPING_ENDPOINTS and _UI_SETTINGS_SCRAPING_ENDPOINT_CHOICES must have the same length"
-    )
 
 _UI_SETTINGS_LLM_ENDPOINT_CHOICES = [
     (name, value) for name, value in zip(["OpenAI", "Ollama"], LLM_ENDPOINTS)
@@ -94,8 +85,8 @@ class SessionState:
     spocks: SpoCKList = field(default_factory=list)
 
     # Scraper config
-    scraper_config: Dict[str, Dict[str, Any]] = field(
-        default_factory=lambda: _SCRAPER_CONFIG
+    scraper_config: Dict[str, Any] = field(
+        default_factory=lambda: _SCRAPER_CONFIG,
     )
 
     # Model config
@@ -161,16 +152,14 @@ class App(BaseApp):
         """Settings column."""
         with gr.Column(scale=1):
             with gr.Accordion(label="Scraping Endpoint", open=True) as self._components["settings.scraping.accordion"]:
-                self._components['settings.scraping_radio'] = gr.Radio(
-                    label="Scraper API",
+                self._components['settings.scraper_service_usage'] = gr.Checkbox(
+                    label="use scraping service",
                     show_label=False,
-                    choices=_UI_SETTINGS_SCRAPING_ENDPOINT_CHOICES,
-                    value="scraperapi",
                     interactive=True,
                 )
 
                 # 'scraperapi' specific settings
-                with gr.Group(visible=True) as self._components["settings.scraperapi_group"]:
+                with gr.Group(visible=False) as self._components["settings.scraper_service_group"]:
                     value = os.environ.get("SCRAPERAPI_KEY")
                     placeholder = (
                         "api_key of scraperapi" if value is None else None
@@ -185,24 +174,6 @@ class App(BaseApp):
                         interactive=True,
                         type="password",
                     )
-                
-                # 'scrapingfish' specific settings
-                with gr.Group(visible=False) as self._components["settings.scrapingfish_group"]:
-                    value = os.environ.get("SCRAPINGFISCHAPI_KEY")
-                    placeholder = (
-                        "api_key of scrapingfish" if value is None else None
-                    )
-                    gr.Markdown("---")
-                    self._components["settings.scrapingfish_key"] = gr.Textbox(
-                        label="api_key",
-                        show_label=False,
-                        info="api_key",
-                        placeholder=placeholder,
-                        value=value,
-                        interactive=True,
-                        type="password",
-                    )
-
 
             with gr.Accordion(label="LLM Endpoint", open=True) as self._components["settings.llm.accordion"]:
                 self._components["settings.llm_radio"] = gr.Radio(
@@ -355,17 +326,15 @@ class App(BaseApp):
     # Helpers
     # --------------------------------------------------------------------------
     @staticmethod
-    def _show_scraper_settings(
-        service: str, session_state: SessionState
-    ) -> Tuple[dict[str, Any], dict[str, Any], SessionState]:
+    def _show_scraper_service_settings(service_usage: bool, session_state: SessionState) -> Tuple[dict[str, Any], dict[str, Any], SessionState]:
         """Show the settings for the selected scraper service."""
-        logger.debug(f"show service={service} settings")
-        if service == "scraperapi":
-            return gr.update(visible=True), gr.update(visible=False), session_state
-        elif service == "scrapingfish":
-            raise gr.Error("ScrapingFish is not supported yet")
+        session_state.use_scraper_service = service_usage
+        if service_usage:
+            logger.debug("show scraper service settings")
+            return gr.update(visible=True), session_state
         else:
-            return gr.update(visible=False), gr.update(visible=False), session_state
+            logger.debug("hide scraper service settings")
+            return gr.update(visible=False), session_state
 
     @staticmethod
     def _set_scraperapi_key(api_key: str, session_state: SessionState) -> SessionState:
@@ -373,18 +342,11 @@ class App(BaseApp):
         log_key = "*****" if api_key else "None"
         logger.debug(f"set scraperapi api_key {log_key}")
         config = {
-            "service": "scraperapi",
+            'use_service_for': USE_SCRAPING_SERVICE_FOR,
             "api_key": api_key,
             "base_url": SCRAPERAPI_BASE_URL,
         }
-        session_state.scraper_config = {"fda": config, "ema": config}
-
-
-    @staticmethod
-    def _set_scrapingfish_key(api_key: str, session_state: SessionState) -> SessionState:
-        """Setup scrapingfish api_key"""
-        logger.error("ScrapingFish is not supported yet -> set equally to __main__.get_scraper_config()")
-        raise gr.Error("ScrapingFish is not supported yet")
+        session_state.scraper_config = config
 
     @staticmethod
     def _show_llm_settings(
@@ -405,7 +367,7 @@ class App(BaseApp):
         """Setup openai api_key"""
         log_key = "*****" if api_key else "None"
         logger.debug(f"set openai api_key {log_key}")
-        session_state.model_config["openai"] = {"api_key": api_key}
+        session_state.openai_api_key = api_key
         session_state.connection_is_valid = False
         return session_state
 
@@ -415,7 +377,7 @@ class App(BaseApp):
     ) -> SessionState:
         """Setup ollama base_url"""
         logger.debug(f"set ollama base_url={base_url}")
-        session_state.model_config["ollama"] = {"base_url": base_url}
+        session_state.ollama_base_url = base_url
         session_state.connection_is_valid = False
         return session_state
 
@@ -619,7 +581,7 @@ class App(BaseApp):
     @staticmethod
     def _setup_spock(
         term: str,
-        service: str,
+        service_usage: bool,
         endpoint: str,
         source: List[str],
         max_docs_src: int,
@@ -646,7 +608,7 @@ class App(BaseApp):
         setup = Setup(
             id_=f"{term} {source} {endpoint}",
             term=term,
-            service=service,
+            service=service_usage,
             endpoint=endpoint,
             source=source,
             max_docs_src=max_docs_src,
@@ -686,7 +648,7 @@ class App(BaseApp):
             ner_queue.task_done()
 
     async def _setup_asyncio_framework(
-        self, session_state: SessionState
+        self, service_usage: bool, session_state: SessionState
     ) -> SessionState:
         """ "Start the SpoCK processes by setting up the asyncio framework and starting the asyncio tasks.
 
@@ -819,17 +781,16 @@ class App(BaseApp):
             outputs=self._components["main.details"],
         )
     
-    def _event_choose_scraper(self):
-        """Choose scraper service and show the corresponding settings."""
-        self._components["settings.scraping_radio"].change(
-            fn=self._show_scraper_settings,
+    def _event_use_scraper_service(self):
+        """Use scraper service and show the corresponding settings."""
+        self._components["settings.scraper_service_usage"].change(
+            fn=self._show_scraper_service_settings,
             inputs=[
-                self._components["settings.scraping_radio"],
+                self._components["settings.scraper_service_usage"],
                 self._session_state,
             ],
             outputs=[
-                self._components["settings.scraperapi_group"],
-                self._components["settings.scrapingfish_group"],
+                self._components["settings.scraper_service_group"],
                 self._session_state,
             ],
         )
@@ -839,14 +800,6 @@ class App(BaseApp):
         self._components["settings.scraperapi_key"].change(
             fn=self._set_scraperapi_key,
             inputs=[self._components["settings.scraperapi_key"], self._session_state],
-            outputs=self._session_state,
-        )
-
-    def _event_settings_scrapingfish(self):
-        """Callback of the scrapingfish settings."""
-        self._components["settings.scrapingfish_key"].change(
-            fn=self._set_scrapingfish_key,
-            inputs=[self._components["settings.scrapingfish_key"], self._session_state],
             outputs=self._session_state,
         )
 
@@ -963,7 +916,7 @@ class App(BaseApp):
             fn=self._setup_spock,
             inputs=[
                 search_term,
-                self._components["settings.scraping_radio"],
+                self._components["settings.scraper_service_usage"],
                 self._components["settings.llm_radio"],
                 self._components["settings.source"],
                 self._components["settings.max_docs_src"],
@@ -973,7 +926,10 @@ class App(BaseApp):
             outputs=self._session_state,
         ).then(
             fn=self._setup_asyncio_framework,
-            inputs=self._session_state,
+            inputs=[
+                self._components["settings.scraper_service_usage"],
+                self._session_state,
+            ],
             outputs=self._session_state,
         ).then(
             fn=lambda: None,
@@ -1091,9 +1047,8 @@ class App(BaseApp):
         self._event_timer()
 
         # Settings events
-        self._event_choose_scraper()
+        self._event_use_scraper_service()
         self._event_settings_scraperapi()
-        self._event_settings_scrapingfish()
         self._event_choose_llm()
         self._event_settings_ollama()
         self._event_settings_openai()

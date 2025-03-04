@@ -13,8 +13,8 @@ GRADIO_UPDATE_INTERVAL = 2
 
 # Scraping settings
 SCRAPING_SOURCES = ["pubmed", "ema", "mhra", "fda"]
-# SCRAPING_ENDPOINTS = ['scraperapi', 'scrapingfish']
-SCRAPING_ENDPOINTS = ['scraperapi']
+SCRAPING_SERVICE = 'ScraperAPI'
+USE_SCRAPING_SERVICE_FOR = ['fda', 'ema']
 SCRAPERAPI_BASE_URL = 'https://api.scraperapi.com/'
 SCRAPINGFISH_BASE_URL = "https://scraping.narf.ai/api/v1/"
 MAX_CHUNK_SIZE = 500

@@ -5,11 +5,11 @@ import asyncio
 import logging
 import os
 import re
-from typing import List
+from typing import List, Dict, Any
 
 from openai import AsyncOpenAI
 
-from vianu.spock.src.base import NamedEntity, QueueItem  # noqa: F401
+from vianu.spock.src.base import Setup, NamedEntity, QueueItem  # noqa: F401
 from vianu.spock.settings import (
     N_CHAR_DOC_ID,
     LLAMA_MODEL,
@@ -246,28 +246,24 @@ class NERFactory:
     """Factory for NER models."""
 
     @staticmethod
-    def create(endpoint: str, config: dict) -> NER:
-        """Create a NER model from the `model` keyword."""
-
+    def create(setup: Setup) -> NER:
+        """Create a NER model."""
+        endpoint = setup.endpoint
         # create a :class:`OpenAINER` instance
         if endpoint == "openai":
-            api_key = config[endpoint].get("api_key")
+            api_key = setup.openai_api_key
             if api_key is None:
-                api_key = os.environ.get("OPENAI_API_KEY")
-            if api_key is None:
-                raise ValueError(
-                    "The api_key for the OpenAI client is missing (set it by the OPENAI_API_KEY environment variable or in the settings)"
-                )
+                raise ValueError("The api_key for the OpenAI client is missing")
             ner = OpenAINER(model=OPENAI_MODEL, api_key=api_key)
 
         # create a :class:`OllamaNER` instance
         elif endpoint == "ollama":
-            base_url = config[endpoint].get("base_url")
-            if base_url is None:
-                base_url = os.environ.get("OLLAMA_BASE_URL")
+            base_url = setup.llama_base_url
             if base_url is None:
                 raise ValueError("The base_url for the ollama endpoint is missing")
             ner = OllamaNER(model=LLAMA_MODEL, base_url=base_url)
+
+        # no further models available
         else:
             raise ValueError(f"unknown ner model '{endpoint}'")
 
@@ -275,16 +271,13 @@ class NERFactory:
 
 
 def create_tasks(
-    args_: Namespace,
+    setup: Setup,
     queue_in: asyncio.Queue,
     queue_out: asyncio.Queue,
-    model_config: dict,
 ) -> List[asyncio.Task]:
     """Create asyncio NER tasks."""
-    n_ner_tasks = args_.n_ner_tasks
-    endpoint = args_.endpoint
-    ner = NERFactory.create(endpoint=endpoint, config=model_config)
-
+    ner = NERFactory.create(setup=setup)
+    n_ner_tasks = setup.n_ner_tasks
     logger.info(f"setting up {n_ner_tasks} NER task(s)")
     tasks = [
         asyncio.create_task(ner.apply(queue_in=queue_in, queue_out=queue_out))
