@@ -18,3 +18,6 @@ console_handler.setFormatter(formatter)
 
 # Add the handler to the logger
 logger.addHandler(console_handler)
+
+# Prevent logs from propagating to the root logger
+logger.propagate = False

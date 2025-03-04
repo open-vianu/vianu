@@ -37,7 +37,7 @@ class FraudCrawlerClient:
             api_key=zyteapi_key, max_retries=max_retries, retry_delay=retry_delay
         )
         self._enricher = KeywordEnricher(
-            serpapi_key=serpapi_key, zyte_api_key=zyteapi_key, location=location
+            serpapi_key=serpapi_key, location=location
         )
         self._processor = Processor(location=location)
         self._classifier_suspiciousness= ClassifySuspiciousProduct(openai_api_key=openai_api_key)
